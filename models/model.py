@@ -505,7 +505,6 @@ class TicketAttachmentModel(Base):
     uploaded_by = Column(Integer, ForeignKey('customers.id'), nullable=False)
     uploaded_at = Column(DateTime, default=func.now())
     user = relationship('CustomerModel', backref='attachments')
-
 class LoanModel(Base):
     __tablename__ = 'loans'
     
