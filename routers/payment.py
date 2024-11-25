@@ -1,0 +1,275 @@
+from fastapi import APIRouter
+from fastapi import (
+    Depends,
+    status,
+    Response,
+    Request,
+    BackgroundTasks,
+)
+from sqlalchemy.orm import Session
+from utils.constant import *
+from typing import Annotated
+from utils.dependencies import getSystemSetting, get_current_user,validateTransactionPIN
+from services import productservice,paymentservice
+from utils.database import get_db
+import logging
+from schemas.payment import *
+from schemas.customer import Customer,CreatePINRequest
+from schemas.setting import Setting
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(tags=["payments"])
+
+@router.post("/enquiry",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,)
+async def wallet_enquiry(
+    payload: CreatePINRequest,
+    request: Request,
+    responses: Response,
+    user: Annotated[Customer, Depends(get_current_user)],
+    Setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        if user:
+            validated_data = CreatePINRequest(**payload.model_dump())
+            if updateUserPIN(
+                db=db, userId=user.id, pin=get_password_hash(validated_data.pin)
+            ):
+                email_template = "createpin.html"
+                email_body = templates.TemplateResponse(
+                    email_template,
+                    {"request": request, "user": user},
+                )
+                background_task.add_task(
+                    util.mailer,
+                    str(email_body.body, "utf-8"),
+                    setting=Setting,
+                    subject="Create PIN",
+                    toAddress=user.email,
+                )
+                responses.status_code = status.HTTP_200_OK
+                return BaseResponse(
+                    statusCode=str(status.HTTP_200_OK),
+                    statusDescription=f"PIN successfully created",
+                )
+            else:
+                responses.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(
+                    statusCode=str(status.HTTP_400_BAD_REQUEST),
+                    statusDescription=SYSTEMBUSY,
+                )
+        else:
+            responses.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(
+                statusCode=str(status.HTTP_400_BAD_REQUEST),
+                statusDescription=INVALIDACCOUNT,
+            )
+    except ValidationError as e:
+        logger.error(e)
+        responses.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(e),
+        )
+    except Exception as ex:
+        logger.error(ex)
+        responses.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.post("/transfer",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,)
+async def wallet_payment(
+    payload: CreatePINRequest,
+    request: Request,
+    responses: Response,
+    user: Annotated[Customer, Depends(get_current_user)],
+    Setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        if user:
+            validated_data = CreatePINRequest(**payload.model_dump())
+            if updateUserPIN(
+                db=db, userId=user.id, pin=get_password_hash(validated_data.pin)
+            ):
+                email_template = "createpin.html"
+                email_body = templates.TemplateResponse(
+                    email_template,
+                    {"request": request, "user": user},
+                )
+                background_task.add_task(
+                    util.mailer,
+                    str(email_body.body, "utf-8"),
+                    setting=Setting,
+                    subject="Create PIN",
+                    toAddress=user.email,
+                )
+                responses.status_code = status.HTTP_200_OK
+                return BaseResponse(
+                    statusCode=str(status.HTTP_200_OK),
+                    statusDescription=f"PIN successfully created",
+                )
+            else:
+                responses.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(
+                    statusCode=str(status.HTTP_400_BAD_REQUEST),
+                    statusDescription=SYSTEMBUSY,
+                )
+        else:
+            responses.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(
+                statusCode=str(status.HTTP_400_BAD_REQUEST),
+                statusDescription=INVALIDACCOUNT,
+            )
+    except ValidationError as e:
+        logger.error(e)
+        responses.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(e),
+        )
+    except Exception as ex:
+        logger.error(ex)
+        responses.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.post("/generate/qr",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,)
+async def payment_via_QR(
+    payload: GenerateQRRequest,
+    request: Request,
+    responses: Response,
+    user: Annotated[Customer, Depends(validateTransactionPIN)],
+    Setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        if user:
+            validated_data = CreatePINRequest(**payload.model_dump())
+            if updateUserPIN(
+                db=db, userId=user.id, pin=get_password_hash(validated_data.pin)
+            ):
+                email_template = "createpin.html"
+                email_body = templates.TemplateResponse(
+                    email_template,
+                    {"request": request, "user": user},
+                )
+                background_task.add_task(
+                    util.mailer,
+                    str(email_body.body, "utf-8"),
+                    setting=Setting,
+                    subject="Create PIN",
+                    toAddress=user.email,
+                )
+                responses.status_code = status.HTTP_200_OK
+                return BaseResponse(
+                    statusCode=str(status.HTTP_200_OK),
+                    statusDescription=f"PIN successfully created",
+                )
+            else:
+                responses.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(
+                    statusCode=str(status.HTTP_400_BAD_REQUEST),
+                    statusDescription=SYSTEMBUSY,
+                )
+        else:
+            responses.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(
+                statusCode=str(status.HTTP_400_BAD_REQUEST),
+                statusDescription=INVALIDACCOUNT,
+            )
+    except ValidationError as e:
+        logger.error(e)
+        responses.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(e),
+        )
+    except Exception as ex:
+        logger.error(ex)
+        responses.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.post("/via/nfc",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,)
+async def payment_via_NFC(
+    payload: CreatePINRequest,
+    request: Request,
+    responses: Response,
+    user: Annotated[Customer, Depends(get_current_user)],
+    Setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        if user:
+            validated_data = CreatePINRequest(**payload.model_dump())
+            responses.status_code = status.HTTP_200_OK
+            return BaseResponse(
+                    statusCode=str(status.HTTP_200_OK),
+                    statusDescription=f"PIN successfully created",
+                )
+        else:
+            responses.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(
+                statusCode=str(status.HTTP_400_BAD_REQUEST),
+                statusDescription=INVALIDACCOUNT,
+            )
+    except Exception as ex:
+        logger.error(ex)
+        responses.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.post("/bills",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,)
+async def getAllBillers(
+    request: Request,
+    responses: Response,
+    user: Annotated[Customer, Depends(get_current_user)],
+    settings: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if user:
+            bill = paymentService.getAllBill(db=db)
+            logger.info(bill)
+            if bill:
+                return BillResponse.model_validate(
+                    {
+                        "statusCode": str(status.HTTP_200_OK),
+                        "statusDescription": SUCCESS,
+                        "data": bill,
+                    }
+                )
+
+        else:
+            responses.status_code = status.HTTP_400_BAD_REQUEST
+            return BillResponse(
+                statusCode=str(status.HTTP_400_BAD_REQUEST),
+                statusDescription=UNKNOWNUSER,
+            )
+    except Exception as ex:
+        logger.error(ex)
+        responses.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return BillResponse(
+            statusCode=str(status.HTTP_500_INTERNAL_SERVER_ERROR),
+            statusDescription=str(ex),
+        )

@@ -1,0 +1,539 @@
+from sqlalchemy import (
+    Boolean,
+    Column,
+    ForeignKey,
+    Integer,
+    String,
+    DateTime,
+    Enum,
+    LargeBinary,
+    Text,
+    DECIMAL,func
+)
+from sqlalchemy.orm import backref, relationship
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.dialects.mysql import LONGTEXT
+from datetime import datetime, timedelta
+import pytz
+import uuid
+
+# from utils.database import Base
+from enum import Enum as PythonEnum
+
+Base = declarative_base()
+
+
+class AccountEnum(PythonEnum):
+    INDIVIDUAL = "individual"
+    AGENT = "agent"
+    MERCHANT = "merchant"
+    AGGREGATOR = "aggregator"
+    BUSINESS = "business"
+
+
+class AccountStatusEnum(PythonEnum):
+    REG = "registration"
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    BLOCKED = "blocked"
+    DISABLED = "disabled"
+    LOCKED = "locked"
+
+
+class AccountRatingEnum(PythonEnum):
+    PLATINUM = "platinum"
+    GOLD = "gold"
+    SILVER = "silver"
+    BRONZE = "bronze"
+
+
+class POSStatusEnum(PythonEnum):
+    ACTIVE = "active"
+    BLOCKED = "blocked"
+    DISABLED = "disabled"
+    LOCKED = "locked"
+    REQUESTED = "requested"
+    PAYMENT = "payment"
+    APPROVED = "approved"
+
+
+class AdminRoleEnum(PythonEnum):
+    SUPERADMIN = "superadmin"
+    ADMIN = "admin"
+    ACCOUNTANT = "accountant"
+    AUDIT = "audit"
+    SUPPORT = "support"
+    CUSTOMER = "customer"
+    AGGREGATOR = "aggregator"
+    BUSINESS = "business"
+
+class AdminTypeEnum(PythonEnum):
+    INTERNAL = "INTERNAL"
+    EXTERNAL = "EXTERNAL"
+
+class AdminStatusEnum(PythonEnum):
+    ACTIVE = "active"
+    NOTACTIVE = "notactive"
+    PENDING = "pending"
+
+class OTPStatusEnum(PythonEnum):
+    SENT = "sent"
+    PENDING = "pending"
+    NOTSENT = "notsent"
+    OPEN = "open"
+    LOGGED = "logged"
+    CLOSED = "closed"
+
+
+class TransactionChannelEnum(PythonEnum):
+    WEB = "web"
+    MOBILE = "mobile"
+    USSD = "ussd"
+    POS = "pos"
+
+class TransactionStatusEnum(PythonEnum):
+    SUCCESS = "success"
+    PENDING = "pending"
+    PROCESSING = "processing"
+    FAILED = "failed"
+class PaymentEnum(PythonEnum):
+    DEBIT = "DEBIT"
+    CREDIT = "CREDIT"
+
+class RoleModel(Base):
+    __tablename__ = "roles"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(25), nullable=False, default="Support")
+    description = Column(String(255))
+    status = Column(Boolean, default=False)
+    admin = relationship("AdminModel",  uselist=False,back_populates="role")
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now())
+class AdminModel(Base):
+    __tablename__ = "admins"
+    id = Column(Integer, primary_key=True, index=True)
+    role_id = Column(Integer, ForeignKey("roles.id"))
+    role = relationship("RoleModel", back_populates="admin")
+    firstname = Column(String(25))
+    lastname = Column(String(25))
+    phonenumber = Column(String(13))
+    email = Column(String(255))
+    password = Column(String(255), nullable=True)
+    status = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now())
+class CustomerModel(Base):
+    __tablename__ = "customers"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(
+        String(50),
+        unique=True,
+        index=True,
+        default=lambda: str(uuid.uuid4()).replace("-", ""),
+    )
+    firstname = Column(String(25))
+    lastname = Column(String(25))
+    middlename = Column(String(25))
+    phonenumber = Column(String(13))
+    gender = Column(Boolean, default=False)
+    password = Column(String(255), nullable=True)
+    pin = Column(String(255), nullable=True)
+    email = Column(String(255),nullable=False)
+    email_verified = Column(Boolean, default=False)
+    date_of_birth = Column(String(13),nullable=True,default=f"{func.now()}")
+    bvn = Column(String(12), nullable=True)
+    nin = Column(String(13), nullable=True)
+    state_of_origin = Column(String(50), nullable=True)
+    state_of_residence = Column(String(50), nullable=True)
+    lga_of_residence = Column(String(50), nullable=True)
+    lga = Column(String(50), nullable=True)
+    profile_picture = Column(LONGTEXT, nullable=True)
+    photo = Column(LONGTEXT, nullable=True)
+    residence_address = Column(String(255), nullable=True)
+    marital_status = Column(String(50), nullable=True)
+    name_on_card = Column(String(255), nullable=True)
+    registration_date = Column(String(50), nullable=True)
+    address_submitted = Column(Boolean, default=False)
+    nin_submitted = Column(Boolean, default=False)
+    referalcode = Column(String(13), nullable=True)
+    bvn_verified = Column(Boolean, default=False)
+    nin_verified = Column(Boolean, default=False)
+    kyc_completed = Column(Boolean, default=False)
+    commission_enabled = Column(Boolean, default=False)
+    is_owner = Column(Boolean, default=True)
+    is_next_of_kin = Column(Boolean, default=False)
+    next_of_kin_name = Column(String(50), nullable=True)
+    next_of_kin_address = Column(String(100), nullable=True)
+    next_of_kin_phone = Column(String(13), nullable=True)
+    next_of_kin_relationship = Column(String(25), nullable=True)
+    aggrement = Column(String(100), nullable=True)
+    hideBalance = Column(Boolean, default=False)
+    account_status = Column(
+        Enum(AccountStatusEnum), nullable=False, default=AccountStatusEnum.REG
+    )
+    account_type = Column(
+        Enum(AccountEnum), nullable=False, default=AccountEnum.INDIVIDUAL
+    )
+    account_ratings = Column(Enum(AccountRatingEnum), default=AccountRatingEnum.BRONZE)
+    point_ratings = Column(String(13), default="5")
+    # device
+    device = relationship("DeviceModel", uselist=False, back_populates="user")
+    # wallet
+    wallet = relationship("AccountModel",  uselist=False,back_populates="user")
+    # otps
+    otps = relationship("OTPModel", backref="user")
+    # beneficiaries
+    beneficiaries = relationship("BeneficiaryModel", backref="user")
+    # notification
+    notifications = relationship('NotificationModel', secondary='user_notifications', back_populates='users')
+    preferences = relationship('UserNotificationPreference', back_populates='user')
+    user_notifications = relationship('UserNotification', back_populates='user')
+    # ticketing
+    tickets = relationship('TicketModel', backref='user')
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now())
+class BeneficiaryModel(Base):
+    __tablename__ = "beneficiaries"
+    id = Column(Integer, primary_key=True, index=True)
+    transaction_type = Column(String(50))
+    nickname = Column(String(100))
+    customerId = Column(String(50))
+    billercode = Column(String(20))
+    billername = Column(String(255), nullable=True)
+    logo = Column(Text, nullable=True)
+    user_id = Column(Integer, ForeignKey("customers.id"))
+    updated_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now())
+class OTPModel(Base):
+    __tablename__ = "otps"
+    id = Column(Integer, primary_key=True, index=True)
+    otp = Column(String(6))
+    servicename = Column(String(255))
+    status = Column(Enum(OTPStatusEnum), nullable=False, default=OTPStatusEnum.OPEN)
+    user_id = Column(Integer, ForeignKey("customers.id"))
+    #user = relationship("CustomerModel", back_populates="otps")
+    created_at = Column(DateTime, default=func.now())
+    expired_at = Column(
+        DateTime,
+        default=func.now() + timedelta(minutes=15),
+    )
+    updated_at = Column(DateTime, default=func.now())
+class AccountModel(Base):
+    __tablename__ = "wallets"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("customers.id"))
+    user = relationship("CustomerModel", back_populates="wallet")
+    payments = relationship('PaymentModel', backref='wallet')
+    walletAccount = Column(String(11))
+    availableBalance= Column(String(50),default="0")
+    referenceNo= Column(String(11),nullable=True)
+    accountStatus= Column(String(20),default=AccountStatusEnum.ACTIVE)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now())
+class DeviceModel(Base):
+    __tablename__ = "devices"
+    id = Column(Integer, primary_key=True, index=True)
+    platformVersion = Column(String(255))
+    imeiNo = Column(String(255))
+    modelName = Column(String(255))
+    manufacturer = Column(String(255))
+    isPhysicalDevice = Column(String(255))
+    deviceName = Column(String(255))
+    apiLevel = Column(String(255))
+    user_id = Column(Integer, ForeignKey("customers.id"), unique=True)
+    user = relationship("CustomerModel", back_populates="device")
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now())
+class ProductModel(Base):
+    __tablename__ = "products"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50))
+    description = Column(String(255), nullable=True)
+    vasType = Column(String(50))
+    icon = Column(String(55), nullable=True)
+    customerField = Column(String(20), nullable=True)
+    status = Column(Boolean, default=False)
+    billers = relationship("ProductTypeModel", backref="product")
+    payments = relationship('PaymentModel', backref='product')
+    iswId = Column(String(20), nullable=True)
+    enabledInline = Column(Boolean, default=False)
+    isWeb = Column(Boolean, default=False)
+    updated_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now())
+class ProductTypeModel(Base):
+    __tablename__ = "product_types"
+    id = Column(Integer, primary_key=True, index=True)
+    billerName = Column(String(50))
+    billerId = Column(String(15))
+    paymentCode = Column(String(25), default="90501")
+    paydirectItemCode = Column(String(25), default="01")
+    billerType = Column(String(25))
+    iswCatId = Column(String(20), nullable=True)
+    iswBillerId = Column(String(20), nullable=True)
+    iswPayDirectProductId = Column(String(20), nullable=True)
+    amountType = Column(String(20), nullable=True)
+    #product = relationship("ProductModel", back_populates="products")
+    logo = Column(String(255), nullable=True)
+    customerField = Column(String(255))
+    provider = Column(String(10),default="ISW")
+    network = Column(String(255), nullable=True)
+    vat = Column(Integer, default=0)
+    maxAmountLimit = Column(Integer, default=500000)
+    minAmountLimit = Column(Integer, default=5000)
+    status = Column(Boolean, default=False)
+    hasPackages = Column(Boolean, default=False)
+    hasLookup = Column(Boolean, default=False)
+    hasAddons = Column(Boolean, default=False)
+    currencyCode = Column(String(25), default="566")
+    currencySymbol = Column(String(25), default="NGN")
+    product_id = Column(Integer, ForeignKey("products.id"))
+    packages = relationship("PackageModel", backref="product_type")
+    updated_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now())
+class PackageModel(Base):
+    __tablename__ = "packages"
+    id = Column(Integer, primary_key=True, index=True)
+    product_type_id = Column(Integer, ForeignKey("product_types.id"))
+    #biller = relationship("ProductTypeModel", back_populates="packages")
+    billerId = Column(String(15))
+    description = Column(String(150))
+    amount = Column(String(50), default="0")
+    validity = Column(String(50), nullable=True)
+    packageCode = Column(String(50))
+    paymentCode = Column(String(25), default="90501")
+    paydirectItemCode = Column(String(25), default="01")
+    currencyCode = Column(String(25), default="566")
+    currencySymbol = Column(String(25), default="NGN")
+    status = Column(Boolean, default=False)
+    hasValidity = Column(Boolean, default=False)
+    updated_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now())
+class TransactionModel(Base):
+    __tablename__ = "transactions"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("customers.id"))
+    terminalId = Column(String(25), nullable=True)
+    transactionId = Column(String(255), default=uuid.uuid4())
+    channel = Column(
+        Enum(TransactionChannelEnum),
+        nullable=False,
+        default=TransactionChannelEnum.MOBILE,
+    )
+    status = Column(
+        Enum(TransactionStatusEnum),
+        nullable=False,
+        default=TransactionStatusEnum.PENDING,
+    )
+    isDebit = Column(Boolean, default=True)
+    remarks = Column(String(255), nullable=True)
+    reference = Column(String(255), nullable=True)
+    customerBillerId = Column(String(255), nullable=True)
+    amount = Column(String(255), nullable=True)
+    product = Column(String(255), nullable=True)
+    transactionType = Column(String(255), nullable=True)
+    transactionStatus = Column(String(255), nullable=True)
+    recipientId = Column(String(255), nullable=True)
+    recipientAccountNumber = Column(String(255), nullable=True)
+    recipientBank = Column(String(255), nullable=True)
+    recipientName = Column(String(255), nullable=True)
+    senderName = Column(String(255), nullable=True)
+    cardRRN = Column(String(255), nullable=True)
+    cardPan = Column(String(255), nullable=True)
+    provider = Column(String(255), nullable=True)
+    btcode = Column(String(5), nullable=True)
+    cashbackFee = Column(DECIMAL(10, 2), default=0.0)
+    serviceFee = Column(DECIMAL(10, 2), default=0.0)
+    accountImpacted = Column(Boolean,default=False)
+    updated_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now())
+class PaymentModel(Base):
+    __tablename__ = 'payments'
+    
+    id = Column(Integer, primary_key=True)
+    amount = Column(String(50), nullable=False)
+    payment_type = Column(Enum(PaymentEnum), nullable=False, default=PaymentEnum.DEBIT)
+    #payment_type = Column(Enum(PaymentEnum), nullable=False, default=PaymentEnum.DEBIT)
+    wallet_id = Column(Integer, ForeignKey('wallets.id'), nullable=False)
+    product_id = Column(Integer, ForeignKey('products.id'), nullable=False)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now())
+    payment_date = Column(DateTime, nullable=False)
+    principal_amount = Column(String(50), nullable=False)  # Portion of payment towards principal
+    interest_amount = Column(String(50), nullable=False)  # Portion of payment towards interest
+    #paidloan = relationship('Loan', backref='payments')
+class BankModel(Base):
+    __tablename__ = "banks"
+    id = Column(Integer, primary_key=True, index=True)
+    cbnCode = Column(String(10))
+    shortname = Column(String(10))
+    longname = Column(String(255))
+    status = Column(Boolean, default=False)
+    code = Column(String(5), nullable=True)
+    nubancode = Column(String(10), nullable=True)
+    sortcode = Column(String(10), nullable=True)
+    ussdCode = Column(String(50), nullable=True)
+    meta1 = Column(String(100), nullable=True)
+    meta2 = Column(String(100), nullable=True)
+    logo = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now())
+class SettingsModel(Base):
+    __tablename__ = "settings"
+    id = Column(Integer, primary_key=True, index=True)
+    app_name = Column(String(255), default="SMART TAP API")
+    channel_name = Column(String(50), default="smart_tap")
+    debug = Column(Boolean, default=True)
+    db_url = Column(String(100), default="")
+    mail_username = Column(String(50), nullable=True)
+    mail_password = Column(String(50), nullable=True)
+    mail_from = Column(String(50), nullable=True)
+    mail_port = Column(String(9), nullable=True)
+    mail_server = Column(String(50), nullable=True)
+    mail_from_name = Column(String(50), nullable=True)
+    allowed_hosts = Column(String(255), nullable=True)
+    allowed_origins = Column(String(255), nullable=True)
+    access_token_expire_minutes = Column(Integer, nullable=True)
+    secret_key = Column(String(250), nullable=True)
+    algorithm = Column(String(250), nullable=True)
+    vanso_url = Column(String(250), nullable=True)
+    vanso_username = Column(String(250), nullable=True)
+    vanso_password = Column(String(250), nullable=True)
+    senderid = Column(String(250), nullable=True)
+    isw_qa_url = Column(String(250), nullable=True)
+    isw_qa_terminalid = Column(String(250), nullable=True)
+    isw_qa_clientid = Column(String(250), nullable=True)
+    isw_qa_secret = Column(String(250), nullable=True)
+    isw_k8_url = Column(String(250), nullable=True)
+    focus_code = Column(String(8), default="0093")
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now())
+class NotificationModel(Base):
+    __tablename__ = "notifications"
+    id = Column(Integer, primary_key=True, index=True)
+    type = Column(String(50), default="APP")
+    title = Column(String(150), nullable=False)
+    message = Column(Text, default="0")
+    isRead = Column(Boolean, default=False)
+    users = relationship('CustomerModel', secondary='user_notifications', back_populates='notifications')
+    user_notifications = relationship('UserNotification', back_populates='notification')
+    updated_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now())
+class UserNotificationPreference(Base):
+    __tablename__ = 'user_notification_preferences'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('customers.id'), nullable=False)
+    #notification_type_id = Column(Integer, ForeignKey('notification_types.id'), nullable=False)
+    receive_via_email = Column(Boolean, default=True)
+    receive_via_sms = Column(Boolean, default=False)
+    receive_in_app = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
+    user = relationship('CustomerModel', back_populates='preferences')
+    #notification_type = relationship('NotificationType')
+class UserNotification(Base):
+    __tablename__ = 'user_notifications'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('customers.id'), nullable=False)
+    notification_id = Column(Integer, ForeignKey('notifications.id'), nullable=False)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=func.now())
+    user = relationship('CustomerModel', back_populates='user_notifications')
+    notification = relationship('NotificationModel', back_populates='user_notifications')
+class TicketModel(Base):
+    __tablename__ = 'tickets'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('customers.id'), nullable=False)  # Creator of the ticket
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True)  # Assigned support agent
+    category_id = Column(Integer, ForeignKey('ticket_categories.id'), nullable=False)
+    status_id = Column(Integer, ForeignKey('ticket_statuses.id'), nullable=False)
+    priority_id = Column(Integer, ForeignKey('ticket_priorities.id'), nullable=False)
+    subject = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    #agent=relationship("AdminModel", back_populates="tickets")
+    #creator=relationship("Customer", back_populates="tickets")
+    category = relationship('TicketCategoryModel', backref='tickets')
+    status = relationship('TicketStatusModel', backref='tickets')
+    priority = relationship('TicketPriorityModel', backref='tickets')
+    comments = relationship('TicketCommentModel', backref='ticket', cascade='all, delete-orphan')
+    attachments = relationship('TicketAttachmentModel', backref='ticket', cascade='all, delete-orphan')
+class TicketCategoryModel(Base):
+    __tablename__ = 'ticket_categories'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), unique=True, nullable=False)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+class TicketStatusModel(Base):
+    __tablename__ = 'ticket_statuses'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), unique=True, nullable=False)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+class TicketPriorityModel(Base):
+    __tablename__ = 'ticket_priorities'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), unique=True, nullable=False)
+    level = Column(Integer, nullable=False)  # e.g., 1 for Low, 2 for Medium, etc.
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+class TicketCommentModel(Base):
+    __tablename__ = 'ticket_comments'
+    
+    id = Column(Integer, primary_key=True)
+    ticket_id = Column(Integer, ForeignKey('tickets.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey('customers.id'), nullable=False)  # Comment author
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True)
+    comment = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=func.now())
+    user = relationship('CustomerModel', backref='comments')
+    agent = relationship('AdminModel', backref='comments')
+class TicketAttachmentModel(Base):
+    __tablename__ = 'ticket_attachments'
+    
+    id = Column(Integer, primary_key=True)
+    ticket_id = Column(Integer, ForeignKey('tickets.id'), nullable=False)
+    file_path = Column(String(255), nullable=False)
+    uploaded_by = Column(Integer, ForeignKey('customers.id'), nullable=False)
+    uploaded_at = Column(DateTime, default=func.now())
+    user = relationship('CustomerModel', backref='attachments')
+
+class LoanModel(Base):
+    __tablename__ = 'loans'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('customers.id'), nullable=False)
+    loan_type_id = Column(Integer, ForeignKey('loan_types.id'), nullable=False)
+    principal_amount = Column(String(50), nullable=False)  # Original loan amount
+    interest_rate = Column(String(50), nullable=False)  # Annual interest rate
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime, nullable=False)
+    status_id = Column(Integer, ForeignKey('loan_statuses.id'), nullable=False)
+    created_at = Column(DateTime, default=func.now())
+    type = relationship('LoanTypeModel', backref='loans')
+    user = relationship('CustomerModel', backref='loans')
+    status = relationship('LoanStatusModel', backref='loans')
+class LoanTypeModel(Base):
+    __tablename__ = 'loan_types'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), nullable=False, unique=True)
+    description = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+class LoanStatusModel(Base):
+    __tablename__ = 'loan_statuses'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), nullable=False, unique=True)
+    description = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
