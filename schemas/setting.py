@@ -42,5 +42,12 @@ class AppSetting(BaseSettings):
     access_token_expire_minutes: int
     secret_key: str
     algorithm: str
+    mail_from_address:str
+    mail_to_address:str
+    mail_cc_address:str
+    mail_host:str
+    mail_port:str
+    mail_username:str
+    mail_password:str
 
     model_config = SettingsConfigDict(env_file=".env")
