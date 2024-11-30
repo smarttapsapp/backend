@@ -9,6 +9,7 @@ class SettingBase(BaseModel):
     access_token_expire_minutes: int
     secret_key:  Union[str, None] = None
     algorithm:  Union[str, None] = None
+    mail_username: Union[str, None] = None
     mail_password: Union[str, None] = None
     mail_from: Union[str, None] = None
     mail_port: Union[str, None] = None
@@ -42,12 +43,5 @@ class AppSetting(BaseSettings):
     access_token_expire_minutes: int
     secret_key: str
     algorithm: str
-    mail_from_address:str
-    mail_to_address:str
-    mail_cc_address:str
-    mail_host:str
-    mail_port:str
-    mail_username:str
-    mail_password:str
 
     model_config = SettingsConfigDict(env_file=".env")
