@@ -95,9 +95,12 @@ def verifyAccountOpening(
             logger.info(latest)
             current_datetime = datetime.now()
             if latest.expired_at >= current_datetime:
+                wallet = AccountModel(user_id=user.id,walletAccount=util.formatPhoneShort(user.phonenumber),availableBalance="0",referenceNo=util.formatPhoneShort(user.phonenumber),accountStatus=AccountStatusEnum.ACTIVE.value,created_at = datetime.now(),updated_at = datetime.now())
                 user.updated_at = current_datetime
                 user.account_status = AccountStatusEnum.ACTIVE
                 user.email_verified = True
+                user.wallet = wallet
+                user.date_of_birth = str(datetime.now().date())
                 verifiedUser = authQuery.create_account(db=db,user=user)
                 if verifiedUser:
                     return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,)

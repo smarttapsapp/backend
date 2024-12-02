@@ -31,7 +31,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         request_end_time = time.time()
         process_time = request_end_time - request_start_time
         logging.info(f"Response status: {response.status_code}")
-        logging.info(f"Response Body: {response_body.decode('utf-8')}")
+        logging.info(f"Response Body: {response_body}")
         #logging.info(f"Response Body: {b''.join(response_body).decode('utf-8')}")
         logging.info(f"Processed in {process_time:.4f} seconds")
 

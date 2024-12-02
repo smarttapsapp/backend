@@ -38,9 +38,9 @@ def createAccount(
             return createUserAccount(db=db,setting=setting,payload=payload,background_task=background_task,request=request,response=response)
     except Exception as ex:
         logger.info(ex)
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(
-                    statusCode=str(status.HTTP_503_SERVICE_UNAVAILABLE),
+                    statusCode=str(status.HTTP_400_BAD_REQUEST),
                     statusDescription=SYSTEMBUSY,
                 )
 def authenticate_user(
@@ -111,10 +111,10 @@ async def resetPasswordInitiate(
             )
     except Exception as ex:
         logger.info(ex)
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse.model_validate(
             {
-                "statusCode": str(status.HTTP_503_SERVICE_UNAVAILABLE),
+                "statusCode": str(status.HTTP_400_BAD_REQUEST),
                 "statusDescription": SYSTEMBUSY,
             }
         )
@@ -133,25 +133,14 @@ async def verifyAccountOpening(
             logger.info(latestOTP)
             current_datetime = datetime.now()
             if latestOTP.expired_at >= current_datetime:
-                return BaseResponse(
-                                        statusCode=str(status.HTTP_200_OK),
-                                        statusDescription=f"Account already created",
-                                    )
+                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=f"Account already created",)
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(
-                    statusCode=str(status.HTTP_400_BAD_REQUEST),
-                    statusDescription="User OTP failed or expired",
-                )
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="User OTP failed or expired",)
     except Exception as ex:
         logger.info(ex)
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        return BaseResponse.model_validate(
-            {
-                "statusCode": str(status.HTTP_503_SERVICE_UNAVAILABLE),
-                "statusDescription": SYSTEMBUSY,
-            }
-        )
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription= SYSTEMBUSY)
 def createUserAccount(db: Session,setting: Setting,payload: CustomerRequest, background_task: BackgroundTasks, request: Request,response: Response):
     try:
         logger.info("started getting bvn records from bvn provider")
