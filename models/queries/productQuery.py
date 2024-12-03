@@ -23,3 +23,12 @@ def get_single_biller_by_id(db: Session, id: int):
 
 def get_single_biller_by_billerId(db: Session, billerId: str):
     return db.query(ProductTypeModel).filter(ProductTypeModel.billerId == billerId).first()
+
+def query_bus_routes(db: Session, departure: str, arrival: str, searchType: str):
+    return db.query(ParkModel).filter(ParkModel.address.like(f"%{departure}%")).filter(ParkModel.address.like(f"%{arrival}%")).all()
+def query_bus_routes_no_type(db: Session, departure: str, arrival: str):
+    return db.query(ParkModel).filter(ParkModel.address.like(f"%{departure}%")).filter(ParkModel.address.like(f"%{arrival}%")).all()
+def query_bus_routes_departure(db: Session, departure: str, arrival: str, searchType: str):
+    return db.query(ParkModel).filter(ParkModel.address.like(f"%{departure}%")).filter(ParkModel.address.like(f"%{arrival}%")).all()
+def query_bus_routes_arrival(db: Session, departure: str, arrival: str, searchType: str):
+    return db.query(ParkModel).filter(ParkModel.address.like(f"%{departure}%")).filter(ParkModel.address.like(f"%{arrival}%")).all()

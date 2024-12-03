@@ -22,6 +22,13 @@ from enum import Enum as PythonEnum
 
 Base = declarative_base()
 
+class MovableEnum(PythonEnum):
+    BIKE = "bike"
+    TRICYCLE = "tricycle"
+    CAR = "car"
+    BUS = "bus"
+    TRAIN = "train"
+    AEROPLANE = "plane"
 
 class AccountEnum(PythonEnum):
     INDIVIDUAL = "individual"
@@ -153,6 +160,7 @@ class CustomerModel(Base):
     marital_status = Column(String(50), nullable=True)
     name_on_card = Column(String(255), nullable=True)
     registration_date = Column(String(50), nullable=True)
+    policy = Column(String(255), nullable=True)
     address_submitted = Column(Boolean, default=False)
     nin_submitted = Column(Boolean, default=False)
     referalcode = Column(String(13), nullable=True)
@@ -534,5 +542,39 @@ class LoanStatusModel(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(50), nullable=False, unique=True)
     description = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class MovableModel(Base):
+    __tablename__ = 'movables'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False, unique=True)
+    seatCount = Column(Integer)
+    description = Column(String(255), nullable=True)
+    types = Column(Enum(MovableEnum), nullable=False, default=MovableEnum.BUS)
+    airCondition = Column(Boolean, default=False)
+    camera = Column(Boolean, default=False)
+    tv = Column(Boolean, default=False)
+    parks = relationship("ParkModel", backref="movable")
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+class ParkModel(Base):
+    __tablename__ = 'parks'
+    id = Column(Integer, primary_key=True)
+    movable_id = Column(Integer, ForeignKey('movables.id'), nullable=True) 
+    name = Column(String(150), nullable=False)
+    parkImage = Column(String(255), nullable=True)
+    address = Column(String(255), nullable=True)
+    contact = Column(String(50), nullable=True)
+    startingPoint = Column(String(100), nullable=True)
+    destination = Column(String(100), nullable=True)
+    price = Column(String(25), nullable=True)
+    estimatedDeparture = Column(DateTime, nullable=True)
+    estimatedArrival = Column(DateTime,nullable=True)
+    description = Column(String(255), nullable=True)
+    policy = Column(String(255), nullable=True)
+    status = Column(Boolean, default=False)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
