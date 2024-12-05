@@ -15,8 +15,6 @@ class AccountRequest(AccountBase):
     user: Union[List[str], None] = None
 
 class Account(AccountBase):
-    isRead: Union[bool, None] = False
-    id: Optional[int]
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 

@@ -59,36 +59,39 @@ async def get_customer_profile(
             statusDescription=SYSTEMBUSY,
         )
 @router.get(
-    "/balance",
+    "/balance{walletAccount}",
     response_model=BaseResponse,
     response_model_exclude_unset=True,
 )
 async def get_customer_balance(
+    walletAccount:str,
     request: Request,
-    responses: Response,
+    response: Response,
     user: Annotated[Customer, Depends(verified_user)],
-    Setting: Annotated[Setting, Depends(getSystemSetting)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
 ):
     try:
         if user:
-            return await authservice.generateAndSendOTP(
+            return customerservice.balance(
+                wallet=walletAccount,
+                request=request,
+                response=response,
+                setting=setting,
                 db=db,
-                userId=user.id,
-                setting=Setting,
+                userId=user,
                 background_task=background_task,
-                response=responses
             )
         else:
-            responses.status_code = status.HTTP_400_BAD_REQUEST
+            response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(
                 statusCode=str(status.HTTP_400_BAD_REQUEST),
                 statusDescription=INVALIDACCOUNT,
             )
     except Exception as ex:
         logger.error(ex)
-        responses.status_code = status.HTTP_400_BAD_REQUEST
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=SYSTEMBUSY,
