@@ -70,14 +70,14 @@ def fundViaPaystack(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-def fundNotificationViaPaystack(
+async def fundNotificationViaPaystack(
     request: Request,
     db: Session,
     setting: Setting,
     response: Response,
     background_task: BackgroundTasks,):
     try:
-        json_data = request.json()
+        json_data = await request.json()
         logger.info(f"incoming payment from paystack {str(request.body())}")
         payment = paymentQuery.getPaymentByReference(db=db,reference=json_data["data"]["reference"])
         if payment:
