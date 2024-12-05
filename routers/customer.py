@@ -80,7 +80,7 @@ async def get_customer_balance(
                 response=response,
                 setting=setting,
                 db=db,
-                userId=user,
+                user=user,
                 background_task=background_task,
             )
         else:
