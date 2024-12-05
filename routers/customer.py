@@ -59,7 +59,7 @@ async def get_customer_profile(
             statusDescription=SYSTEMBUSY,
         )
 @router.get(
-    "/balance{walletAccount}",
+    "/balance/{walletAccount}",
     response_model=BaseResponse,
     response_model_exclude_unset=True,
 )
