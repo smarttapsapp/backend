@@ -5,4 +5,4 @@ from typing import Dict
 class BaseResponse(BaseModel):
     statusCode: str
     statusDescription: str
-    data: Dict = None
+    data: Dict | str = None
