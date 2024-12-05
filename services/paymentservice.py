@@ -95,21 +95,21 @@ async def fundNotificationViaPaystack(
             payment.user.hasAuthToken = True
             updatedPayment = paymentQuery.create_payment(db=db,payment=payment)
             if updatedPayment:
-                card = paymentQuery.getCardByLast4(db=db,last4=json_data["authorization"]["last4"])
+                card = paymentQuery.getCardByLast4(db=db,last4=json_data["data"]["authorization"]["last4"])
                 if card is None:
                     createCard = CardsModel(
                         user_id= payment.user_id,
-                        authorization_code=json_data["authorization"]["authorization_code"],
-                        bin=json_data["authorization"]["bin"],
-                        last4=json_data["authorization"]["last4"],
-                        exp_month=json_data["authorization"]["exp_month"],
-                        exp_year=json_data["authorization"]["exp_year"],
-                        channel=json_data["authorization"]["channel"],
-                        card_type=json_data["authorization"]["card_type"],
-                        bank=json_data["authorization"]["bank"],
-                        signature=json_data["authorization"]["signature"],
-                        account_name=json_data["authorization"]["account_name"],
-                        reusable=json_data["authorization"]["reusable"],
+                        authorization_code=json_data["data"]["authorization"]["authorization_code"],
+                        bin=json_data["data"]["authorization"]["bin"],
+                        last4=json_data["data"]["authorization"]["last4"],
+                        exp_month=json_data["data"]["authorization"]["exp_month"],
+                        exp_year=json_data["data"]["authorization"]["exp_year"],
+                        channel=json_data["data"]["authorization"]["channel"],
+                        card_type=json_data["data"]["authorization"]["card_type"],
+                        bank=json_data["data"]["authorization"]["bank"],
+                        signature=json_data["data"]["authorization"]["signature"],
+                        account_name=json_data["data"]["authorization"]["account_name"],
+                        reusable=json_data["data"]["authorization"]["reusable"],
                         created_at=datetime.now(),
                         updated_at=datetime.now(),
                     )
