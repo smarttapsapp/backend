@@ -9,7 +9,7 @@ from fastapi import (
 from sqlalchemy.orm import Session
 from utils.constant import *
 from typing import Annotated
-from utils.dependencies import getSystemSetting, get_current_user,validateTransactionPIN
+from utils.dependencies import getSystemSetting, verified_user,validateTransactionPIN
 from services import productservice,paymentservice
 from utils.database import get_db
 import logging
@@ -28,7 +28,7 @@ async def wallet_enquiry(
     payload: CreatePINRequest,
     request: Request,
     responses: Response,
-    user: Annotated[Customer, Depends(get_current_user)],
+    user: Annotated[Customer, Depends(verified_user)],
     Setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
@@ -89,7 +89,7 @@ async def wallet_payment(
     payload: CreatePINRequest,
     request: Request,
     responses: Response,
-    user: Annotated[Customer, Depends(get_current_user)],
+    user: Annotated[Customer, Depends(verified_user)],
     Setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
@@ -211,7 +211,7 @@ async def payment_via_NFC(
     payload: CreatePINRequest,
     request: Request,
     responses: Response,
-    user: Annotated[Customer, Depends(get_current_user)],
+    user: Annotated[Customer, Depends(verified_user)],
     Setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
@@ -243,7 +243,7 @@ async def payment_via_NFC(
 async def getAllBillers(
     request: Request,
     responses: Response,
-    user: Annotated[Customer, Depends(get_current_user)],
+    user: Annotated[Customer, Depends(verified_user)],
     settings: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
 ):
@@ -271,5 +271,48 @@ async def getAllBillers(
         responses.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         return BillResponse(
             statusCode=str(status.HTTP_500_INTERNAL_SERVER_ERROR),
+            statusDescription=str(ex),
+        )
+
+@router.post("/fund",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,)
+async def fund_wallet(
+    payload: FundRequest,
+    request: Request,
+    response: Response,
+    user: Annotated[Customer, Depends(verified_user)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        if user:
+            return paymentservice.fundViaPaystack(user=user,request=request,db=db,response=response,setting=setting,amount=payload.amount)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+
+@router.post("/notification",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,)
+async def fund_notifications(
+    request: Request,
+    response: Response,
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return paymentservice.fundNotificationViaPaystack(request=request,db=db,response=response,setting=setting,background_task=background_task)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )

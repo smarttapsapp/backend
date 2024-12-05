@@ -2,7 +2,7 @@
 import logging
 from sqlalchemy.orm import Session
 from models.model import *
-from models.queries import authQuery
+from models.queries import paymentQuery,authQuery
 from datetime import datetime,timedelta
 from schemas import otp
 from utils import util
@@ -19,6 +19,112 @@ from fastapi import (
 
 logger = logging.getLogger(__name__)
 
+def fundViaPaystack(
+        user:Customer,
+        request: Request,
+        db: Session,
+        response: Response,
+        setting: Setting,amount:str):
+    try:
+        payment = PaymentModel(
+            wallet_id = user.wallet.id,
+            user_id = user.id,
+            amount = amount,
+            payment_type = PaymentEnum.CREDIT,
+            created_at = datetime.now(),
+            updated_at= datetime.now(),
+        )
+        createdPayment = paymentQuery.create_payment(db=db,payment=payment)
+        appResponse = None
+        if createdPayment:
+            headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
+            params = {"email": user.email,"amount": amount}
+            result = util.httpV2(setting.paystack_url,params=params,headers=headers)
+            logger.info(result)
+            if result.status_code == 200:
+                paystackResponse = result.json()
+                if paystackResponse and paystackResponse["status"] is True:
+                    createdPayment.reference = paystackResponse["data"]["reference"]
+                    createdPayment.access_code = paystackResponse["data"]["access_code"]
+                    createdPayment.statusCode = str(status.HTTP_200_OK)
+                    createdPayment.statusMessage = paystackResponse["message"]
+                    appResponse = BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=paystackResponse["message"],data=paystackResponse["data"])
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    createdPayment.statusCode = str(status.HTTP_400_BAD_REQUEST)
+                    createdPayment.statusMessage = paystackResponse["message"]
+                    appResponse = BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse["message"])
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                createdPayment.statusCode = str(status.HTTP_400_BAD_REQUEST)
+                createdPayment.statusMessage = "Failed"
+                appResponse = BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed")
+            createdPayment.event = "initialize"
+            updatePayment = paymentQuery.create_payment(db=db,payment=createdPayment)
+            if updatePayment:
+                return appResponse
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed")
+        else:
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed")
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+def fundNotificationViaPaystack(
+    request: Request,
+    db: Session,
+    setting: Setting,
+    response: Response,
+    background_task: BackgroundTasks,):
+    try:
+        json_data = request.json()
+        logger.info(f"incoming payment from paystack {str(request.body())}")
+        payment = paymentQuery.getPaymentByReference(db=db,reference=json_data["data"]["reference"])
+        if payment:
+            payment.event = json_data["event"]
+            payment.channel = json_data["data"]["channel"]
+            payment.payment_date = json_data["data"]["channel"]
+            payment.status = json_data["data"]["status"]
+            payment.fee = json_data["data"]["fees"]
+            payment.paystack_id = json_data["data"]["id"]
+            payment.payment_date = json_data["data"]["paid_at"]
+            payment.balanceBefore = payment.wallet.availableBalance
+            payment.balanceAfter = str(int(payment.wallet.availableBalance)+int(json_data["data"]["amount"]))
+            payment.wallet.availableBalance = str(int(payment.wallet.availableBalance)+int(json_data["data"]["amount"]))
+            payment.updated_at = datetime.now()
+            payment.user.hasAuthToken = True
+            updatedPayment = paymentQuery.create_payment(db=db,payment=payment)
+            if updatedPayment:
+                card = paymentQuery.getCardByLast4(db=db,last4=json_data["authorization"]["last4"])
+                if card is None:
+                    createCard = CardsModel(
+                        user_id= payment.user_id,
+                        authorization_code=json_data["authorization"]["authorization_code"],
+                        bin=json_data["authorization"]["bin"],
+                        last4=json_data["authorization"]["last4"],
+                        exp_month=json_data["authorization"]["exp_month"],
+                        exp_year=json_data["authorization"]["exp_year"],
+                        channel=json_data["authorization"]["channel"],
+                        card_type=json_data["authorization"]["card_type"],
+                        bank=json_data["authorization"]["bank"],
+                        signature=json_data["authorization"]["signature"],
+                        account_name=json_data["authorization"]["account_name"],
+                        reusable=json_data["authorization"]["reusable"],
+                        created_at=datetime.now(),
+                        updated_at=datetime.now(),
+                    )
+                    addCard = paymentQuery.create_card(db=db,card=createCard)
+                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Unable to add fund",)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 def createAccount(
         request: Request,
         response: Response,
@@ -38,9 +144,9 @@ def createAccount(
             return createUserAccount(db=db,setting=setting,payload=payload,background_task=background_task,request=request,response=response)
     except Exception as ex:
         logger.info(ex)
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(
-                    statusCode=str(status.HTTP_503_SERVICE_UNAVAILABLE),
+                    statusCode=str(status.HTTP_400_BAD_REQUEST),
                     statusDescription=SYSTEMBUSY,
                 )
 def authenticate_user(
@@ -110,10 +216,10 @@ async def resetPasswordInitiate(
             )
     except Exception as ex:
         logger.info(ex)
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse.model_validate(
             {
-                "statusCode": str(status.HTTP_503_SERVICE_UNAVAILABLE),
+                "statusCode": str(status.HTTP_400_BAD_REQUEST),
                 "statusDescription": SYSTEMBUSY,
             }
         )
@@ -144,10 +250,10 @@ async def verifyAccountOpening(
                 )
     except Exception as ex:
         logger.info(ex)
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse.model_validate(
             {
-                "statusCode": str(status.HTTP_503_SERVICE_UNAVAILABLE),
+                "statusCode": str(status.HTTP_400_BAD_REQUEST),
                 "statusDescription": SYSTEMBUSY,
             }
         )

@@ -175,6 +175,8 @@ class CustomerModel(Base):
     next_of_kin_phone = Column(String(13), nullable=True)
     next_of_kin_relationship = Column(String(25), nullable=True)
     aggrement = Column(String(100), nullable=True)
+    authToken = Column(String(100), nullable=True)
+    hasAuthToken = Column(Boolean, default=False)
     hideBalance = Column(Boolean, default=False)
     account_status = Column(
         Enum(AccountStatusEnum), nullable=False, default=AccountStatusEnum.REG
@@ -184,12 +186,15 @@ class CustomerModel(Base):
     )
     account_ratings = Column(Enum(AccountRatingEnum), default=AccountRatingEnum.BRONZE)
     point_ratings = Column(String(13), default="5")
+    # otps
+    payments = relationship("PaymentModel", backref="user")
     # device
     device = relationship("DeviceModel", uselist=False, back_populates="user")
     # wallet
     wallet = relationship("AccountModel",  uselist=False,back_populates="user")
     # otps
     otps = relationship("OTPModel", backref="user")
+    cards = relationship("CardsModel", backref="user")
     # beneficiaries
     beneficiaries = relationship("BeneficiaryModel", backref="user")
     # notification
@@ -225,6 +230,23 @@ class OTPModel(Base):
         DateTime,
         default=func.now() + timedelta(minutes=15),
     )
+    updated_at = Column(DateTime, default=func.now())
+class CardsModel(Base):
+    __tablename__ = "cards"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("customers.id"))
+    authorization_code = Column(String(100))
+    bin= Column(String(50),default="0")
+    last4= Column(String(5),nullable=True)
+    exp_month= Column(String(3),nullable=True)
+    exp_year= Column(String(5),nullable=True)
+    channel= Column(String(10),nullable=True)
+    card_type= Column(String(25),nullable=True)
+    bank= Column(String(25),nullable=True)
+    signature= Column(String(25),nullable=True)
+    account_name= Column(String(25),nullable=True)
+    reusable = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
 class AccountModel(Base):
     __tablename__ = "wallets"
@@ -358,16 +380,25 @@ class PaymentModel(Base):
     __tablename__ = 'payments'
     
     id = Column(Integer, primary_key=True)
+    wallet_id = Column(Integer, ForeignKey('wallets.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey("customers.id"))
     amount = Column(String(50), nullable=False)
     payment_type = Column(Enum(PaymentEnum), nullable=False, default=PaymentEnum.DEBIT)
-    #payment_type = Column(Enum(PaymentEnum), nullable=False, default=PaymentEnum.DEBIT)
-    wallet_id = Column(Integer, ForeignKey('wallets.id'), nullable=False)
+    reference = Column(String(100), nullable=True)
+    access_code = Column(String(100), nullable=True)
+    event = Column(String(100), nullable=True)
+    paystack_id = Column(String(100), nullable=True)
+    status = Column(String(25), nullable=True)
+    payment_date = Column(String(25), nullable=False)
+    channel = Column(String(25), nullable=False)
+    fee = Column(String(25), default="0")
+    statusCode = Column(String(25), default="01")
+    statusMessage = Column(String(50), default="01")
+    balanceBefore = Column(String(25), default="0")
+    balanceAfter = Column(String(25), default="0")
     product_id = Column(Integer, ForeignKey('products.id'), nullable=False)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
-    payment_date = Column(DateTime, nullable=False)
-    principal_amount = Column(String(50), nullable=False)  # Portion of payment towards principal
-    interest_amount = Column(String(50), nullable=False)  # Portion of payment towards interest
     #paidloan = relationship('Loan', backref='payments')
 class BankModel(Base):
     __tablename__ = "banks"
@@ -413,6 +444,8 @@ class SettingsModel(Base):
     isw_qa_secret = Column(String(250), nullable=True)
     isw_k8_url = Column(String(250), nullable=True)
     focus_code = Column(String(8), default="0093")
+    paystack_url = Column(String(250), nullable=True)
+    paystack_token = Column(String(250), nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
 class NotificationModel(Base):
@@ -578,3 +611,4 @@ class ParkModel(Base):
     status = Column(Boolean, default=False)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+

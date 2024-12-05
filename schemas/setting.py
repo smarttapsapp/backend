@@ -15,6 +15,8 @@ class SettingBase(BaseModel):
     mail_port: Union[str, None] = None
     mail_server:  Union[str, None] = None
     mail_from_name:  Union[str, None] = None
+    paystack_url:  Union[str, None] = None
+    paystack_token:  Union[str, None] = None
 
 
 class SettingRequest(SettingBase):

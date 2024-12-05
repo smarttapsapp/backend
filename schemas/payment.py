@@ -35,3 +35,5 @@ class PaymentsResponse(BaseResponse):
     
 class PaymentResponse(BaseResponse):
     data: Payment = None
+class FundRequest(BaseModel):
+    amount: Union[str, None] = None
