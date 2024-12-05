@@ -77,7 +77,7 @@ async def fundNotificationViaPaystack(
     response: Response,
     background_task: BackgroundTasks,):
     try:
-        json_data = await request.body()
+        json_data = await request.json()
         logger.info(f"incoming payment from paystack {str(json_data)}")
         payment = paymentQuery.getPaymentByReference(db=db,reference=json_data["data"]["reference"])
         if payment:
