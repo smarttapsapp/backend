@@ -9,6 +9,7 @@ from utils import util
 from schemas.setting import Setting
 from utils.constant import *
 from schemas.customer import *
+from schemas.payment import *
 from schemas.admin import Admin
 from fastapi import (
     status,
@@ -125,6 +126,158 @@ async def fundNotificationViaPaystack(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+def payments(request: Request,response: Response,setting: Setting,db: Session,user: Customer,startDate: str,endDate: str,transactionType: str):
+    try:
+        logger.info(
+            f"started querying payments from {startDate} to {endDate} for {transactionType}"
+        )
+        if transactionType:
+            return PaymentsResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=paymentQuery.getAllByUser(db=db,userId=user.id,start=startDate,end=endDate,transType=transactionType)
+            )
+        return PaymentsResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=paymentQuery.getAllByUser(db=db,userId=user.id,start=startDate,end=endDate,transType=transactionType)
+            )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return PaymentsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+def getPayment(
+    request: Request,
+    response: Response,
+    setting: Setting,
+    db: Session,
+    user: Admin,
+    startDate: str ,
+    endDate: str ,
+    transactionType: str ,
+):
+    try:
+        logger.info(
+            f"started transaction querying from {startDate} to {endDate} for {transactionType}"
+        )
+        if startDate and endDate and transactionType:
+            startDate_object = datetime.strptime(startDate, "%Y-%m-%d").date()
+            endDate_object = datetime.strptime(endDate, "%Y-%m-%d").date()
+            if endDate_object >= startDate_object:
+                response.status_code = status.HTTP_200_OK
+                return PaymentsResponse.model_validate(
+                    {
+                        "statusCode": str(status.HTTP_200_OK),
+                        "statusDescription": SUCCESS,
+                        "data": paymentQuery.get_all(
+                            db=db,
+                            sql=QUERYTRANSACTIONBYDATEANDTRANSTYPE.replace(
+                                "<userId>", str(user.id)
+                            )
+                            .replace("<start>", startDate)
+                            .replace("<end>", endDate)
+                            .replace("<transactionType>", transactionType),
+                        ),
+                    }
+                )
+            else:
+                response.status_code = status.HTTP_200_OK
+                return PaymentsResponse.model_validate(
+                    {
+                        "statusCode": str(status.HTTP_200_OK),
+                        "statusDescription": SUCCESS,
+                        "data": paymentQuery.get_all(
+                            db=db,
+                            sql=QUERYTRANSACTIONBYDATEANDTRANSTYPE.replace(
+                                "<userId>", str(user.id)
+                            )
+                            .replace("<start>", startDate)
+                            .replace("<end>", str(date.today()))
+                            .replace("<transactionType>", transactionType),
+                        ),
+                    }
+                )
+        elif startDate and endDate and transactionType is None:
+            response.status_code = status.HTTP_200_OK
+            return PaymentsResponse.model_validate(
+                {
+                    "statusCode": str(status.HTTP_200_OK),
+                    "statusDescription": SUCCESS,
+                    "data": paymentQuery.get_all(
+                        db=db,
+                        sql=QUERYTRANSACTIONBYDATES.replace(
+                            "<userId>", str(user.id)
+                        )
+                        .replace("<start>", startDate)
+                        .replace("<end>", endDate),
+                    ),
+                }
+            )
+        else:
+            response.status_code = status.HTTP_200_OK
+            return PaymentsResponse.model_validate(
+                {
+                    "statusCode": str(status.HTTP_200_OK),
+                    "statusDescription": SUCCESS,
+                    "data": paymentQuery.get_all(
+                        db=db,
+                        sql=QUERYTRANSACTIONS.replace("<userId>", str(user.id)),
+                    ),
+                }
+            )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return PaymentsResponse.model_validate(
+            {
+                "statusCode": str(status.HTTP_400_BAD_REQUEST),
+                "statusDescription": str(ex),
+            }
+        )
+def payment(
+    request: Request,
+    response: Response,
+    setting: Setting,
+    db: Session,
+    user: Admin,
+    transactionId: str ,
+):
+    try:
+        logger.info(f"started transaction querying for {transactionId}")
+        if transactionId:
+            response.status_code = status.HTTP_200_OK
+            return PaymentResponse.model_validate(
+                {
+                    "statusCode": str(status.HTTP_200_OK),
+                    "statusDescription": SUCCESS,
+                    "data": paymentQuery.get_one(
+                        db=db,
+                        sql=QUERYSINGLETRANSACTION.replace(
+                            "<userId>", str(user.id)
+                        ).replace("<transactionId>", transactionId),
+                    ),
+                }
+            )
+        else:
+            response.status_code = status.HTTP_200_OK
+            return PaymentResponse.model_validate(
+                {
+                    "statusCode": str(status.HTTP_200_OK),
+                    "statusDescription": UNKNOWNTRANSACTION,
+                }
+            )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return PaymentResponse.model_validate(
+            {
+                "statusCode": str(status.HTTP_400_BAD_REQUEST),
+                "statusDescription": str(ex),
+            }
+        )
+
+
+
 def createAccount(
         request: Request,
         response: Response,

@@ -25,7 +25,7 @@ def transactions(request: Request,response: Response,setting: Setting,db: Sessio
         logger.info(
             f"started querying transactions from {startDate} to {endDate} for {transactionType}"
         )
-        sleep(20)
+        sleep(5)
         if transactionType:
             return Transactions(
                 statusCode= str(status.HTTP_200_OK),
@@ -39,8 +39,8 @@ def transactions(request: Request,response: Response,setting: Setting,db: Sessio
             )
     except Exception as ex:
         logger.info(ex)
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        return Transactions(statusCode= str(status.HTTP_503_SERVICE_UNAVAILABLE),statusDescription=SYSTEMBUSY,)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return Transactions(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 def getAllTransactions(
     request: Request,
     response: Response,
@@ -122,10 +122,10 @@ def getAllTransactions(
             )
     except Exception as ex:
         logger.info(ex)
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return Transactions.model_validate(
             {
-                "statusCode": str(status.HTTP_503_SERVICE_UNAVAILABLE),
+                "statusCode": str(status.HTTP_400_BAD_REQUEST),
                 "statusDescription": str(ex),
             }
         )
@@ -163,10 +163,10 @@ def getSingleTransactions(
             )
     except Exception as ex:
         logger.info(ex)
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return SingleTransactions.model_validate(
             {
-                "statusCode": str(status.HTTP_503_SERVICE_UNAVAILABLE),
+                "statusCode": str(status.HTTP_400_BAD_REQUEST),
                 "statusDescription": str(ex),
             }
         )
