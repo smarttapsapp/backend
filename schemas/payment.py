@@ -7,17 +7,26 @@ from schemas.request import TransactionPINRequest
 
 
 class PaymentBase(BaseModel):
-    title: Union[str, None] = None
-    type: Union[str, None] = None
-    message: Union[str, None] = None
+    amount: Union[str, None] = None
+    payment_type: Union[str, None] = None
+    reference: Union[str, None] = None
+    event: Union[str, None] = None
 
 
 class PaymentRequest(PaymentBase):
     user: Union[List[str], None] = None
 
 class Payment(PaymentBase):
-    isRead: Union[bool, None] = False
     id: Optional[int]
+    statusMessage: Union[str, None] = None
+    statusCode: Union[str, None] = None
+    balanceBefore: Union[str, None] = None
+    balanceAfter: Union[str, None] = None
+    fee: Union[str, None] = None
+    channel: Union[str, None] = None
+    access_code: Union[str, None] = None
+    status: Union[str, None] = None
+    payment_date: Union[str, None] = None
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 

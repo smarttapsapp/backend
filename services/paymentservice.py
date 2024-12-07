@@ -135,7 +135,7 @@ def payments(request: Request,response: Response,setting: Setting,db: Session,us
             return PaymentsResponse(
                 statusCode= str(status.HTTP_200_OK),
                 statusDescription=SUCCESS,
-                data=paymentQuery.getAllByUser(db=db,userId=user.id,start=startDate,end=endDate,transType=transactionType)
+                data=paymentQuery.getPaymentHistories(db=db,userId=user.id,start=startDate,end=endDate,transType=transactionType)
             )
         return PaymentsResponse(
                 statusCode= str(status.HTTP_200_OK),

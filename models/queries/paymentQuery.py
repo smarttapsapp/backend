@@ -21,6 +21,9 @@ def create_card(db: Session, card: CardsModel):
 def getCardByLast4(db: Session, last4: str):
     return db.query(CardsModel).filter(CardsModel.last4 == last4).first()
 
+def getPaymentHistories(db: Session,userId:int,start:DateTime,end:DateTime,transType:str):
+    return db.query(PaymentModel).filter(PaymentModel.user_id == userId).all()
+
 def get_all_bill(db: Session):
     return db.query(ProductModel).all()
 
