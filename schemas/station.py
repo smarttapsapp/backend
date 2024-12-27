@@ -1,0 +1,28 @@
+from typing import Optional, Union,List
+from datetime import datetime
+from sqlalchemy import func
+from pydantic import BaseModel
+from schemas.response import BaseResponse
+from schemas.moveable import Movable
+
+class StationBase(BaseModel):
+    stationName: Union[str, None] = None
+    location: Union[str, None] = None
+
+class StationRequest(StationBase):
+    user: Union[List[str], None] = None
+
+class Station(StationBase):
+    id: Optional[int]
+    created_at: Union[datetime, None] = func.now()
+    updated_at: Union[datetime, None] = func.now()
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class StationsResponse(BaseResponse):
+    data: Union[List[Station],None] = None
+    
+class StationResponse(BaseResponse):
+    data: Station = None

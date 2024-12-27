@@ -22,6 +22,16 @@ from enum import Enum as PythonEnum
 
 Base = declarative_base()
 
+class TimeOfOperationEnum(PythonEnum):
+    MORNING = "Morning"
+    AFTERNOON = "Afternoon"
+    EVENING = "Evening"
+    NIGHT = "Night"
+class TrainClassEnum(PythonEnum):
+    FIRST = "first Class"
+    BUSINESS = "Business Class"
+    ADULT = "Standard Adult"
+    MINOR = "Standard Minor"
 class MovableEnum(PythonEnum):
     BIKE = "bike"
     TRICYCLE = "tricycle"
@@ -578,6 +588,83 @@ class LoanStatusModel(Base):
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
+class TrainScheduleModel(Base):
+    __tablename__ = 'train_schedule'
+    
+    id = Column(Integer, primary_key=True)
+    train_id = Column(Integer, ForeignKey('trains.id'), nullable=False)
+    schedule_id = Column(Integer, ForeignKey('schedules.id'), nullable=False)
+
+class TrainModel(Base):
+    __tablename__ = 'trains'
+    
+    id = Column(Integer, primary_key=True)
+    trainNumber = Column(String(50), nullable=False, unique=True)
+    trainName = Column(String(50), nullable=False)
+    route_id = Column(Integer, ForeignKey("routes.id"))
+    #route = relationship("RouteModel",  uselist=False,back_populates="trains")
+    schedules =  relationship("ScheduleModel", secondary="train_schedule", back_populates="trains")
+    description = Column(String(255), nullable=True)
+    seats = relationship("SeatModel", backref="train")
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+
+class RouteModel(Base):
+    __tablename__ = 'routes'
+    
+    id = Column(Integer, primary_key=True)
+    routeName = Column(String(50), nullable=True,)
+    sourceStation_id = Column(Integer, ForeignKey("stations.id"))
+    destinationStation_id = Column(Integer, ForeignKey("stations.id"))
+    sourceStation = relationship("StationModel", foreign_keys=[sourceStation_id], back_populates="depature")
+    destinationStation = relationship("StationModel", foreign_keys=[destinationStation_id], back_populates="arrival")
+    trains = relationship("TrainModel", backref="route")
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+
+class StationModel(Base):
+    __tablename__ = 'stations'
+    
+    id = Column(Integer, primary_key=True)
+    stationName = Column(String(50), nullable=False, unique=True)
+    location = Column(String(50), nullable=False)
+    description = Column(String(255), nullable=True)
+    #routes = relationship("RouteModel", backref="station")
+    depature = relationship("RouteModel", foreign_keys="RouteModel.sourceStation_id", back_populates="sourceStation")
+    arrival = relationship("RouteModel", foreign_keys="RouteModel.destinationStation_id", back_populates="destinationStation")
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+class ScheduleModel(Base):
+    __tablename__ = 'schedules'
+    
+    id = Column(Integer, primary_key=True)
+    #train_id = Column(String(50), nullable=False, unique=True)
+    #train_id = Column(Integer, ForeignKey("trains.id"))
+    #trains = relationship("TrainModel", backref="schedule")
+    trains = relationship("TrainModel", secondary="train_schedule", back_populates="schedules")
+    departureTime = Column(String(50), nullable=False)
+    arrivalTime = Column(String(255), nullable=True)
+    daysOfOperation = Column(String(255), nullable=True)
+    timeOfOperation = Column(Enum(TimeOfOperationEnum), default=TimeOfOperationEnum.MORNING)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class SeatModel(Base):
+    __tablename__ = 'seats'
+    
+    id = Column(Integer, primary_key=True)
+    train_id  = Column(Integer, ForeignKey("trains.id"))
+    seatNumber = Column(String(50), nullable=False)
+    classType = Column(Enum(TrainClassEnum), default=TrainClassEnum.ADULT)
+    availabilityStatus = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
 class MovableModel(Base):
     __tablename__ = 'movables'

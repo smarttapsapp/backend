@@ -8,6 +8,8 @@ from fastapi import (
 )
 from schemas.product import ProductsResponse
 from schemas.park import ParksResponse
+from schemas.station import StationsResponse
+from schemas.route import RoutesResponse
 from sqlalchemy.orm import Session
 from utils.constant import *
 from typing import Annotated
@@ -83,3 +85,47 @@ async def get_Bus_Routes(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return ParksResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/stations",
+    response_model=StationsResponse,
+    response_model_exclude_unset=True,)
+async def get_Train_Stations(
+    request: Request,
+    response: Response,
+    user: Annotated[Customer, Depends(verified_user)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)]
+):
+    try:
+        if user:
+            return productservice.stations(request=request,response=response,setting=setting,db=db,user=user)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return StationsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,data=[])
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return StationsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,data=[])
+@router.get("/train_search",
+    response_model=RoutesResponse,
+    response_model_exclude_unset=True,)
+async def get_Trains_Routes(
+    request: Request,
+    response: Response,
+    user: Annotated[Customer, Depends(verified_user)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    departure: str = Query(None),
+    arrival: str = Query(None),
+    seatType: str = Query("Standard Adult"),
+    timeOperation: str = Query("Morning"),
+):
+    try:
+        if user:
+            return productservice.searchTrainRoutes(request=request,response=response,setting=setting,db=db,user=user,departure=departure,arrival=arrival,seatType=seatType,operationTime=timeOperation)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

@@ -1,4 +1,4 @@
 from pydantic import BaseModel
 
-class TransactionPINRequest(BaseModel):
+class PINRequest(BaseModel):
     pin: str

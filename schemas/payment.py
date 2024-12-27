@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import func
 from pydantic import BaseModel
 from schemas.response import BaseResponse
-from schemas.request import TransactionPINRequest
+from schemas.request import PINRequest
 
 
 class PaymentBase(BaseModel):
@@ -34,7 +34,7 @@ class Payment(PaymentBase):
         from_attributes = True
         populate_by_name = True
 
-class GenerateQRRequest(TransactionPINRequest):
+class GenerateQRRequest(PINRequest):
     walletNumber: str
     amount: str
     description: str
@@ -45,4 +45,9 @@ class PaymentsResponse(BaseResponse):
 class PaymentResponse(BaseResponse):
     data: Payment = None
 class FundRequest(BaseModel):
-    amount: Union[str, None] = None
+    amount:str
+
+class BuyTicketRequest(PINRequest):
+    ticketId: int
+    walletAccount:str
+    amount: str

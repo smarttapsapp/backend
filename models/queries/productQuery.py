@@ -32,3 +32,8 @@ def query_bus_routes_departure(db: Session, departure: str, arrival: str, search
     return db.query(ParkModel).filter(ParkModel.address.like(f"%{departure}%")).filter(ParkModel.address.like(f"%{arrival}%")).all()
 def query_bus_routes_arrival(db: Session, departure: str, arrival: str, searchType: str):
     return db.query(ParkModel).filter(ParkModel.address.like(f"%{departure}%")).filter(ParkModel.address.like(f"%{arrival}%")).all()
+
+def query_stations(db: Session):
+    return db.query(StationModel).all()
+def query_train_routes(db: Session, departure: str, arrival: str, seatType: str, takeOffTime: str):
+    return db.query(RouteModel).all()

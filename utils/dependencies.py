@@ -17,7 +17,7 @@ from fastapi import Depends,Header,status
 from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from schemas.request import TransactionPINRequest
+from schemas.request import PINRequest
 
 logger = logging.getLogger(__name__)
 # initialise fast api instance
@@ -95,7 +95,7 @@ async def verified_user(
     except JWTError:
         raise credentials_exception
 async def validateTransactionPIN(
-    payload:TransactionPINRequest,
+    payload:PINRequest,
     #device: Annotated[Device, Depends(validateDevice)],
     token: str = Depends(util.oauth2_scheme),
     setting: Setting = Depends(getSystemSetting),
