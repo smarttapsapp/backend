@@ -9,6 +9,7 @@ class SeatBase(BaseModel):
     seatNumber: Union[str, None] = None
     classType: Union[str, None] = None
     availabilityStatus: Union[str, None] = None
+    price: Union[str, None] = None
 
 
 class SeatRequest(SeatBase):

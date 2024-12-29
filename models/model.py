@@ -594,7 +594,12 @@ class TrainScheduleModel(Base):
     id = Column(Integer, primary_key=True)
     train_id = Column(Integer, ForeignKey('trains.id'), nullable=False)
     schedule_id = Column(Integer, ForeignKey('schedules.id'), nullable=False)
-
+class ScheduleSeatModel(Base):
+    __tablename__ = 'seat_schedule'
+    
+    id = Column(Integer, primary_key=True)
+    seat_id = Column(Integer, ForeignKey('seats.id'), nullable=False)
+    schedule_id = Column(Integer, ForeignKey('schedules.id'), nullable=False)
 class TrainModel(Base):
     __tablename__ = 'trains'
     
@@ -602,15 +607,13 @@ class TrainModel(Base):
     trainNumber = Column(String(50), nullable=False, unique=True)
     trainName = Column(String(50), nullable=False)
     route_id = Column(Integer, ForeignKey("routes.id"))
+    image = Column(String(255), nullable=True)
     #route = relationship("RouteModel",  uselist=False,back_populates="trains")
     schedules =  relationship("ScheduleModel", secondary="train_schedule", back_populates="trains")
     description = Column(String(255), nullable=True)
     seats = relationship("SeatModel", backref="train")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-
-
 class RouteModel(Base):
     __tablename__ = 'routes'
     
@@ -623,9 +626,6 @@ class RouteModel(Base):
     trains = relationship("TrainModel", backref="route")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-
-
 class StationModel(Base):
     __tablename__ = 'stations'
     
@@ -638,7 +638,6 @@ class StationModel(Base):
     arrival = relationship("RouteModel", foreign_keys="RouteModel.destinationStation_id", back_populates="destinationStation")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
 class ScheduleModel(Base):
     __tablename__ = 'schedules'
     
@@ -647,6 +646,7 @@ class ScheduleModel(Base):
     #train_id = Column(Integer, ForeignKey("trains.id"))
     #trains = relationship("TrainModel", backref="schedule")
     trains = relationship("TrainModel", secondary="train_schedule", back_populates="schedules")
+    seats =  relationship("SeatModel", secondary="seat_schedule", back_populates="schedules")
     departureTime = Column(String(50), nullable=False)
     arrivalTime = Column(String(255), nullable=True)
     daysOfOperation = Column(String(255), nullable=True)
@@ -660,7 +660,10 @@ class SeatModel(Base):
     
     id = Column(Integer, primary_key=True)
     train_id  = Column(Integer, ForeignKey("trains.id"))
+    schedule_id  = Column(Integer, ForeignKey("schedules.id"))
+    schedules =  relationship("ScheduleModel", secondary="seat_schedule", back_populates="seats")
     seatNumber = Column(String(50), nullable=False)
+    price = Column(String(25), nullable=True)
     classType = Column(Enum(TrainClassEnum), default=TrainClassEnum.ADULT)
     availabilityStatus = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=func.now())

@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import func
 from pydantic import BaseModel
 from schemas.response import BaseResponse
+from schemas.seat import Seat
 
 
 class ScheduleBase(BaseModel):
@@ -14,6 +15,7 @@ class ScheduleRequest(ScheduleBase):
     user: Union[List[str], None] = None
 
 class Schedule(ScheduleBase):    
+    seats: Union[List[Seat],None] = None
     timeOfOperation: Union[str, None] = None
     daysOfOperation: Union[str, None] = None
     id: Optional[int]

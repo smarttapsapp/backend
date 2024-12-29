@@ -10,6 +10,7 @@ from schemas.schedule import Schedule
 class TrainBase(BaseModel):
     trainName: Union[str, None] = None
     trainNumber: Union[str, None] = None
+    image: Union[str, None] = None
 
 
 class TrainRequest(TrainBase):
