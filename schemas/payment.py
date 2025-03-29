@@ -51,3 +51,21 @@ class BuyTicketRequest(PINRequest):
     ticketId: int
     walletAccount:str
     amount: str
+class BuyTrainTicketRequest(PINRequest):
+    trainId:int
+    scheduleId: int
+    walletAccount:str
+    amount: int
+    adult:int
+    minor:int
+    tripDate:datetime
+class DebitRequest(PINRequest):
+    walletAccount:str
+    senderAccount:str
+    senderPhone: str
+    senderToken:str
+    amount: str
+    description:str
+    transactionId:str
+    transactionChannel:str
+    transactionDate:str

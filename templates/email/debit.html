@@ -1,0 +1,17 @@
+<!-- Include the footer  -->
+{% include 'include/header.html' %}
+
+<p>Dear {{user.lastname}}, {{user.firstname}}<br>
+   A debit transaction just occurred on your account <br>
+   <ul>
+    <li>ACCOUNT : {{user.wallet.walletAccount}}</li>
+    <li>AMOUNT : {{payment.amount}}</li>
+    <li>STATUS : {{payment.status}}</li>
+    <li>DESCRIPTION : {{payment.statusMessage}}</li>
+    <li>TRANSACTION REFERENCE : {{payment.reference}}</li>
+    <li>TRANSACTION DATE : {{payment.created_at}}</li>
+   </ul>
+</p>
+
+<!-- Include the footer  -->
+{% include 'include/footer.html' %}

@@ -587,7 +587,6 @@ class LoanStatusModel(Base):
     description = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
 class TrainScheduleModel(Base):
     __tablename__ = 'train_schedule'
     
@@ -653,8 +652,6 @@ class ScheduleModel(Base):
     timeOfOperation = Column(Enum(TimeOfOperationEnum), default=TimeOfOperationEnum.MORNING)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-
 class SeatModel(Base):
     __tablename__ = 'seats'
     
@@ -668,7 +665,6 @@ class SeatModel(Base):
     availabilityStatus = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
 class MovableModel(Base):
     __tablename__ = 'movables'
     id = Column(Integer, primary_key=True)
@@ -682,7 +678,6 @@ class MovableModel(Base):
     parks = relationship("ParkModel", backref="movable")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
 class ParkModel(Base):
     __tablename__ = 'parks'
     id = Column(Integer, primary_key=True)

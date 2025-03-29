@@ -116,7 +116,7 @@ async def get_Trains_Routes(
     db: Annotated[Session, Depends(get_db)],
     departure: str = Query(None),
     arrival: str = Query(None),
-    seatType: str = Query("Standard Adult"),
+    seatType: str = Query("Standard"),
     timeOperation: str = Query("Morning"),
 ):
     try:

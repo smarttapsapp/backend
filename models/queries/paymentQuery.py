@@ -5,7 +5,15 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
+def querySender(db:Session,walletAccount:str):
+    return db.query(AccountModel).filter(AccountModel.walletAccount == walletAccount).first()
+def queryLatestRecordByAmount(db:Session,amount:str):
+    return db.query(PaymentModel).filter(PaymentModel.amount == amount).first()
+def create(db: Session, model: object):
+    db.add(model)
+    db.commit()
+    db.refresh(model)
+    return model
 def create_payment(db: Session, payment: PaymentModel):
     db.add(payment)
     db.commit()
