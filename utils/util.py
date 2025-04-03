@@ -182,6 +182,9 @@ def send_sms_message(setting: Setting, toPhoneNumber: str, message: str,transact
         logger.error(str(ex))
         pass
 
+def amountToKobo(amount):
+    return str(int(float(amount) * 100))
+
 def formatPhoneWithDialingCode(msisdn):
     msisdn = msisdn.replace("+", "", 1)
     if msisdn.startswith("234") and len(msisdn) == 13:

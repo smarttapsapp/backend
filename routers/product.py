@@ -1,25 +1,28 @@
+
+import logging
+from utils.constant import *
+from typing import Annotated
 from fastapi import APIRouter
 from fastapi import (
     Depends,
     Query,
     status,
     Response,
-    Request,
+    Request,BackgroundTasks
 )
-from schemas.product import ProductsResponse
-from schemas.park import ParksResponse
-from schemas.station import StationsResponse
-from schemas.route import RoutesResponse
+from schemas.admin import Admin
+from utils.database import get_db
 from sqlalchemy.orm import Session
-from utils.constant import *
-from typing import Annotated
-from utils.dependencies import getSystemSetting, verified_user
+from schemas.park import ParksResponse
+from schemas.route import RoutesResponse
 from services import productservice
 from schemas.customer import Customer
 from schemas.setting import Setting
-from utils.database import get_db
-from schemas.admin import Admin
-import logging
+from schemas.product import ProductsResponse
+from schemas.station import StationsResponse
+from schemas.beneficiary import *
+from models.model import CustomerModel
+from utils.dependencies import getSystemSetting, verified_user,validateTransactionPIN
 
 logger = logging.getLogger(__name__)
 
@@ -129,3 +132,72 @@ async def get_Trains_Routes(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/beneficiaries/{billerType}",
+    response_model=BeneficiariesResponse,
+    response_model_exclude_unset=True,)
+async def get_beneficiaries_by_product(
+    billerType:str,
+    request: Request,
+    response: Response,
+    user: Annotated[Customer, Depends(verified_user)],
+    settings: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if user:
+            return productservice.getBeneficiaries(db=db,response=response,transType=billerType,user=user)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BeneficiariesResponse(
+                statusCode=str(status.HTTP_400_BAD_REQUEST),
+                statusDescription=UNKNOWNUSER,
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return BeneficiariesResponse(
+            statusCode=str(status.HTTP_500_INTERNAL_SERVER_ERROR),
+            statusDescription=str(ex),
+        )
+@router.post("/add-beneficiary",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,)
+async def add_beneficiary(
+    payload: AddBeneficiaryRequest,
+    request: Request,
+    response: Response,
+    user: Annotated[CustomerModel, Depends(validateTransactionPIN)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        if user:
+            return productservice.addBeneficiary(db=db,request=request,response=response,payload=payload,user=user)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex), )
+@router.delete("/delete-beneficiary/{beneficiaryId}",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,)
+async def delete_beneficiary(
+    beneficiaryId: str,
+    request: Request,
+    response: Response,
+    user: Annotated[Customer, Depends(verified_user)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        if user:
+            return productservice.deleteBeneficiary(db=db,beneficiaryId=beneficiaryId,user=user)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex), )

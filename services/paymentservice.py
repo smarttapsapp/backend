@@ -335,8 +335,6 @@ def debit(
     sender:AccountModel,
     background_task:BackgroundTasks
 ):
-    
-    
     sender.availableBalance = (int(sender.availableBalance) - int(payload.amount))
     updatedAccount = paymentQuery.create(db=db,model=sender)
     logger.info(f"balance after debit posted successfully is {updatedAccount.availableBalance}")
@@ -397,8 +395,114 @@ def debit(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)
     response.status_code = status.HTTP_400_BAD_REQUEST
-    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)
-            
+    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)            
+def billerEnquiry(
+        payload:BillNameEnquiryRequest,
+        request: Request,
+        response: Response,
+        setting: Setting,
+        db: Session,
+        user: Customer
+):
+    biller = paymentQuery.get_single_biller_by_billerId(db=db,billerId=payload.billerId)
+    if payload.customerNumber:
+        if biller:
+            package = next((x for x in biller.packages if x.packageCode == payload.packageId), None)
+            if package:
+                if biller.billerType == "utility":
+                    return BillNameEnquiryResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={
+                        "fullName":"John Doe",
+                        "address":"3, lokoja street Abuja Lagos",
+                        "minimumAmount":"1000"
+                    })
+                return BillNameEnquiryResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={
+                        "fullName":"John Doe"
+                    })
+            logger.info(f"Invalid package code selected {payload.packageId}")    
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDBILLER)
+        logger.info(f"Invalid biller selected {payload.billerId}")    
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDBILLER)
+    else:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INCOMPLETE)
+def payBills(
+        payload:BillPaymentRequest,
+        request: Request,
+        response: Response,
+        setting: Setting,
+        db: Session,
+        user: CustomerModel,
+        background_task:BackgroundTasks
+):
+    biller = paymentQuery.get_single_biller_by_billerId(db=db,billerId=payload.billerId)
+    if payload.customerNumber:
+        if biller:
+            if biller.hasPackages:
+                package = next((x for x in biller.packages if x.packageCode == payload.packageId), None)
+                if package:
+                    return debitBillPayment(biller=biller,package=package,payload=payload,request=request,response=response,setting=setting,db=db,user=user,background_task=background_task)
+                else:
+                    logger.info(f"Invalid package code selected {payload.packageId}")
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDBILLER)
+            else:
+                return debitBillPayment(biller=biller,payload=payload,request=request,response=response,setting=setting,db=db,user=user,background_task=background_task)
+        logger.info(f"Invalid biller selected {payload.billerId}")    
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDBILLER)
+    else:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INCOMPLETE)
 
-            
+def debitBillPayment(
+        biller:ProductTypeModel,
+        payload:BillPaymentRequest,
+        request: Request,
+        response: Response,
+        setting: Setting,
+        db: Session,
+        user: CustomerModel,
+        background_task:BackgroundTasks,
+        package:PackageModel=None,
+):
+    logger.info(f"Started debit process for bill payment {payload.billerId} for amount {payload.amount}")
+    #amount = int(float(payload.amount) * 100)
+    if int(user.wallet.availableBalance) > int(payload.amount):
+        logger.info(f"balance is sufficient {user.wallet.availableBalance}")
+        newBalance = int(user.wallet.availableBalance) - int(payload.amount)
+        user.wallet.availableBalance = newBalance
+        updatedUser = paymentQuery.create(db=db,model=user)
+        if updatedUser:
+            logger.info(f"Start processing payment records ...............")
+            debit = PaymentModel(
+                wallet_id = user.wallet.id,
+                user_id =user.id,
+                amount = payload.amount,
+                payment_type =PaymentEnum.DEBIT,
+                reference =f"{biller.billerName[:3]}-{util.generateId()}",
+                event = "charge.success",
+                status = "success",
+                #payment_date = datetime.now().fromisoformat(),
+                channel = "MOBILE",
+                fee = "1000",
+                statusCode = "200",
+                statusMessage = f"{biller.billerType}/{biller.billerName}/{package.packageCode if package else ''}/{payload.customerNumber}",
+                balanceBefore = user.wallet.availableBalance,
+                balanceAfter = newBalance,
+                product_id = biller.product_id,
+                created_at =datetime.now(),
+                updated_at = datetime.now()
+        )
+            createDebitRecord = paymentQuery.create(db=db,model=debit)
+            if createDebitRecord:
+                email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"payment":createDebitRecord},)
+                background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Debit Notification",toAddress=user.email)
+                logger.info(f"start credit to receiver {user.wallet.walletAccount} with balance before {user.wallet.availableBalance}")
+                return BillPaymentResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":createDebitRecord.id})
+    else:
+        logger.info(f"{INSUFFICIENTFUND} with user {user.firstname}")
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INSUFFICIENTFUND)
 

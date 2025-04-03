@@ -54,6 +54,15 @@ class ChangePINRequest(BaseModel):
     oldPin: str
     pin: str
     confirmPin: str
+class VerificationRequest(BaseModel):
+    action:str
+    nin: Optional[str]
+    bvn: Optional[str]
+    email: Optional[str]
+    phone: Optional[str]
+class InfoVerificationRequest(BaseModel):
+    action: str
+    otp: str
 class ChangePasswordRequest(BaseModel):
     oldPassword: str
     password: str

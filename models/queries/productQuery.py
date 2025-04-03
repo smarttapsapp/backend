@@ -37,3 +37,14 @@ def query_stations(db: Session):
     return db.query(StationModel).all()
 def query_train_routes(db: Session, departure: str, arrival: str, seatType: str, takeOffTime: str):
     return db.query(RouteModel).all()
+def querySinglebeneficiary(db: Session,transactionType:str,userId:int, customerId: str):
+    return db.query(BeneficiaryModel).filter(BeneficiaryModel.user_id == userId).filter(BeneficiaryModel.customerId == customerId).filter(BeneficiaryModel.transaction_type == transactionType).first()
+def queryBeneficiaryByTransactionType(db: Session,transactionType:str,userId:int):
+    return db.query(BeneficiaryModel).filter(BeneficiaryModel.user_id == userId).filter(BeneficiaryModel.transaction_type == transactionType).all()
+def create(db: Session, model: object):
+    db.add(model)
+    db.commit()
+    db.refresh(model)
+    return model
+def deleteRecord(db:Session,id:int,userId:int):
+    return db.query(BeneficiaryModel).filter(BeneficiaryModel.id == id).filter(BeneficiaryModel.user_id == userId).delete()

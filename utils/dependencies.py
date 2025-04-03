@@ -115,11 +115,11 @@ async def validateTransactionPIN(
         )
         if user is None:
             raise credentials_exception
-        validatedUser = Customer.model_validate(user)
-        if validatedUser.account_status == AccountStatusEnum.ACTIVE.value:
+        #validatedUser = Customer.model_validate(user)
+        if user.account_status == AccountStatusEnum.ACTIVE:
             logger.info(payload.pin)
             if util.verify_password(payload.pin, user.pin) is True:
-                return validatedUser
+                return user
             raise util.UnicornException(
                 status=status.HTTP_403_FORBIDDEN,
                 error={
@@ -132,7 +132,7 @@ async def validateTransactionPIN(
                 status=status.HTTP_403_FORBIDDEN,
                 error={
                     "statusCode": str(status.HTTP_403_FORBIDDEN),
-                    "statusDescription": f"Your account is {validatedUser.account_status}",
+                    "statusDescription": f"Your account is {user.account_status}",
                 },
             )
     except JWTError:
@@ -197,7 +197,6 @@ async def validateAdmin(
         raise credentials_exception
     except JWTError:
         raise credentials_exception
-
 async def get_current_user(
     #device: Annotated[Device, Depends(validateDevice)],
     token: str = Depends(util.oauth2_scheme),

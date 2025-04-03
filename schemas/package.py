@@ -6,16 +6,22 @@ from schemas.response import BaseResponse
 
 
 class PackageBase(BaseModel):
-    title: Union[str, None] = None
-    type: Union[str, None] = None
-    message: Union[str, None] = None
+    product_type_id:int
+    billerId: Union[str, None] = None
+    description: Union[str, None] = None
+    amount: Union[str, None] = None
+    validity: Union[str, None] = None
+    packageCode: Union[str, None] = None
+    hasValidity: Union[bool, None] = None
+    status: Union[bool, None] = None
+    currencyCode: Union[str, None] = None
+    currencySymbol: Union[str, None] = None
 
 
 class PackageRequest(PackageBase):
     user: Union[List[str], None] = None
 
 class Package(PackageBase):
-    isRead: Union[bool, None] = False
     id: Optional[int]
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()

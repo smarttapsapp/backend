@@ -18,6 +18,7 @@ from datetime import date
 from schemas.payment import *
 from schemas.customer import Customer,CreatePINRequest
 from schemas.setting import Setting
+from models.model import CustomerModel
 
 logger = logging.getLogger(__name__)
 
@@ -217,7 +218,6 @@ async def getAllBillers(
             statusCode=str(status.HTTP_500_INTERNAL_SERVER_ERROR),
             statusDescription=str(ex),
         )
-
 @router.post("/fund",
     response_model=BaseResponse,
     response_model_exclude_unset=True,)
@@ -384,3 +384,50 @@ async def fund_wallet(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+@router.post("/name-enquiry",
+    response_model=BillNameEnquiryResponse,
+    response_model_exclude_unset=True,)
+async def bill_payment_name_enquiry(
+    payload: BillNameEnquiryRequest,
+    request: Request,
+    response: Response,
+    user: Annotated[Customer, Depends(verified_user)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if user:
+            return paymentservice.billerEnquiry(payload=payload,request=request,response=response,setting=setting,db=db,user=user)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BillNameEnquiryResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=INVALIDACCOUNT,
+        )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BillNameEnquiryResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.post("/purchase",
+    response_model=BillPaymentResponse,
+    response_model_exclude_unset=True,)
+async def bill_payment(
+    payload: BillPaymentRequest,
+    request: Request,
+    response: Response,
+    user: Annotated[CustomerModel, Depends(validateTransactionPIN)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        if user:
+            return paymentservice.payBills(payload=payload,request=request,response=response,setting=setting,db=db,user=user,background_task=background_task)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex), )

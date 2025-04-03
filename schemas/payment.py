@@ -1,9 +1,10 @@
-from typing import Optional, Union,List
+from typing import Optional, Union,List,Dict
 from datetime import datetime
 from sqlalchemy import func
-from pydantic import BaseModel
+from pydantic import BaseModel,validator
 from schemas.response import BaseResponse
 from schemas.request import PINRequest
+from utils import util
 
 
 class PaymentBase(BaseModel):
@@ -44,6 +45,7 @@ class PaymentsResponse(BaseResponse):
     
 class PaymentResponse(BaseResponse):
     data: Payment = None
+
 class FundRequest(BaseModel):
     amount:str
 
@@ -69,3 +71,25 @@ class DebitRequest(PINRequest):
     transactionId:str
     transactionChannel:str
     transactionDate:str
+class BillNameEnquiryRequest(BaseModel):
+    billerId:str
+    packageId:str
+    customerNumber:str
+    amount: str
+    walletAccount:str
+class BillNameEnquiryResponse(BaseResponse):
+    data: Dict = None
+class BillPaymentRequest(PINRequest):
+    billerId:str
+    packageId:Optional[str]
+    customerNumber:str
+    walletAccount:str
+    amount: str
+    @validator("amount")
+    def amount_validator(cls, amount):
+        formattedAmount = util.amountToKobo(amount=amount)
+        return formattedAmount
+    customerAddress:Optional[str]
+    customerName:Optional[str]
+class BillPaymentResponse(BaseResponse):
+    data: Dict = None
