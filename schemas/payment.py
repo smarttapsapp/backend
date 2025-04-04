@@ -93,3 +93,9 @@ class BillPaymentRequest(PINRequest):
     customerName:Optional[str]
 class BillPaymentResponse(BaseResponse):
     data: Dict = None
+class WalletDebitRequest(PINRequest):
+    senderAccount:str
+    receiverAccount:str
+    receiverAccountName: str
+    description:str
+    amount: float

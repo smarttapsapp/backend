@@ -22,79 +22,15 @@ from models.model import CustomerModel
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["payments"])
+router = APIRouter()
 
-@router.post("/enquiry",
-    response_model=BaseResponse,
-    response_model_exclude_unset=True,)
-async def wallet_enquiry(
-    payload: CreatePINRequest,
-    request: Request,
-    responses: Response,
-    user: Annotated[Customer, Depends(verified_user)],
-    Setting: Annotated[Setting, Depends(getSystemSetting)],
-    db: Annotated[Session, Depends(get_db)],
-    background_task: BackgroundTasks,
-):
-    try:
-        if user:
-            responses.status_code = status.HTTP_200_OK
-            return BaseResponse(
-                    statusCode=str(status.HTTP_200_OK),
-                    statusDescription=f"PIN successfully created",
-                )
-        else:
-            responses.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(
-                statusCode=str(status.HTTP_400_BAD_REQUEST),
-                statusDescription=INVALIDACCOUNT,
-            )
-    except Exception as ex:
-        logger.error(ex)
-        responses.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(
-            statusCode=str(status.HTTP_400_BAD_REQUEST),
-            statusDescription=str(ex),
-        )
-@router.post("/transfer",
-    response_model=BaseResponse,
-    response_model_exclude_unset=True,)
-async def wallet_payment(
-    payload: CreatePINRequest,
-    request: Request,
-    responses: Response,
-    user: Annotated[Customer, Depends(verified_user)],
-    Setting: Annotated[Setting, Depends(getSystemSetting)],
-    db: Annotated[Session, Depends(get_db)],
-    background_task: BackgroundTasks,
-):
-    try:
-        if user:
-            responses.status_code = status.HTTP_200_OK
-            return BaseResponse(
-                    statusCode=str(status.HTTP_200_OK),
-                    statusDescription=f"PIN successfully created",
-                )
-        else:
-            responses.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(
-                statusCode=str(status.HTTP_400_BAD_REQUEST),
-                statusDescription=INVALIDACCOUNT,
-            )
-    except Exception as ex:
-        logger.error(ex)
-        responses.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(
-            statusCode=str(status.HTTP_400_BAD_REQUEST),
-            statusDescription=str(ex),
-        )
 @router.post("/generate/qr",
     response_model=BaseResponse,
     response_model_exclude_unset=True,)
 async def payment_via_QR(
     payload: GenerateQRRequest,
     request: Request,
-    responses: Response,
+    response: Response,
     user: Annotated[Customer, Depends(validateTransactionPIN)],
     Setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
@@ -118,106 +54,39 @@ async def payment_via_QR(
                     subject="Create PIN",
                     toAddress=user.email,
                 )
-                responses.status_code = status.HTTP_200_OK
+                response.status_code = status.HTTP_200_OK
                 return BaseResponse(
                     statusCode=str(status.HTTP_200_OK),
                     statusDescription=f"PIN successfully created",
                 )
             else:
-                responses.status_code = status.HTTP_400_BAD_REQUEST
+                response.status_code = status.HTTP_400_BAD_REQUEST
                 return BaseResponse(
                     statusCode=str(status.HTTP_400_BAD_REQUEST),
                     statusDescription=SYSTEMBUSY,
                 )
         else:
-            responses.status_code = status.HTTP_400_BAD_REQUEST
+            response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(
                 statusCode=str(status.HTTP_400_BAD_REQUEST),
                 statusDescription=INVALIDACCOUNT,
             )
     except ValidationError as e:
         logger.error(e)
-        responses.status_code = status.HTTP_400_BAD_REQUEST
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(e),
         )
     except Exception as ex:
         logger.error(ex)
-        responses.status_code = status.HTTP_400_BAD_REQUEST
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-@router.post("/via/nfc",
-    response_model=BaseResponse,
-    response_model_exclude_unset=True,)
-async def payment_via_NFC(
-    payload: CreatePINRequest,
-    request: Request,
-    responses: Response,
-    user: Annotated[Customer, Depends(verified_user)],
-    Setting: Annotated[Setting, Depends(getSystemSetting)],
-    db: Annotated[Session, Depends(get_db)],
-    background_task: BackgroundTasks,
-):
-    try:
-        if user:
-            validated_data = CreatePINRequest(**payload.model_dump())
-            responses.status_code = status.HTTP_200_OK
-            return BaseResponse(
-                    statusCode=str(status.HTTP_200_OK),
-                    statusDescription=f"PIN successfully created",
-                )
-        else:
-            responses.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(
-                statusCode=str(status.HTTP_400_BAD_REQUEST),
-                statusDescription=INVALIDACCOUNT,
-            )
-    except Exception as ex:
-        logger.error(ex)
-        responses.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(
-            statusCode=str(status.HTTP_400_BAD_REQUEST),
-            statusDescription=str(ex),
-        )
-@router.post("/bills",
-    response_model=BaseResponse,
-    response_model_exclude_unset=True,)
-async def getAllBillers(
-    request: Request,
-    responses: Response,
-    user: Annotated[Customer, Depends(verified_user)],
-    settings: Annotated[Setting, Depends(getSystemSetting)],
-    db: Annotated[Session, Depends(get_db)],
-):
-    try:
-        if user:
-            bill = paymentService.getAllBill(db=db)
-            logger.info(bill)
-            if bill:
-                return BillResponse.model_validate(
-                    {
-                        "statusCode": str(status.HTTP_200_OK),
-                        "statusDescription": SUCCESS,
-                        "data": bill,
-                    }
-                )
 
-        else:
-            responses.status_code = status.HTTP_400_BAD_REQUEST
-            return BillResponse(
-                statusCode=str(status.HTTP_400_BAD_REQUEST),
-                statusDescription=UNKNOWNUSER,
-            )
-    except Exception as ex:
-        logger.error(ex)
-        responses.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        return BillResponse(
-            statusCode=str(status.HTTP_500_INTERNAL_SERVER_ERROR),
-            statusDescription=str(ex),
-        )
+# fund wallet
 @router.post("/fund",
     response_model=BaseResponse,
     response_model_exclude_unset=True,)
@@ -259,6 +128,7 @@ async def fund_notifications(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+
 # payments
 @router.get("s", 
     response_model=PaymentsResponse,
@@ -313,9 +183,11 @@ async def get_payment(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return PaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-@router.post("/buyticket",
+
+# bus ticket payment
+@router.post("/bus/buyticket",
     response_model=BaseResponse,
-    response_model_exclude_unset=True,)
+    response_model_exclude_unset=True,tags=["tickets"])
 async def buy_ticket(
     payload: FundRequest,
     request: Request,
@@ -335,9 +207,11 @@ async def buy_ticket(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-@router.post("/buytrainticket",
+
+# train ticket payment
+@router.post("/train/buyticket",
     response_model=BaseResponse,
-    response_model_exclude_unset=True,)
+    response_model_exclude_unset=True,tags=["tickets"])
 async def buy_train_ticket(
     payload: BuyTrainTicketRequest,
     request: Request,
@@ -357,9 +231,11 @@ async def buy_train_ticket(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-@router.post("/debit",
+
+# nfc debit payment
+@router.post("/nfc/debit",
     response_model=BaseResponse,
-    response_model_exclude_unset=True,)
+    response_model_exclude_unset=True,tags=["NFC payment"])
 async def fund_wallet(
     payload: DebitRequest,
     request: Request,
@@ -384,9 +260,11 @@ async def fund_wallet(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-@router.post("/name-enquiry",
+
+# bill payment
+@router.post("/bill/name-enquiry",
     response_model=BillNameEnquiryResponse,
-    response_model_exclude_unset=True,)
+    response_model_exclude_unset=True,tags=["Bills Payement"])
 async def bill_payment_name_enquiry(
     payload: BillNameEnquiryRequest,
     request: Request,
@@ -410,9 +288,9 @@ async def bill_payment_name_enquiry(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-@router.post("/purchase",
+@router.post("/bill/purchase",
     response_model=BillPaymentResponse,
-    response_model_exclude_unset=True,)
+    response_model_exclude_unset=True,tags=["Bills Payement"])
 async def bill_payment(
     payload: BillPaymentRequest,
     request: Request,
@@ -431,3 +309,65 @@ async def bill_payment(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex), )
+
+# wallet payment
+@router.get("/wallet/enquiry/{accountNumber}",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["wallet"])
+async def wallet_enquiry(
+    accountNumber: str,
+    request: Request,
+    response: Response,
+    user: Annotated[Customer, Depends(verified_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if user:
+            return paymentservice.walletEnquiry(
+                wallet=accountNumber,
+                response=response,
+                db=db,
+            )
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(
+                statusCode=str(status.HTTP_400_BAD_REQUEST),
+                statusDescription=INVALIDACCOUNT,
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.post("/wallet/transfer",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["wallet"])
+async def wallet_payment(
+    payload: WalletDebitRequest,
+    request: Request,
+    response: Response,
+    user: Annotated[CustomerModel, Depends(validateTransactionPIN)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        if user:
+            return paymentservice.walletTransfer(
+                payload=payload,
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                user=user,
+                background_task=background_task,
+            )
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

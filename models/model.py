@@ -208,9 +208,11 @@ class CustomerModel(Base):
     # beneficiaries
     beneficiaries = relationship("BeneficiaryModel", backref="user")
     # notification
-    notifications = relationship('NotificationModel', secondary='user_notifications', back_populates='users')
-    preferences = relationship('UserNotificationPreference', back_populates='user')
-    user_notifications = relationship('UserNotification', back_populates='user')
+    user_notifications = relationship("UserNotification", back_populates="customer")
+
+    #user_notifications = relationship("UserNotification", back_populates="customer")
+    #notifications = relationship("NotificationModel", secondary="user_notifications", back_populates="users")
+    preference = relationship('UserNotificationPreference', back_populates='user')
     # ticketing
     tickets = relationship('TicketModel', backref='user')
     created_at = Column(DateTime, default=func.now())
@@ -465,32 +467,37 @@ class NotificationModel(Base):
     title = Column(String(150), nullable=False)
     message = Column(Text, default="0")
     isRead = Column(Boolean, default=False)
-    users = relationship('CustomerModel', secondary='user_notifications', back_populates='notifications')
-    user_notifications = relationship('UserNotification', back_populates='notification')
+    user_notifications = relationship("UserNotification", back_populates="notification")
+
+    #users = relationship('CustomerModel', secondary='user_notifications', back_populates='notifications')
+    #user_notifications = relationship('UserNotification', back_populates='notification')
     updated_at = Column(DateTime, default=func.now())
     created_at = Column(DateTime, default=func.now())
 class UserNotificationPreference(Base):
     __tablename__ = 'user_notification_preferences'
     
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('customers.id'), nullable=False)
+    customer_id = Column(Integer, ForeignKey('customers.id'), nullable=False)
     #notification_type_id = Column(Integer, ForeignKey('notification_types.id'), nullable=False)
     receive_via_email = Column(Boolean, default=True)
     receive_via_sms = Column(Boolean, default=False)
     receive_in_app = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
-    user = relationship('CustomerModel', back_populates='preferences')
+    user = relationship('CustomerModel', back_populates='preference')
     #notification_type = relationship('NotificationType')
 class UserNotification(Base):
     __tablename__ = 'user_notifications'
     
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('customers.id'), nullable=False)
+    customer_id = Column(Integer, ForeignKey('customers.id'), nullable=False)
     notification_id = Column(Integer, ForeignKey('notifications.id'), nullable=False)
     is_read = Column(Boolean, default=False)
     created_at = Column(DateTime, default=func.now())
-    user = relationship('CustomerModel', back_populates='user_notifications')
-    notification = relationship('NotificationModel', back_populates='user_notifications')
+    customer = relationship("CustomerModel", back_populates="user_notifications")
+    notification = relationship("NotificationModel", back_populates="user_notifications")
+
+    #customer = relationship("CustomerModel", back_populates="user_notifications")
+    #notification = relationship('NotificationModel', back_populates='user_notifications')
 class TicketModel(Base):
     __tablename__ = 'tickets'
     

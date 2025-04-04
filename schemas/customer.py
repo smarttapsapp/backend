@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import func
 from pydantic import BaseModel,EmailStr,validator,Field
 from schemas.response import BaseResponse
+from schemas.request import PINRequest
 from schemas.account import Account
 from utils import util
 
@@ -18,6 +19,11 @@ class CustomerBase(BaseModel):
     password: str
     email: str
     username: str
+    nin_submitted: bool = False
+    nin_verified: bool = False
+    bvn_verified: bool = False
+    email_verified: bool = False
+    address_submitted: bool = False
 class Customer(CustomerBase):
     point_ratings: Union[str, None] = "0"
     account_ratings: Union[str, None] = "0"
@@ -50,16 +56,15 @@ class ResetPasswordRequest(BaseModel):
     otp: str 
     password: str 
     confirmPassword: str 
-class ChangePINRequest(BaseModel):
-    oldPin: str
-    pin: str
+class ChangePINRequest(PINRequest):
+    newPin: str
     confirmPin: str
 class VerificationRequest(BaseModel):
     action:str
-    nin: Optional[str]
-    bvn: Optional[str]
-    email: Optional[str]
-    phone: Optional[str]
+    nin: Optional[str]=None
+    bvn: Optional[str]=None
+    email: Optional[str]=None
+    phone: Optional[str]=None
 class InfoVerificationRequest(BaseModel):
     action: str
     otp: str

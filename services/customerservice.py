@@ -2,9 +2,10 @@
 import logging
 from sqlalchemy.orm import Session
 from models.model import *
-from models.queries import authQuery,customerQuery
+from models.queries import queries
 from datetime import datetime,timedelta
 from schemas import otp
+from services.notificationservice import notifyUser
 from utils import util
 from schemas.setting import Setting
 from utils.constant import *
@@ -55,13 +56,23 @@ def balance(
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST), statusDescription=SYSTEMBUSY,)
 def performAction(request:Request,payload:VerificationRequest,user: Customer,response: Response,setting: Setting,db: Session,background_task:BackgroundTasks):
     if payload.action.upper() == "NIN":
-        return submitNINForVerification(
+        return ninverification(
                         request=request,
                     user=user,
                     response=response,
                     setting=setting,
                     db=db,
                     nin=payload.nin,
+                    background_task=background_task
+                )
+    elif payload.action.upper() == "BVN":
+        return bvnverification(
+                        request=request,
+                    user=user,
+                    response=response,
+                    setting=setting,
+                    db=db,
+                    bvn=payload.nin,
                     background_task=background_task
                 )
     elif payload.action.upper() == "EMAIL":
@@ -71,7 +82,7 @@ def performAction(request:Request,payload:VerificationRequest,user: Customer,res
                     response=response,
                     setting=setting,
                     db=db,
-                    email=payload.email,
+                    email=payload.nin,
                     background_task=background_task
                 )
     else:
@@ -91,7 +102,7 @@ def submitEmailForVerification(
             f"started updating/verification of account with email for {user.firstname} with {email}"
         )
         user.email = email
-        userRecord = customer.update_user_agent_records(
+        userRecord = queries.update_user_agent_records(
             db=db, id=user.id, user=user
         )
         if userRecord:
@@ -102,7 +113,7 @@ def submitEmailForVerification(
                 created_at=datetime.now(),
                 expired_at=(datetime.now() + timedelta(minutes=15))
                 )
-            createdOtp = customerQuery.create_otp(db=db,otp=otpModel)
+            createdOtp = queries.create(db=db,model=otpModel)
             if createdOtp:
                 email_body = util.templates.TemplateResponse(
                         "otp.html",
@@ -116,38 +127,79 @@ def submitEmailForVerification(
                         toAddress=userRecord.email,
                     )
                 response.status_code = status.HTTP_200_OK
-                return BaseResponse.model_validate(
-                    {
-                    "statusCode": str(status.HTTP_200_OK),
-                    "statusDescription": SUCCESS,
-                    }
-                )
+                return BaseResponse(
+                    statusCode =str(status.HTTP_200_OK),
+                   statusDescription = SUCCESS, )
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse.model_validate(
-                {
-                    "statusCode": str(status.HTTP_400_BAD_REQUEST),
-                    "statusDescription": SYSTEMBUSY,
-                }
-            )
+                return BaseResponse(
+                    statusCode =str(status.HTTP_400_BAD_REQUEST),
+                   statusDescription = SYSTEMBUSY,)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse.model_validate(
-                {
-                    "statusCode": str(status.HTTP_400_BAD_REQUEST),
-                    "statusDescription": SYSTEMBUSY,
-                }
-            )
+            return BaseResponse(
+                    statusCode =str(status.HTTP_400_BAD_REQUEST),
+                   statusDescription = SYSTEMBUSY, )
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse.model_validate(
-            {
-                "statusCode": str(status.HTTP_400_BAD_REQUEST),
-                "statusDescription": str(ex),
-            }
+        return BaseResponse(
+                statusCode =str(status.HTTP_400_BAD_REQUEST),
+               statusDescription = str(ex), )
+def bvnverification(
+    request: Request,
+    user: Customer,
+    response: Response,
+    setting: Setting,
+    db: Session,
+    bvn: str,
+    background_task: BackgroundTasks,
+):
+    try:
+        logger.info(
+            f"started updating/verification of account with bvn for {user.firstname} with {bvn}"
         )
-def submitNINForVerification(
+        userRecord = queries.updateUserBvn(
+            db=db, userId=user.id, bvn=bvn
+        )
+        if userRecord:
+            otpModel = OTPModel(
+                otp=util.generateOTP(),
+                servicename="bvnVerification",
+                user_id=user.id,
+                created_at=datetime.now(),
+                expired_at=(datetime.now() + timedelta(minutes=15)))
+            createdOtp = queries.create(db=db,model=otpModel)
+            if createdOtp:
+                email_body = util.templates.TemplateResponse(
+                        "otp.html",
+                        {"request": request, "user": userRecord,"otp":createdOtp.otp},
+                    )
+                background_task.add_task(
+                        util.mailer,
+                        str(email_body.body, "utf-8"),
+                        setting=setting,
+                        subject="BVN OTP Verification",
+                        toAddress=user.email,
+                    )
+                response.status_code = status.HTTP_200_OK
+                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription = SUCCESS)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(
+                    statusCode =str(status.HTTP_400_BAD_REQUEST),
+                   statusDescription = SYSTEMBUSY,)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(
+                    statusCode =str(status.HTTP_400_BAD_REQUEST),
+                   statusDescription = SYSTEMBUSY,)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),
+               statusDescription = str(ex), )
+def ninverification(
     request: Request,
     user: Customer,
     response: Response,
@@ -158,12 +210,10 @@ def submitNINForVerification(
 ):
     try:
         logger.info(
-            f"started updating/verification of account with nin for {user.firstname} with {nin}"
+            f"started updating/verification of account with bvn for {user.firstname} with {nin}"
         )
-        user.nin = nin
-        user.nin_submitted = True
-        userRecord = customerQuery.update_user_agent_records(
-            db=db, id=user.id, user=user
+        userRecord = queries.updateUserNiN(
+            db=db, userId=user.id, nin=nin
         )
         if userRecord:
             otpModel = OTPModel(
@@ -172,7 +222,7 @@ def submitNINForVerification(
                 user_id=user.id,
                 created_at=datetime.now(),
                 expired_at=(datetime.now() + timedelta(minutes=15)))
-            createdOtp = customerQuery.create_otp(db=db,otp=otpModel)
+            createdOtp = queries.create(db=db,model=otpModel)
             if createdOtp:
                 email_body = util.templates.TemplateResponse(
                         "otp.html",
@@ -182,41 +232,26 @@ def submitNINForVerification(
                         util.mailer,
                         str(email_body.body, "utf-8"),
                         setting=setting,
-                        subject="NIN OTP Verification",
-                        toAddress=userRecord.email,
+                        subject="BVN OTP Verification",
+                        toAddress=user.email,
                     )
                 response.status_code = status.HTTP_200_OK
-                return BaseResponse.model_validate(
-                    {
-                    "statusCode": str(status.HTTP_200_OK),
-                    "statusDescription": SUCCESS,
-                    }
-                )
+                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription = SUCCESS)
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse.model_validate(
-                {
-                    "statusCode": str(status.HTTP_400_BAD_REQUEST),
-                    "statusDescription": SYSTEMBUSY,
-                }
-            )
+                return BaseResponse(
+                    statusCode =str(status.HTTP_400_BAD_REQUEST),
+                   statusDescription = SYSTEMBUSY,)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse.model_validate(
-                {
-                    "statusCode": str(status.HTTP_400_BAD_REQUEST),
-                    "statusDescription": SYSTEMBUSY,
-                }
-            )
+            return BaseResponse(
+                    statusCode =str(status.HTTP_400_BAD_REQUEST),
+                   statusDescription = SYSTEMBUSY )
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse.model_validate(
-            {
-                "statusCode": str(status.HTTP_400_BAD_REQUEST),
-                "statusDescription": str(ex),
-            }
-        )
+        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),
+               statusDescription = str(ex),)
 def handleOTPVerification(
     request: Request,
     user: Customer,
@@ -228,30 +263,33 @@ def handleOTPVerification(
 ):
     try:
         logger.info(
-            f"started verification of account with nin for {loggedInUser.firstname} with {payload.action}"
+            f"started verification of account with nin for {user.firstname} with {payload.action}"
         )
         if payload.action:
             otpQuery = ""
-            if payload.action == "nin":
-                loggedInUser.nin_verified = True
+            if payload.action.lower() == "nin":
+                user.nin_verified = True
                 otpQuery = "ninVerification"
-            if payload.action == "email":
-                loggedInUser.email_verified = True
+            if payload.action.lower() == "bvn":
+                user.bvn_verified = True
+                otpQuery = "bvnVerification"
+            if payload.action.lower == "email":
+                user.email_verified = True
                 otpQuery = "emailVerification"
-            latestOtp = customerQuery.get_latest_otp_by_servicename(userId=loggedInUser.id,servicename=otpQuery,db=db)
+            latestOtp = queries.get_latest_otp_by_servicename(userId=user.id,servicename=otpQuery,db=db)
             if latestOtp:
                 current_datetime = datetime.now()
                 if latestOtp.expired_at >= current_datetime:
                     if latestOtp.otp == payload.otp:
-                        userRecord = customerQuery.update_user_agent_records(db=db, id=loggedInUser.id, user=loggedInUser)
+                        userRecord = queries.update_user_agent_records(db=db, id=user.id, user=user)
                         if userRecord:
                             latestOtp.status = OTPStatusEnum.CLOSED
                             latestOtp.updated_at = current_datetime
-                            createdOtp = customerQuery.create_otp(db=db,otp=latestOtp)
+                            createdOtp = queries.create(db=db,model=latestOtp)
                             if createdOtp:
+                                background_task.add_task(notifyUser,db=db,title=f"{payload.action.capitalize()} Verification", message=f"Your {payload.action.capitalize()} Verification Successful",userId=user.id, setting=setting)
                                 email_body = util.templates.TemplateResponse(
-                                        "success.html",
-                                        {"request": request, "user": userRecord,"message":f"Your {payload.action.capitalize()} Verification Successful"},
+                                        "success.html",{"request": request, "user": userRecord,"message":f"Your {payload.action.capitalize()} Verification Successful"},
                                     )
                                 background_task.add_task(
                                         util.mailer,
@@ -261,303 +299,139 @@ def handleOTPVerification(
                                         toAddress=userRecord.email,
                                     )
                                 response.status_code = status.HTTP_200_OK
-                                return BaseResponse.model_validate(
-                                    {
-                                    "statusCode": str(status.HTTP_200_OK),
-                                    "statusDescription": SUCCESS,
-                                    }
+                                return BaseResponse(
+                                    statusCode =str(status.HTTP_200_OK),
+                                   statusDescription = SUCCESS,
+    
                                 )
                             else:
                                 response.status_code = status.HTTP_400_BAD_REQUEST
-                                return BaseResponse.model_validate(
-                                {
-                                    "statusCode": str(status.HTTP_400_BAD_REQUEST),
-                                    "statusDescription": SYSTEMBUSY,
-                                }
+                                return BaseResponse(
+
+                                    statusCode =str(status.HTTP_400_BAD_REQUEST),
+                                   statusDescription = SYSTEMBUSY,
+
                             )
                         else:
                             response.status_code = status.HTTP_400_BAD_REQUEST
-                            return BaseResponse.model_validate(
-                                {
-                                    "statusCode": str(status.HTTP_400_BAD_REQUEST),
-                                    "statusDescription": SYSTEMBUSY,
-                                }
+                            return BaseResponse(
+
+                                    statusCode =str(status.HTTP_400_BAD_REQUEST),
+                                   statusDescription = SYSTEMBUSY,
+
                             )
                     else:
                         logger.info(latestOtp.otp)
                         response.status_code = status.HTTP_400_BAD_REQUEST
-                        return BaseResponse.model_validate(
-                                {
-                                    "statusCode": str(status.HTTP_400_BAD_REQUEST),
-                                    "statusDescription":"OTP is invalid/expired",
-                                }
+                        return BaseResponse(
+
+                                    statusCode =str(status.HTTP_400_BAD_REQUEST),
+                                   statusDescription ="OTP is invalid/expired",
+
                             )
                 else:
                     logger.info(latestOtp.expired_at)
                     response.status_code = status.HTTP_400_BAD_REQUEST
-                    return BaseResponse.model_validate(
-                                {
-                                    "statusCode": str(status.HTTP_400_BAD_REQUEST),
-                                    "statusDescription":"OTP is invalid/expired",
-                                }
+                    return BaseResponse(
+                        statusCode =str(status.HTTP_400_BAD_REQUEST),
+                                   statusDescription ="OTP is invalid/expired",
+
                             )
             else:
                 logger.info(latestOtp.status)
                 response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse.model_validate(
-                                {
-                                    "statusCode": str(status.HTTP_400_BAD_REQUEST),
-                                    "statusDescription":"OTP is invalid/expired",
-                                }
+                return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),
+                                   statusDescription ="OTP is invalid/expired",
                             )
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse.model_validate(
-                {
-                                    "statusCode": str(status.HTTP_400_BAD_REQUEST),
-                                    "statusDescription":"Invalid Request",
-                                }
+            return BaseResponse(
+
+                                    statusCode =str(status.HTTP_400_BAD_REQUEST),
+                                   statusDescription ="Invalid Request",
+
                             )
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse.model_validate(
-            {
-                "statusCode": str(status.HTTP_400_BAD_REQUEST),
-                "statusDescription": str(ex),
-            }
-        )
-
-def authenticate_user(
-        db: Session,
-    response: Response,
-    setting: Setting,
-    background_task: BackgroundTasks, payload: LoginRequest):
-    user = authQuery.getCheckAdmin(username=payload.username, db=db)
-    if user:
-        if util.verify_password(payload.password, user.password) is True:
-            if user.status:
-                authToken = util.create_access_token(setting=setting,credentials={"username": user.email,"password": payload.password,},exp=600)
-                logger.info(authToken)
-                return BaseResponse(
-                    statusCode= str(status.HTTP_200_OK),
-                    statusDescription= f"Login Successful",
-                    data={
-                        "user":Admin.from_orm(user),
-                        "idToken":authToken[0],
-                        "expiresIn":authToken[1]
-                    },
-                
-            )
-            response.status_code= status.HTTP_400_BAD_REQUEST
-            return BaseResponse(
-        statusCode=str(status.HTTP_400_BAD_REQUEST),
-        statusDescription=ACCTERROR
-        )
-        response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(
-        statusCode=str(status.HTTP_400_BAD_REQUEST),
-        statusDescription=INVALIDACCOUNT
-        )
-    response.status_code = status.HTTP_400_BAD_REQUEST
-    return BaseResponse(
-        statusCode=str(status.HTTP_400_BAD_REQUEST),
-        statusDescription=INVALIDACCOUNT
-        )
-async def resetPasswordInitiate(
+                statusCode =str(status.HTTP_400_BAD_REQUEST),
+               statusDescription = str(ex),)
+def changepin(
     request: Request,
-    user: Customer,
+    user: CustomerModel,
     response: Response,
     setting: Setting,
     db: Session,
+    payload: ChangePINRequest,
     background_task: BackgroundTasks,
 ):
     try:
-        logger.info(f"started resetPasswordInitiate")
-        otp = util.generateOTP()
-        dbOtp = OTPModel(
-            otp=otp,
-            user_id=user.id,
-            status=OTPStatusEnum.OPEN,
-            servicename="resetPasswordInitiate",
-            created_at=datetime.now(),
-            expired_at=datetime.now()+timedelta(minutes=5),
-            updated_at=datetime.now(),
+        logger.info(
+            f"started chnage pin for {user.firstname}"
         )
-        createdOTP = authQuery.create_otp(db=db, otp=dbOtp)
-        if createdOTP:
-            return sendSms(otp=createdOTP,response=response,setting=setting,background_task=background_task)
+        if payload.newPin and payload.confirmPin:
+            if payload.newPin == payload.confirmPin:
+                user.pin = util.get_password_hash(payload.newPin)
+                userRecord = queries.create(db=db,model=user)
+                if userRecord:
+                    background_task.add_task(notifyUser,db=db,title=f"Change PIN", message=f"PIN change Successful",userId=user.id, setting=setting)
+                    email_body = util.templates.TemplateResponse("success.html",{"request": request, "user": userRecord,"message":f"PIN change Successful"},)
+                    background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=f"Change PIN",toAddress=userRecord.email,)
+                    response.status_code = status.HTTP_200_OK
+                    return BaseResponse(
+                        statusCode =str(status.HTTP_200_OK),
+                       statusDescription = SUCCESS,
+                    )
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = FAILED,)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = "PIN mismatch",)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(
-                statusCode=str(status.HTTP_400_BAD_REQUEST),
-                statusDescription=SYSTEMBUSY,
-            )
+            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription ="Invalid Request",)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse.model_validate(
-            {
-                "statusCode": str(status.HTTP_400_BAD_REQUEST),
-                "statusDescription": SYSTEMBUSY,
-            }
-        )
-async def verifyAccountOpening(
+        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = str(ex),)
+def changepassword(
     request: Request,
+    user: Customer,
     response: Response,
     setting: Setting,
     db: Session,
-    user: Customer,
-    payload: OTPRequest,
-    background_task: BackgroundTasks,):
+    payload: ChangePasswordRequest,
+    background_task: BackgroundTasks,
+):
     try:
-        logger.info(user.otps)
-        latestOTP:otp.OTP = sorted(user.otps, key=lambda p: p.id, reverse=True)[0]
-        if latestOTP:
-            logger.info(latestOTP)
-            current_datetime = datetime.now()
-            if latestOTP.expired_at >= current_datetime:
-                return BaseResponse(
-                                        statusCode=str(status.HTTP_200_OK),
-                                        statusDescription=f"Account already created",
-                                    )
+        logger.info(
+            f"started chnage pin for {user.firstname}"
+        )
+        if payload.password and payload.confirmPassword:
+            if payload.password == payload.confirmPassword:
+                user.password = util.get_password_hash(payload.password)
+                userRecord = queries.update_user_agent_records(db=db,id=user.id,user=user)
+                if userRecord:
+                    background_task.add_task(notifyUser,db=db,title=f"Change Password", message=f"Change Password Successful",userId=user.id, setting=setting)
+                    email_body = util.templates.TemplateResponse("success.html",{"request": request, "user": userRecord,"message":f"Password change Successful"},)
+                    background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=f"Change Password",toAddress=userRecord.email,)
+                    response.status_code = status.HTTP_200_OK
+                    return BaseResponse(
+                        statusCode =str(status.HTTP_200_OK),
+                       statusDescription = SUCCESS,
+                    )
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = FAILED,)
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(
-                    statusCode=str(status.HTTP_400_BAD_REQUEST),
-                    statusDescription="User OTP failed or expired",
-                )
+                return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = "PIN mismatch",)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription ="Invalid Request",)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse.model_validate(
-            {
-                "statusCode": str(status.HTTP_400_BAD_REQUEST),
-                "statusDescription": SYSTEMBUSY,
-            }
-        )
-def createUserAccount(db: Session,setting: Setting,payload: CustomerRequest, background_task: BackgroundTasks, request: Request,response: Response):
-    try:
-        logger.info("started getting bvn records from bvn provider")
-        password = util.generateOTP()
-        user = AdminModel(
-            firstname=payload.firstname,
-            lastname=payload.lastname,
-            email=payload.email,
-            phonenumber=payload.phonenumber,
-            status=payload.status,
-            role=payload.role,
-            password=util.get_password_hash(password),
-            businesscode=payload.code
-            )
-        createdAccount = authQuery.create_account(db=db, user=user)
-        if createdAccount:
-            email_body = util.templates.TemplateResponse(
-                    "onboarding.html",
-                    {"request": request, "user": user,"password":password},
-                )
-            background_task.add_task(
-                    util.mailer,
-                    str(email_body.body, "utf-8"),
-                    setting=setting,
-                    subject="Onboarding Notification",
-                    toAddress=user.email,
-                )
-            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
-        else:
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ACCTERROR)
-    except Exception as ex:
-        logger.error(str(ex))
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=CREATEACCTERR)
-def sendSms(otp: OTPModel,response: Response,setting: Setting, background_task: BackgroundTasks):
-    #latestOtp = authQuery.get_latest_otp(db=db, userId=userId)
-    if otp:
-        logger.info(otp)
-        logger.info(otp.user)
-        background_task.add_task(util.send_sms_message,setting=setting,toPhoneNumber=otp.user.phonenumber,message=f"Your activation code is {otp.otp}",transactionId=util.generateId())
-        authToken = util.create_access_token(
-            setting=setting,
-            credentials={
-                "username": otp.user.phonenumber,
-                "password": otp.otp,
-                },
-                exp=5,
-                )
-        response.status_code = status.HTTP_200_OK
-        return BaseResponse(
-            statusCode=str(status.HTTP_200_OK),
-            statusDescription=f"Please enter the OTP sent to {otp.user.phonenumber[0:4]}xxxxxx{otp.user.phonenumber[-2:]} to complete your registration",
-            data={
-                "idToken":authToken[0],
-                "expiresIn":authToken[1]},
-        )
-    response.status_code = status.HTTP_400_BAD_REQUEST
-    return BaseResponse(
-        statusCode=str(status.HTTP_400_BAD_REQUEST),
-        statusDescription="OTP Issue. Try after sometime"
-    )
-def generateAndSendOTP(db: Session, userId:int,setting: Setting,background_task:BackgroundTasks,response: Response):
-    newOtp = authQuery.create_otp(db=db,otp=OTPModel(otp=util.generateOTP(), servicename="openAccount", user_id=userId,
-                created_at=datetime.now(),
-                expired_at=(datetime.now() + timedelta(minutes=15)),
-            updated_at=datetime.now(),))
-    if newOtp:
-        return sendSms(otp=newOtp,background_task=background_task,response=response,setting=setting)
-    else:
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(
-            statusCode=str(status.HTTP_400_BAD_REQUEST),
-            statusDescription="Unable to send otp at the moment",
-            )
-def resetPasswordFinal(db:Session,response:Response,token:str,setting: Setting, background_task: BackgroundTasks,payload:ResetPasswordRequest):
-    try:
-        data = util.jwt.decode(token, setting.secret_key, algorithms=[setting.algorithm])
-        if data:
-            logger.info(data)
-            user = get_user_phone(db=db,phonenumber=data["username"])
-            logger.info(user)
-            if user:
-                if data["password"] == payload.otp:
-                    otp = authQuery.get_otp_by_code(db=db,code=payload.otp,userId=user.id)
-                    if otp and otp.expired_at > datetime.now():
-                        if payload.password == payload.confirmPassword:
-                            user.password = util.get_password_hash(payload.password)
-                            user.updated_at = datetime.now()
-                            otp.status = OTPStatusEnum.CLOSED
-                            otp.updated_at = datetime.now()
-                            updatedUser = authQuery.create_account(db=db,user=user)
-                            if updatedUser:
-                                updatedOtp = authQuery.updateOTPStatus(db=db,id=otp.id)
-                                if updatedOtp:
-                                    response.status_code = status.HTTP_200_OK
-                                    return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription="Password Reset Successful",)
-                                else:
-                                    response.status_code = status.HTTP_400_BAD_REQUEST
-                                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Unable to complete Password Reset",)
-                            else:
-                                response.status_code = status.HTTP_400_BAD_REQUEST
-                                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Unable to complete Password Reset",)
-                        else:
-                            response.status_code = status.HTTP_400_BAD_REQUEST
-                            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Error! Password mismatch",)
-                    else:
-                        response.status_code = status.HTTP_400_BAD_REQUEST
-                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Invalid/expired OTP",)
-                else:
-                    response.status_code = status.HTTP_400_BAD_REQUEST
-                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Invalid/expired OTP",)
-            else:
-                response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Unauthoried",)
-        else:
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Unauthoried",)
-    except util.JWTError as e:
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(e),)
-    except Exception as ex:
-        logger.error(ex)
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = str(ex),)
