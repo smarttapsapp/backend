@@ -88,10 +88,11 @@ async def get_Bus_Routes(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return ParksResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-@router.get("/stations",
+@router.get("/stations/{mode}",
     response_model=StationsResponse,
     response_model_exclude_unset=True,)
 async def get_Train_Stations(
+    mode:str,
     request: Request,
     response: Response,
     user: Annotated[Customer, Depends(verified_user)],
@@ -100,7 +101,7 @@ async def get_Train_Stations(
 ):
     try:
         if user:
-            return productservice.stations(request=request,response=response,setting=setting,db=db,user=user)
+            return productservice.stations(mode=mode,request=request,response=response,setting=setting,db=db,user=user)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return StationsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,data=[])

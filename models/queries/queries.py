@@ -98,3 +98,5 @@ def queryWallet(db:Session,walletAccount:str):
 def getLastpaymentByAccount(db: Session, accountId: int):
     return db.query(PaymentModel).filter(PaymentModel.wallet_id == accountId).order_by(desc(PaymentModel.updated_at)).first()
 
+def query_stations(db: Session,mode:str):
+    return db.query(StationModel).filter(StationModel.mode == mode).all()

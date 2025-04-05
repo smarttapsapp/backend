@@ -39,15 +39,12 @@ class MovableEnum(PythonEnum):
     BUS = "bus"
     TRAIN = "train"
     AEROPLANE = "plane"
-
 class AccountEnum(PythonEnum):
     INDIVIDUAL = "individual"
     AGENT = "agent"
     MERCHANT = "merchant"
     AGGREGATOR = "aggregator"
     BUSINESS = "business"
-
-
 class AccountStatusEnum(PythonEnum):
     REG = "registration"
     ACTIVE = "active"
@@ -116,6 +113,14 @@ class TransactionStatusEnum(PythonEnum):
 class PaymentEnum(PythonEnum):
     DEBIT = "DEBIT"
     CREDIT = "CREDIT"
+
+class TicketStatusEnum(PythonEnum):
+    BOOKED = "booked"
+    CANCELLED = "cancelled"
+    USED = "used"
+class TicketModeEnum(PythonEnum):
+    BUS = "bus"
+    TRAIN = "train"
 
 class RoleModel(Base):
     __tablename__ = "roles"
@@ -214,7 +219,7 @@ class CustomerModel(Base):
     #notifications = relationship("NotificationModel", secondary="user_notifications", back_populates="users")
     preference = relationship('UserNotificationPreference', back_populates='user')
     # ticketing
-    tickets = relationship('TicketModel', backref='user')
+    support_tickets = relationship('SupportTicketModel', backref='user')
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
 class BeneficiaryModel(Base):
@@ -498,8 +503,8 @@ class UserNotification(Base):
 
     #customer = relationship("CustomerModel", back_populates="user_notifications")
     #notification = relationship('NotificationModel', back_populates='user_notifications')
-class TicketModel(Base):
-    __tablename__ = 'tickets'
+class SupportTicketModel(Base):
+    __tablename__ = 'support_tickets'
     
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('customers.id'), nullable=False)  # Creator of the ticket
@@ -513,11 +518,11 @@ class TicketModel(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     #agent=relationship("AdminModel", back_populates="tickets")
     #creator=relationship("Customer", back_populates="tickets")
-    category = relationship('TicketCategoryModel', backref='tickets')
-    status = relationship('TicketStatusModel', backref='tickets')
-    priority = relationship('TicketPriorityModel', backref='tickets')
-    comments = relationship('TicketCommentModel', backref='ticket', cascade='all, delete-orphan')
-    attachments = relationship('TicketAttachmentModel', backref='ticket', cascade='all, delete-orphan')
+    category = relationship('TicketCategoryModel', backref='support_tickets')
+    status = relationship('TicketStatusModel', backref='support_tickets')
+    priority = relationship('TicketPriorityModel', backref='support_tickets')
+    comments = relationship('TicketCommentModel', backref='support_ticket', cascade='all, delete-orphan')
+    attachments = relationship('TicketAttachmentModel', backref='support_ticket', cascade='all, delete-orphan')
 class TicketCategoryModel(Base):
     __tablename__ = 'ticket_categories'
     
@@ -547,7 +552,7 @@ class TicketCommentModel(Base):
     __tablename__ = 'ticket_comments'
     
     id = Column(Integer, primary_key=True)
-    ticket_id = Column(Integer, ForeignKey('tickets.id'), nullable=False)
+    ticket_id = Column(Integer, ForeignKey('support_tickets.id'), nullable=False)
     user_id = Column(Integer, ForeignKey('customers.id'), nullable=False)  # Comment author
     admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True)
     comment = Column(Text, nullable=False)
@@ -558,7 +563,7 @@ class TicketAttachmentModel(Base):
     __tablename__ = 'ticket_attachments'
     
     id = Column(Integer, primary_key=True)
-    ticket_id = Column(Integer, ForeignKey('tickets.id'), nullable=False)
+    ticket_id = Column(Integer, ForeignKey('support_tickets.id'), nullable=False)
     file_path = Column(String(255), nullable=False)
     uploaded_by = Column(Integer, ForeignKey('customers.id'), nullable=False)
     uploaded_at = Column(DateTime, default=func.now())
@@ -594,11 +599,18 @@ class LoanStatusModel(Base):
     description = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
 class TrainScheduleModel(Base):
     __tablename__ = 'train_schedule'
     
     id = Column(Integer, primary_key=True)
     train_id = Column(Integer, ForeignKey('trains.id'), nullable=False)
+    schedule_id = Column(Integer, ForeignKey('schedules.id'), nullable=False)
+class BusScheduleModel(Base):
+    __tablename__ = 'bus_schedule'
+    
+    id = Column(Integer, primary_key=True)
+    bus_id = Column(Integer, ForeignKey('buses.id'), nullable=False)
     schedule_id = Column(Integer, ForeignKey('schedules.id'), nullable=False)
 class ScheduleSeatModel(Base):
     __tablename__ = 'seat_schedule'
@@ -606,6 +618,78 @@ class ScheduleSeatModel(Base):
     id = Column(Integer, primary_key=True)
     seat_id = Column(Integer, ForeignKey('seats.id'), nullable=False)
     schedule_id = Column(Integer, ForeignKey('schedules.id'), nullable=False)
+
+
+
+
+class SeatModel(Base):
+    __tablename__ = 'seats'
+    
+    id = Column(Integer, primary_key=True)
+    train_id  = Column(Integer, ForeignKey("trains.id"))
+    schedule_id  = Column(Integer, ForeignKey("schedules.id"))
+    schedules =  relationship("ScheduleModel", secondary="seat_schedule", back_populates="seats")
+    seatNumber = Column(String(50), nullable=False)
+    price = Column(String(25), nullable=True)
+    classType = Column(Enum(TrainClassEnum), default=TrainClassEnum.ADULT)
+    availabilityStatus = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+
+class ParkModel(Base):
+    __tablename__ = 'parks'
+    id = Column(Integer, primary_key=True)
+    bus_id = Column(Integer, ForeignKey('buses.id'), nullable=True) 
+    name = Column(String(150), nullable=False)
+    parkImage = Column(String(255), nullable=True)
+    address = Column(String(255), nullable=True)
+    contact = Column(String(50), nullable=True)
+    startingPoint = Column(String(100), nullable=True)
+    destination = Column(String(100), nullable=True)
+    price = Column(String(25), nullable=True)
+    estimatedDeparture = Column(DateTime, nullable=True)
+    estimatedArrival = Column(DateTime,nullable=True)
+    description = Column(String(255), nullable=True)
+    policy = Column(String(255), nullable=True)
+    status = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class StationModel(Base):
+    __tablename__ = 'stations'
+    
+    id = Column(Integer, primary_key=True)
+    stationName = Column(String(50), nullable=False, unique=True)
+    location = Column(String(50), nullable=False)
+    description = Column(String(255), nullable=True)
+    parkImage = Column(String(255), nullable=True)
+    address = Column(String(255), nullable=True)
+    contact = Column(String(50), nullable=True)
+    policy = Column(String(255), nullable=True)
+    status = Column(Boolean, default=False)
+    mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS)  # schedule mode
+    depature = relationship("RouteModel", foreign_keys="RouteModel.sourceStation_id", back_populates="sourceStation")
+    arrival = relationship("RouteModel", foreign_keys="RouteModel.destinationStation_id", back_populates="destinationStation")
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+class BusModel(Base):
+    __tablename__ = 'buses'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False, unique=True)
+    seatCount = Column(Integer)
+    bus_number = Column(String(10),)
+    description = Column(String(255), nullable=True)
+    types = Column(Enum(MovableEnum), nullable=False, default=MovableEnum.BUS)
+    airCondition = Column(Boolean, default=False)
+    camera = Column(Boolean, default=False)
+    tv = Column(Boolean, default=False)
+    #parks = relationship("ParkModel", backref="movable")
+    schedules =  relationship("ScheduleModel", secondary="bus_schedule", back_populates="buses")
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 class TrainModel(Base):
     __tablename__ = 'trains'
     
@@ -625,82 +709,47 @@ class RouteModel(Base):
     
     id = Column(Integer, primary_key=True)
     routeName = Column(String(50), nullable=True,)
+    mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS)  # schedule mode
     sourceStation_id = Column(Integer, ForeignKey("stations.id"))
     destinationStation_id = Column(Integer, ForeignKey("stations.id"))
     sourceStation = relationship("StationModel", foreign_keys=[sourceStation_id], back_populates="depature")
     destinationStation = relationship("StationModel", foreign_keys=[destinationStation_id], back_populates="arrival")
     trains = relationship("TrainModel", backref="route")
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-class StationModel(Base):
-    __tablename__ = 'stations'
-    
-    id = Column(Integer, primary_key=True)
-    stationName = Column(String(50), nullable=False, unique=True)
-    location = Column(String(50), nullable=False)
-    description = Column(String(255), nullable=True)
-    #routes = relationship("RouteModel", backref="station")
-    depature = relationship("RouteModel", foreign_keys="RouteModel.sourceStation_id", back_populates="sourceStation")
-    arrival = relationship("RouteModel", foreign_keys="RouteModel.destinationStation_id", back_populates="destinationStation")
+    #buses = relationship("BusModel", backref="route")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 class ScheduleModel(Base):
     __tablename__ = 'schedules'
     
     id = Column(Integer, primary_key=True)
-    #train_id = Column(String(50), nullable=False, unique=True)
-    #train_id = Column(Integer, ForeignKey("trains.id"))
-    #trains = relationship("TrainModel", backref="schedule")
-    trains = relationship("TrainModel", secondary="train_schedule", back_populates="schedules")
-    seats =  relationship("SeatModel", secondary="seat_schedule", back_populates="schedules")
+    train_id = Column(Integer, ForeignKey("trains.id"), nullable=True)
+    bus_id = Column(Integer, ForeignKey('buses.id'), nullable=True)
+    route_id = Column(Integer, ForeignKey('routes.id'), nullable=False)
     departureTime = Column(String(50), nullable=False)
     arrivalTime = Column(String(255), nullable=True)
+    seats =  relationship("SeatModel", secondary="seat_schedule", back_populates="schedules")
     daysOfOperation = Column(String(255), nullable=True)
     timeOfOperation = Column(Enum(TimeOfOperationEnum), default=TimeOfOperationEnum.MORNING)
+    mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS)  # schedule mode
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-class SeatModel(Base):
-    __tablename__ = 'seats'
+    trains = relationship("TrainModel", secondary="train_schedule", back_populates="schedules")
+    buses = relationship("BusModel", secondary="bus_schedule", back_populates="schedules")
+
+class TicketModel(Base):
+    __tablename__ = 'tickets'
     
     id = Column(Integer, primary_key=True)
-    train_id  = Column(Integer, ForeignKey("trains.id"))
-    schedule_id  = Column(Integer, ForeignKey("schedules.id"))
-    schedules =  relationship("ScheduleModel", secondary="seat_schedule", back_populates="seats")
-    seatNumber = Column(String(50), nullable=False)
-    price = Column(String(25), nullable=True)
-    classType = Column(Enum(TrainClassEnum), default=TrainClassEnum.ADULT)
-    availabilityStatus = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-class MovableModel(Base):
-    __tablename__ = 'movables'
-    id = Column(Integer, primary_key=True)
-    name = Column(String(100), nullable=False, unique=True)
-    seatCount = Column(Integer)
-    description = Column(String(255), nullable=True)
-    types = Column(Enum(MovableEnum), nullable=False, default=MovableEnum.BUS)
-    airCondition = Column(Boolean, default=False)
-    camera = Column(Boolean, default=False)
-    tv = Column(Boolean, default=False)
-    parks = relationship("ParkModel", backref="movable")
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-class ParkModel(Base):
-    __tablename__ = 'parks'
-    id = Column(Integer, primary_key=True)
-    movable_id = Column(Integer, ForeignKey('movables.id'), nullable=True) 
-    name = Column(String(150), nullable=False)
-    parkImage = Column(String(255), nullable=True)
-    address = Column(String(255), nullable=True)
-    contact = Column(String(50), nullable=True)
-    startingPoint = Column(String(100), nullable=True)
-    destination = Column(String(100), nullable=True)
-    price = Column(String(25), nullable=True)
-    estimatedDeparture = Column(DateTime, nullable=True)
-    estimatedArrival = Column(DateTime,nullable=True)
-    description = Column(String(255), nullable=True)
-    policy = Column(String(255), nullable=True)
-    status = Column(Boolean, default=False)
+    customer_id = Column(Integer, ForeignKey('customers.id'), nullable=False)  # Creator of the ticket
+    customer = relationship('CustomerModel', backref='tickets')
+    schedule_id = Column(Integer, ForeignKey('schedules.id'), nullable=False)  # Train schedule
+    schedule = relationship('ScheduleModel', backref='tickets')
+    seat_number = Column(String(50), nullable=True)  # Seat number
+    price= Column(String(25), nullable=True)  # Ticket price
+    qr_code = Column(String(255), nullable=False,unique=True)  # QR code string or URL
+    status= Column(Enum(TicketStatusEnum), default=TicketStatusEnum.BOOKED)  # Ticket status
+    mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS)  # Ticket status
+    purchase_time = Column(DateTime, default=func.now())  # Purchase time
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 

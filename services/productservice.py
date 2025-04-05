@@ -11,7 +11,7 @@ from schemas.park import ParksResponse
 from schemas.station import StationsResponse
 from schemas.route import RoutesResponse
 from fastapi import Response,Request,status
-from models.queries import productQuery
+from models.queries import productQuery,queries
 from schemas.beneficiary import *
 
 logger = logging.getLogger(__name__)
@@ -65,11 +65,19 @@ def searchTrainRoutes(request: Request,response: Response,setting: Setting,db: S
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return RoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-def stations(request: Request,response: Response,setting: Setting,db: Session,user: Customer):
+def stations(mode:str,request: Request,response: Response,setting: Setting,db: Session,user: Customer):
     try:
-        logger.info(f"Started getting stations") 
+        logger.info(f"Started getting stations")
+        if mode.lower() == "bus":
+            data = queries.query_stations(db=db,mode=mode)
+        elif mode == "train":
+            data = queries.query_stations(db=db,mode=mode)
+        else:
+            data = queries.query_stations(db=db,mode=mode)
+        if not data:
+            data = queries.query_stations(db=db,mode=mode)
         data = []
-        data = productQuery.query_stations(db=db)
+        data = queries.query_stations(db=db,mode=mode)
         if data:
             return StationsResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=data)
         return StationsResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=data)
@@ -80,9 +88,9 @@ def stations(request: Request,response: Response,setting: Setting,db: Session,us
 def getBeneficiaries(db: Session,response: Response,transType:str,user:Customer):
     beneficiaries = productQuery.queryBeneficiaryByTransactionType(db=db,transactionType=transType,userId=user.id)
     if beneficiaries:
-        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=beneficiaries)
+        return BeneficiariesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=beneficiaries)
     response.status_code = status.HTTP_400_BAD_REQUEST
-    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+    return BeneficiariesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
 def addBeneficiary(db: Session,request:Request,response:Response,payload:AddBeneficiaryRequest,user:CustomerModel):
     existedBeneficiary = productQuery.querySinglebeneficiary(db=db,transactionType=payload.transaction_type,userId=user.id,customerId=payload.customerId)
     if existedBeneficiary:

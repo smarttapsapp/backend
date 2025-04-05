@@ -536,7 +536,7 @@ def walletTransfer(
             sender = queries.queryWallet(db=db,walletAccount=payload.senderAccount)
             if sender:
                 if float(sender.availableBalance) >= float(payload.amount):
-                    lastPayment = queries.getLastpaymentByAccount(db=db,reference=sender.id)
+                    lastPayment = queries.getLastpaymentByAccount(db=db,accountId=sender.id)
                     if lastPayment:
                         logger.info(f"last transaction from sender {payload.senderAccount} is {lastPayment.created_at}")
                         timeDifference  = (datetime.now() - lastPayment.updated_at).total_seconds()
@@ -582,8 +582,8 @@ def debitWallet(
         payment_type =PaymentEnum.DEBIT,
         reference =util.generateId(),
         event = "charge.success",
+        payment_date = datetime.now().date(),
         status = "success",
-        payment_date = datetime.now(),
         channel = "MOBILE",
         fee = "1000",
         statusCode = "200",
@@ -612,16 +612,16 @@ def debitWallet(
                     reference =util.generateId(),
                     event = "charge.success",
                     status = "success",
-                    payment_date = datetime.now(),
+                    payment_date = datetime.now().date(),
                     channel ="MOBILE",
                     statusCode = "200",
                     statusMessage = payload.description,
                     balanceBefore = receipient.availableBalance,
-                    balanceAfter = updatedReceiver.wallet.availableBalance,
+                    balanceAfter = updatedReceiver.availableBalance,
                     created_at =datetime.now(),
                     updated_at = datetime.now()
                     )
-                createCreditRecord = paymentQuery.create(db=db,model=credit)
+                createCreditRecord = queries.create(db=db,model=credit)
                 if createCreditRecord:
                     background_task.add_task(notifyUser,db=db,title=f"Credit Notification", message=createCreditRecord.statusMessage,userId=user.id, setting=setting)
                     email_credit = util.templates.TemplateResponse("credit.html",{"request": request, "user": user,"payment":createCreditRecord},)
