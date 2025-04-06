@@ -3,7 +3,6 @@ from datetime import datetime
 from sqlalchemy import func
 from pydantic import BaseModel
 from schemas.response import BaseResponse
-from schemas.moveable import Movable
 
 class ParkBase(BaseModel):
     name: Union[str, None] = None
@@ -23,8 +22,7 @@ class ParkRequest(ParkBase):
 class Park(ParkBase):
     price: Union[str, None] = None
     status: Union[bool, None] = False
-    movable:Union[Movable, None] = None
-    id: Optional[int]
+    id: Optional[int] =0
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 

@@ -50,7 +50,8 @@ class FundRequest(BaseModel):
     amount:str
 
 class BuyTicketRequest(PINRequest):
-    ticketId: int
+    busId:int
+    scheduleId: int
     walletAccount:str
     amount: str
 class BuyTrainTicketRequest(PINRequest):

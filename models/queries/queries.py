@@ -100,3 +100,10 @@ def getLastpaymentByAccount(db: Session, accountId: int):
 
 def query_stations(db: Session,mode:str):
     return db.query(StationModel).filter(StationModel.mode == mode).all()
+def query_routes(db: Session,mode:str):
+    return db.query(RouteModel).filter(RouteModel.mode == mode).all()
+def query_routes_by_stations(db: Session,departure:int,arrival:int,mode:str):
+    return db.query(RouteModel).filter(RouteModel.mode == mode).filter(RouteModel.sourceStation_id == departure).filter(RouteModel.destinationStation_id == arrival).first()
+
+def busById(db: Session,busId:int):
+    return db.query(BusModel).filter(BusModel.id == busId).first()

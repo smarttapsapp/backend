@@ -189,17 +189,17 @@ async def get_payment(
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["tickets"])
 async def buy_ticket(
-    payload: FundRequest,
+    payload: BuyTicketRequest,
     request: Request,
     response: Response,
-    user: Annotated[Customer, Depends(verified_user)],
+    user: Annotated[CustomerModel, Depends(validateTransactionPIN)],
     setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
 ):
     try:
         if user:
-            return paymentservice.fundViaPaystack(user=user,request=request,db=db,response=response,setting=setting,amount=payload.amount)
+            return paymentservice.debitBusTicket(user=user,request=request,db=db,response=response,setting=setting,payload=payload,background_task=background_task)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -216,7 +216,7 @@ async def buy_train_ticket(
     payload: BuyTrainTicketRequest,
     request: Request,
     response: Response,
-    user: Annotated[Customer, Depends(verified_user)],
+    user: Annotated[CustomerModel, Depends(validateTransactionPIN)],
     setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,

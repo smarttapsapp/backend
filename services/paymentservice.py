@@ -635,3 +635,76 @@ def debitWallet(
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)
     response.status_code = status.HTTP_400_BAD_REQUEST
     return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)            
+def debitBusTicket(db:Session,request:Request,response:Response,setting:Setting,payload:BuyTicketRequest,user:CustomerModel,background_task:BackgroundTasks):
+    try:
+        logger.info(f"Started debit process for bus ticket payment {payload.busId} for amount {payload.amount} for {user.firstname}")
+        if user.wallet.walletAccount == payload.walletAccount:
+            bus = queries.busById(db=db,busId=payload.busId)
+            if bus:
+                if bus.availabilityStatus:
+                    if int(user.wallet.availableBalance) > int(payload.amount):
+                        logger.info(f"balance is sufficient {user.wallet.availableBalance}")
+                        newBalance = int(user.wallet.availableBalance) - int(payload.amount)
+                        user.wallet.availableBalance = newBalance
+                        updatedUser = paymentQuery.create(db=db,model=user)
+                        if updatedUser:
+                            logger.info(f"Start processing payment records ...............")
+                            debit = PaymentModel(
+                                wallet_id = user.wallet.id,
+                                user_id =user.id,
+                                amount = payload.amount,
+                                payment_type =PaymentEnum.DEBIT,
+                                reference =f"BUS-{util.generateId()}",
+                                event = "charge.success",
+                                status = "success",
+                                channel = "MOBILE",
+                                fee = "1000",
+                                statusCode = "200",
+                                statusMessage = f"{bus.name}/{bus.park.name}/{payload.busId}",
+                                balanceBefore = user.wallet.availableBalance,
+                                balanceAfter = newBalance,
+                                created_at =datetime.now(),
+                                updated_at = datetime.now()
+                            )
+                            createDebitRecord = paymentQuery.create(db=db,model=debit)
+                            if createDebitRecord:
+                                logger.info(f"create ticket record for bus {payload.busId} with balance after {user.wallet.availableBalance}")
+                                ticket = TicketModel(
+                                    bus_id = bus.id,
+                                    customer_id = user.id,
+                                    ticket_type = payload.ticketType,
+                                    ticket_number = f"BUS-{util.generateId()}",
+                                    ticket_status = "active",
+                                    price = payload.amount,
+                                    ticket_date = payload.ticketDate,
+                                    ticket_time = payload.ticketTime,
+                                    ticket_seat = payload.seatNumber,
+                                    ticket_reference = f"BUS-{util.generateId()}",
+                                    created_at =datetime.now(),
+                                    updated_at = datetime.now()
+                                )
+                                createTicketRecord = paymentQuery.create(db=db,model=ticket)
+                                background_task.add_task(notifyUser,db=db,title=f"Bus Ticket Purchase", message=createDebitRecord.statusMessage,userId=user.id, setting=setting)
+                                email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"payment":createDebitRecord},)
+                                background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Bus Ticket Purchase",toAddress=user.email)
+                                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":createDebitRecord.id})
+                    else:
+                        logger.info(f"{INSUFFICIENTFUND} with user {user.firstname}")
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INSUFFICIENTFUND)
+                else:
+                    logger.info(f"Bus {payload.busId} is not available for {user.firstname}")
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Bus not available")
+            else:
+                logger.info(f"Invalid bus selected {payload.busId} for {user.firstname}")
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Bus not found")
+        else:
+            logger.info(f"Invalid account selected {payload.walletAccount} for {user.firstname}")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex),)

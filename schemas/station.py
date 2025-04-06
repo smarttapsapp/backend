@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import func
 from pydantic import BaseModel
 from schemas.response import BaseResponse
-from schemas.moveable import Movable
+from schemas.bus import Bus
 
 class StationBase(BaseModel):
     stationName: Union[str, None] = None

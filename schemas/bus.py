@@ -3,22 +3,30 @@ from datetime import datetime
 from sqlalchemy import func
 from pydantic import BaseModel
 from schemas.response import BaseResponse
+from schemas.park import Park
+from schemas.schedule import Schedule
 
 
-class MovableBase(BaseModel):
+class BusBase(BaseModel):
     name: Union[str, None] = None
     seatCount: Union[int, None] = None
     types: Union[str, None] = None
+    bus_number: Optional[str] = None
+    busImage: Union[str, None] = None
+    description: Union[str, None] = None
+    base_price: Union[str, None] = None
 
 
-class MovableRequest(MovableBase):
+class BusRequest(BusBase):
     user: Union[List[str], None] = None
 
-class Movable(MovableBase):
+class Bus(BusBase):
     tv: Union[bool, None] = False
     camera: Union[bool, None] = False
     ac: Union[bool, None] = False
     id: Optional[int]
+    park: Optional[Park]=None
+    schedules: Optional[List[Schedule]] = []
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 
@@ -26,8 +34,8 @@ class Movable(MovableBase):
         from_attributes = True
         populate_by_name = True
 
-class MovablesResponse(BaseResponse):
-    data: Union[List[Movable],None] = None
+class BusesResponse(BaseResponse):
+    data: Union[List[Bus],None] = None
     
-class MovableResponse(BaseResponse):
-    data: Movable = None
+class BusResponse(BaseResponse):
+    data: Bus = None
