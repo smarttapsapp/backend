@@ -227,9 +227,10 @@ def generateId():
 def generateOTP():
     return str(randint(100000, 999999))
 
-
+def find_item(items, key, value):
+    return next((x for x in items if x.billerId == value), None)
 def generateUniqueId():
-    return "2510" + str(uuid.uuid5(uuid.NAMESPACE_DNS, "better-ng.com").int)
+    return "2510" + str(uuid.uuid5(uuid.NAMESPACE_DNS, "smarttap.org").int)
 
 def formatDateOfBirth(dob:str):
     try:

@@ -7,7 +7,8 @@ from schemas.account import Account
 import logging
 
 logger = logging.getLogger(__name__)
-
+def getBillByVas(db: Session,vasType:str):
+    return db.query(ProductModel).filter(ProductModel.vasType == vasType).first()
 def customer(db: Session, userId: int):
     return db.query(CustomerModel).filter(CustomerModel.id == userId).first()
 def customer_by_email(db: Session, email: str):
@@ -55,15 +56,11 @@ def notification(db: Session,userId:int):
     if userId:
         return db.query(NotificationModel).filter(NotificationModel.user_notifications).all()
     return db.query(NotificationModel).first()
-def updateNotifications(db: Session,userId:int):
+def readNotifications(db: Session,userId:int):
     if userId:
         return db.query(NotificationModel).filter(NotificationModel.user_notifications).all()
     return db.query(NotificationModel).first()
-def updateNotification(db: Session,userId:int):
-    if userId:
-        return db.query(NotificationModel).filter(NotificationModel.user_notifications).all()
-    return db.query(NotificationModel).first()
-def deleteNotification(db: Session,userId:int):
+def readNotification(db: Session,userId:int):
     if userId:
         return db.query(NotificationModel).filter(NotificationModel.user_notifications).all()
     return db.query(NotificationModel).first()
@@ -73,6 +70,8 @@ def deleteNotifications(db: Session,userId:int):
     return db.query(NotificationModel).first()
 def queryNotifications(db: Session ,userId:int):
     return db.query(NotificationModel).join(UserNotification).join(CustomerModel).filter(CustomerModel.id == userId).order_by(desc(NotificationModel.updated_at)).all()
+def deleteNotification(db: Session ,userId:int,notificationId:int):
+    return db.query(NotificationModel).filter(NotificationModel.id == notificationId).delete()
 def queryNotification(db: Session ,userId:int,notificationId:int):
     return db.query(NotificationModel).join(UserNotification).join(CustomerModel).filter(CustomerModel.id == userId).filter(NotificationModel.id == notificationId).order_by(desc(NotificationModel.updated_at)).first()
 def update_user_agent_records(db: Session, id: int, user: Customer):
@@ -119,6 +118,8 @@ def getPaymentHistoriesByTransaction(db: Session,userId:int,startDate:str,endDat
         end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
         return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.payment_type == transType).filter(PaymentModel.statusCode=="200").filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
     return db.query(PaymentModel).filter(PaymentModel.payment_type == transType).filter(PaymentModel.user_id == userId).filter(PaymentModel.statusCode=="200").order_by(desc(PaymentModel.created_at)).all()
+def paymentByTransactionNumber(db:Session,mode:PaymentEnum,transactionId:str,userId=int):
+    return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.reference == transactionId).filter(PaymentModel.payment_type == mode).first()
 def ticketByTicketNumber(db:Session,mode:TicketModeEnum,ticketId:str):
     return db.query(TicketModel).filter(TicketModel.ticket_number == ticketId).filter(TicketModel.mode == mode).first()
 def getTicketHistories(db: Session,userId:int,startDate:str,endDate:str):

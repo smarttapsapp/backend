@@ -59,3 +59,13 @@ def query_bus_routes_departure(db: Session, departure: str, arrival: str, search
     return db.query(ParkModel).filter(ParkModel.address.like(f"%{departure}%")).filter(ParkModel.address.like(f"%{arrival}%")).all()
 def query_bus_routes_arrival(db: Session, departure: str, arrival: str, searchType: str):
     return db.query(ParkModel).filter(ParkModel.address.like(f"%{departure}%")).filter(ParkModel.address.like(f"%{arrival}%")).all()
+def updateAccountBalance(db:Session,walletId:str,newBalance:str):
+    account = db.query(AccountModel).filter(AccountModel.walletAccount == walletId).first()
+    if account:
+        account.availableBalance = newBalance
+        account.updated_at = datetime.now()
+        db.add(account)
+        db.commit()
+        db.refresh(account)
+        return account
+    return None

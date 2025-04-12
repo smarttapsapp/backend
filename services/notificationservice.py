@@ -29,18 +29,28 @@ def getNotification(db: Session,userId:int,notificationId:int):
     notifications = queries.notifications(db=db,userId=userId)
     logger.info(notifications)
     return notifications
+def readNotification(db: Session,response:Response,userId:int,notificationId:int):
+    notification = queries.queryNotification(db=db,userId=userId,notificationId=notificationId)
+    logger.info(notification)
+    if notification:
+        notification.isRead = True
+        notification.updated_at = datetime.now()
+        updated = queries.create(db=db,model=notification)
+        if updated:
+            return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,)
+    response.status_code = status.HTTP_400_BAD_REQUEST
+    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
 def readNotifications(db: Session,userId:int,notificationId:int):
     notifications = queries.notifications(db=db,userId=userId)
     logger.info(notifications)
     return notifications
-def readNotification(db: Session,userId:int,notificationId:int):
-    notifications = queries.notifications(db=db,userId=userId)
-    logger.info(notifications)
-    return notifications
-def deleteNotification(db: Session,userId:int,notificationId:int):
-    notifications = queries.notifications(db=db,userId=userId)
-    logger.info(notifications)
-    return notifications
+def deleteNotification(db: Session,response:Response,userId:int,notificationId:int):
+    deleted = queries.deleteNotification(db=db,userId=userId,notificationId=notificationId)
+    logger.info(deleted)
+    if deleted:
+        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,)
+    response.status_code = status.HTTP_400_BAD_REQUEST
+    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
 
 def createNotification(
         request: Request,

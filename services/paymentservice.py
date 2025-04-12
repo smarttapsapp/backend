@@ -149,93 +149,29 @@ def payments(request: Request,response: Response,setting: Setting,db: Session,us
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return PaymentsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-def getPayment(
+def getSinglePayment(
     request: Request,
     response: Response,
     setting: Setting,
     db: Session,
-    user: Admin,
-    startDate: str ,
-    endDate: str ,
+    user: Customer,
+    transactionId: str ,
     transactionType: str ,
 ):
     try:
-        logger.info(
-            f"started transaction querying from {startDate} to {endDate} for {transactionType}"
-        )
-        if startDate and endDate and transactionType:
-            startDate_object = datetime.strptime(startDate, "%Y-%m-%d").date()
-            endDate_object = datetime.strptime(endDate, "%Y-%m-%d").date()
-            if endDate_object >= startDate_object:
-                response.status_code = status.HTTP_200_OK
-                return PaymentsResponse(
-                  
-                       statusCode=str(status.HTTP_200_OK),
-                       statusDescription=SUCCESS,
-                       data=paymentQuery.get_all(
-                            db=db,
-                            sql=QUERYTRANSACTIONBYDATEANDTRANSTYPE.replace(
-                                "<userId>", str(user.id)
-                            )
-                            .replace("<start>", startDate)
-                            .replace("<end>", endDate)
-                            .replace("<transactionType>", transactionType),
-                        ),
-                 
-                )
-            else:
-                response.status_code = status.HTTP_200_OK
-                return PaymentsResponse(
-                  
-                       statusCode=str(status.HTTP_200_OK),
-                       statusDescription=SUCCESS,
-                       data=paymentQuery.get_all(
-                            db=db,
-                            sql=QUERYTRANSACTIONBYDATEANDTRANSTYPE.replace(
-                                "<userId>", str(user.id)
-                            )
-                            .replace("<start>", startDate)
-                            .replace("<end>", str(date.today()))
-                            .replace("<transactionType>", transactionType),
-                        ),
-                 
-                )
-        elif startDate and endDate and transactionType is None:
-            response.status_code = status.HTTP_200_OK
-            return PaymentsResponse(
-              
-                   statusCode=str(status.HTTP_200_OK),
-                   statusDescription=SUCCESS,
-                   data=paymentQuery.get_all(
-                        db=db,
-                        sql=QUERYTRANSACTIONBYDATES.replace(
-                            "<userId>", str(user.id)
-                        )
-                        .replace("<start>", startDate)
-                        .replace("<end>", endDate),
-                    ),
-             
-            )
-        else:
-            response.status_code = status.HTTP_200_OK
-            return PaymentsResponse(
-              
-                   statusCode=str(status.HTTP_200_OK),
-                   statusDescription=SUCCESS,
-                   data=paymentQuery.get_all(
-                        db=db,
-                        sql=QUERYTRANSACTIONS.replace("<userId>", str(user.id)),
-                    ),
-             
+        logger.info(f"started transaction querying for {transactionId}")
+        payment = queries.paymentByTransactionNumber(db=db,mode=PaymentEnum[transactionType.upper()],transactionId=transactionId,userId=user.id)
+        return PaymentResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=Transaction.from_orm(payment)
             )
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return PaymentsResponse(
-          
+        return PaymentResponse(
                statusCode=str(status.HTTP_400_BAD_REQUEST),
                statusDescription=str(ex),
-         
         )
 def payment(
     request: Request,
@@ -289,41 +225,52 @@ def nfcdebitService(
 ):
     try:
         logger.info(f"started debit transaction via NFC for sender {payload.senderAccount} to receiver {payload.walletAccount}")
-        if payload.senderAccount != user.wallet.walletAccount:
-            duplicate = paymentQuery.getPaymentByReference(db=db,reference=payload.transactionId)
-            if duplicate:
-                logger.info(f"duplicate transaction found {duplicate.reference}")
-                response.status_code = status.HTTP_400_BAD_REQUEST
-                return PaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=DUPLICATE)
-            else:
-                sender = paymentQuery.querySender(db=db,walletAccount=payload.senderAccount)
-                if sender:
-                    if float(sender.availableBalance) >= float(payload.amount):
-                        lastTransaction = paymentQuery.queryLatestRecordByAmount(db=db,amount=payload.amount)
-                        if lastTransaction:
-                            logger.info(f"last transaction from sender {payload.senderAccount} is {lastTransaction.created_at}")
-                            timeDifference  = (datetime.now() - lastTransaction.updated_at).total_seconds()
-                            if timeDifference > 5:
-                                if lastTransaction.amount != payload.amount:
-                                    lastTransactionTime = datetime.strptime(lastTransaction.updated_at, "%Y-%m-%d %H:%M:%S")
-                                    return debitNfc(payload=payload,request=request,response=response,setting=setting,db=db,user=user,sender=sender,background_task=background_task)
+        sender = paymentQuery.querySender(db=db,walletAccount=payload.senderAccount)
+        if sender:
+            verifiedPIN = util.verify_password(payload.pin,sender.user.pin)
+            if verifiedPIN:
+                if payload.senderAccount != user.wallet.walletAccount:
+                    duplicate = paymentQuery.getPaymentByReference(db=db,reference=payload.transactionId)
+                    if duplicate:
+                        logger.info(f"duplicate transaction found {duplicate.reference}")
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return PaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=DUPLICATE)
+                    else:
+                        product = queries.getBillByVas(db=db,vasType="payment")
+                        if product:
+                            if float(sender.availableBalance) >= float(payload.amount):
+                                lastTransaction = paymentQuery.queryLatestRecordByAmount(db=db,amount=payload.amount)
+                                if lastTransaction:
+                                    logger.info(f"last transaction from sender {payload.senderAccount} is {lastTransaction.created_at}")
+                                    timeDifference  = (datetime.now() - lastTransaction.updated_at).total_seconds()
+                                    logger.info(f"ths time difference is {timeDifference}")
+                                    if int(timeDifference) > 5:
+                                        #if lastTransaction.amount != payload.amount:
+                                        #    lastTransactionTime = datetime.strptime(lastTransaction.updated_at, "%Y-%m-%d %H:%M:%S")
+                                        return debitNfc(payload=payload,request=request,response=response,setting=setting,db=db,user=user,sender=sender,product=product,background_task=background_task)
+                                        #else:
+                                        #    response.status_code = status.HTTP_400_BAD_REQUEST
+                                        #    return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = DUPLICATE)
+                                    else:
+                                        response.status_code = status.HTTP_400_BAD_REQUEST
+                                        return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = DUPLICATE)
                                 else:
-                                    response.status_code = status.HTTP_400_BAD_REQUEST
-                                    return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = INSUFFICIENTFUND)
+                                    return debitNfc(payload=payload,request=request,response=response,setting=setting,db=db,user=user,sender=sender,product=product,background_task=background_task)
                             else:
                                 response.status_code = status.HTTP_400_BAD_REQUEST
-                                return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = DUPLICATE)
+                                return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = INSUFFICIENTFUND)
                         else:
-                            return debitNfc(payload=payload,request=request,response=response,setting=setting,db=db,user=user,sender=sender,background_task=background_task)
-                    else:
-                        response.status_code = status.HTTP_400_BAD_REQUEST
-                        return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = INSUFFICIENTFUND)
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
-                    return PaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT)
+                    return PaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SAMEACCOUNT,)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return PaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDPIN)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
-            return PaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SAMEACCOUNT,)
+            return PaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -336,71 +283,83 @@ def debitNfc(
     db: Session,
     user: Customer,
     sender:AccountModel,
+    product:ProductModel,
     background_task:BackgroundTasks
 ):
-    sender.availableBalance = (int(sender.availableBalance) - int(payload.amount))
-    updatedAccount = paymentQuery.create(db=db,model=sender)
-    logger.info(f"balance after debit posted successfully is {updatedAccount.availableBalance}")
-    if updatedAccount:
-        debit = PaymentModel(
-        wallet_id = sender.id,
-        user_id =sender.user_id,
-        amount = payload.amount,
-        payment_type =PaymentEnum.DEBIT,
-        reference =payload.transactionId,
-        event = "charge.success",
-        status = "success",
-        payment_date = datetime.now(),
-        channel = payload.transactionChannel,
-        fee = "1000",
-        statusCode = "200",
-        statusMessage = payload.description,
-        balanceBefore = sender.availableBalance,
-        balanceAfter = updatedAccount.availableBalance,
-        created_at =datetime.now(),
-        updated_at = datetime.now()
-        )
-        createDebitRecord = paymentQuery.create(db=db,model=debit)
-        if createDebitRecord:
-            background_task.add_task(notifyUser,db=db,title=f"Debit Notification", message=createDebitRecord.statusMessage,userId=user.id, setting=setting)
-            email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"payment":createDebitRecord},)
-            background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Debit Notification",toAddress=user.email)
-            logger.info(f"start credit to receiver {user.wallet.walletAccount} with balance before {user.wallet.availableBalance}")
-            user.wallet.availableBalance =  int(user.wallet.availableBalance)+int(payload.amount)
-            updatedReceiver = paymentQuery.create(user)
-            if updatedReceiver:
-                logger.info(f"create credit record for reciever {user.wallet.walletAccount} with balance after {user.wallet.availableBalance}")
-                credit = PaymentModel(
-                    wallet_id = user.wallet.id,
-                    user_id =user.id,
-                    amount = payload.amount,
-                    payment_type =PaymentEnum.CREDIT,
-                    reference =payload.transactionId,
-                    event = "charge.success",
-                    status = "success",
-                    payment_date = datetime.now(),
-                    channel = payload.transactionChannel,
-                    statusCode = "200",
-                    statusMessage = payload.description,
-                    balanceBefore = user.wallet.availableBalance,
-                    balanceAfter = updatedReceiver.wallet.availableBalance,
-                    created_at =datetime.now(),
-                    updated_at = datetime.now()
-                    )
-                createCreditRecord = paymentQuery.create(db=db,model=credit)
-                if createCreditRecord:
-                    background_task.add_task(notifyUser,db=db,title=f"Credit Notification", message=createCreditRecord.statusMessage,userId=user.id, setting=setting)
-                    email_credit = util.templates.TemplateResponse("credit.html",{"request": request, "user": user,"payment":createCreditRecord},)
-                    background_task.add_task(util.mailer,str(email_credit.body, "utf-8"),setting=setting,subject="Credit Notification",toAddress=user.email)
-                    return BaseResponse(statusCode="00",statusDescription=SUCCESS)
+    debitProductType = util.find_item(product.billers,"billerId","debit")
+    if debitProductType:
+        sender.availableBalance = (int(sender.availableBalance) - int(payload.amount))
+        updatedAccount = paymentQuery.create(db=db,model=sender)
+        logger.info(f"balance after debit posted successfully is {updatedAccount.availableBalance}")
+        if updatedAccount:
+            debit = PaymentModel(
+            wallet_id = sender.id,
+            user_id =sender.user_id,
+            amount = payload.amount,
+            payment_type =PaymentEnum.DEBIT,
+            reference =payload.transactionId,
+            event = "charge.success",
+            status = "success",
+            channel = "NFC",
+            fee = "1000",
+            payment_date = datetime.now().date(),
+            statusCode = "200",
+            product_type_id = debitProductType.id,
+            product_id=product.id,
+            statusMessage = payload.description,
+            recipient=user.wallet.walletAccount,
+            balanceBefore = sender.availableBalance,
+            balanceAfter = updatedAccount.availableBalance,
+            created_at =datetime.now(),
+            updated_at = datetime.now()
+            )
+            createDebitRecord = paymentQuery.create(db=db,model=debit)
+            if createDebitRecord:
+                background_task.add_task(notifyUser,db=db,title=f"Debit Notification", message=createDebitRecord.statusMessage,userId=user.id, setting=setting)
+                email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"payment":createDebitRecord},)
+                background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Debit Notification",toAddress=user.email)
+                logger.info(f"start credit to receiver {user.wallet.walletAccount} with balance before {user.wallet.availableBalance}")
+                newBalance =  int(user.wallet.availableBalance)+int(payload.amount)
+                updatedReceiver = paymentQuery.updateAccountBalance(db=db,walletId=user.wallet.walletAccount,newBalance=newBalance)
+                if updatedReceiver:
+                    logger.info(f"create credit record for reciever {user.wallet.walletAccount} with balance after {user.wallet.availableBalance}")
+                    creditProductType = util.find_item(product.billers,"billerId","credit")
+                    credit = PaymentModel(
+                        wallet_id = user.wallet.id,
+                        user_id =user.id,
+                        amount = payload.amount,
+                        payment_type =PaymentEnum.CREDIT,
+                        reference =payload.transactionId,
+                        event = "charge.success",
+                        status = "success",
+                        payment_date = datetime.now().date(),
+                        channel = payload.transactionChannel,
+                        statusCode = "200",
+                        product_id=product.id,
+                        recipient=sender.walletAccount,
+                        product_type_id = creditProductType.id if creditProductType else 1,
+                        statusMessage = payload.description,
+                        balanceBefore = user.wallet.availableBalance,
+                        balanceAfter = updatedReceiver.availableBalance,
+                        created_at =datetime.now(),
+                        updated_at = datetime.now()
+                        )
+                    createCreditRecord = paymentQuery.create(db=db,model=credit)
+                    if createCreditRecord:
+                        background_task.add_task(notifyUser,db=db,title=f"Credit Notification", message=createCreditRecord.statusMessage,userId=user.id, setting=setting)
+                        email_credit = util.templates.TemplateResponse("credit.html",{"request": request, "user": user,"payment":createCreditRecord},)
+                        background_task.add_task(util.mailer,str(email_credit.body, "utf-8"),setting=setting,subject="Credit Notification",toAddress=user.email)
+                        return BaseResponse(statusCode="00",statusDescription=SUCCESS,data={"transactionId":createCreditRecord.reference})
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)
                 response.status_code = status.HTTP_400_BAD_REQUEST
                 return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)    
     response.status_code = status.HTTP_400_BAD_REQUEST
-    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)            
+    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)          
 def billerEnquiry(
         payload:BillNameEnquiryRequest,
         request: Request,
@@ -484,6 +443,7 @@ def debitBillPayment(
                 wallet_id = user.wallet.id,
                 user_id =user.id,
                 amount = payload.amount,
+                recipient=payload.customerNumber,
                 payment_type =PaymentEnum.DEBIT,
                 reference =f"{biller.billerName[:3]}-{util.generateId()}",
                 event = "charge.success",
@@ -496,6 +456,7 @@ def debitBillPayment(
                 balanceBefore = user.wallet.availableBalance,
                 balanceAfter = newBalance,
                 product_id = biller.product_id,
+                product_type_id = biller.id,
                 created_at =datetime.now(),
                 updated_at = datetime.now()
         )
@@ -505,8 +466,8 @@ def debitBillPayment(
                 email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"payment":createDebitRecord},)
                 background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Debit Notification",toAddress=user.email)
                 logger.info(f"start credit to receiver {user.wallet.walletAccount} with balance before {user.wallet.availableBalance}")
-                return BillPaymentResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":createDebitRecord.id})
-    else:
+                return BillPaymentResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":createDebitRecord.reference})
+    else: 
         logger.info(f"{INSUFFICIENTFUND} with user {user.firstname}")
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INSUFFICIENTFUND)
@@ -532,26 +493,31 @@ def walletTransfer(
         background_task:BackgroundTasks
 ):
     if payload.senderAccount != payload.receiverAccount:
-        receipient = queries.queryWallet(db=db,walletAccount=payload.receiverAccount)
-        if receipient:
+        recipient = queries.queryWallet(db=db,walletAccount=payload.receiverAccount)
+        if recipient:
             sender = queries.queryWallet(db=db,walletAccount=payload.senderAccount)
             if sender:
-                if float(sender.availableBalance) >= float(payload.amount):
-                    lastPayment = queries.getLastpaymentByAccount(db=db,accountId=sender.id)
-                    if lastPayment:
-                        logger.info(f"last transaction from sender {payload.senderAccount} is {lastPayment.created_at}")
-                        timeDifference  = (datetime.now() - lastPayment.updated_at).total_seconds()
-                        if timeDifference > 5:
-                            return debitWallet(payload=payload,request=request,response=response,setting=setting,db=db,user=user,sender=sender,receipient=receipient,background_task=background_task)
+                bill = queries.getBillByVas(db=db,vasType="payment")
+                if bill:
+                    if float(sender.availableBalance) >= float(payload.amount):
+                        lastPayment = queries.getLastpaymentByAccount(db=db,accountId=sender.id)
+                        if lastPayment:
+                            logger.info(f"last transaction from sender {payload.senderAccount} is {lastPayment.created_at}")
+                            timeDifference  = (datetime.now() - lastPayment.updated_at).total_seconds()
+                            if timeDifference > 5:
+                                return debitWallet(payload=payload,request=request,response=response,setting=setting,db=db,user=user,sender=sender,recipient=recipient,product=bill,background_task=background_task)
+                            else:
+                                response.status_code = status.HTTP_400_BAD_REQUEST
+                                return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = DUPLICATE)
                         else:
-                            response.status_code = status.HTTP_400_BAD_REQUEST
-                            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = DUPLICATE)
+                            logger.info(f"last payment not found for {sender.walletAccount}")
+                            return debitWallet(payload=payload,request=request,response=response,setting=setting,db=db,user=user,sender=sender,recipient=recipient,product=bill,background_task=background_task)
                     else:
-                        logger.info(f"last payment not found for {sender.walletAccount}")
-                        return debitWallet(payload=payload,request=request,response=response,setting=setting,db=db,user=user,sender=sender,receipient=receipient,background_task=background_task)
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = INSUFFICIENTFUND)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
-                    return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = INSUFFICIENTFUND)
+                    return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
                 return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT)
@@ -569,71 +535,83 @@ def debitWallet(
     db: Session,
     user: Customer,
     sender:AccountModel,
-    receipient:AccountModel,
+    recipient:AccountModel,
+    product:ProductModel,
     background_task:BackgroundTasks
 ):
-    sender.availableBalance = (int(sender.availableBalance) - int(payload.amount))
-    updatedAccount = paymentQuery.create(db=db,model=sender)
-    logger.info(f"balance after debit posted successfully is {updatedAccount.availableBalance}")
-    if updatedAccount:
-        debit = PaymentModel(
-        wallet_id = sender.id,
-        user_id =sender.user_id,
-        amount = payload.amount,
-        payment_type =PaymentEnum.DEBIT,
-        reference =util.generateId(),
-        event = "charge.success",
-        payment_date = datetime.now().date(),
-        status = "success",
-        channel = "MOBILE",
-        fee = "1000",
-        statusCode = "200",
-        statusMessage = payload.description,
-        balanceBefore = sender.availableBalance,
-        balanceAfter = updatedAccount.availableBalance,
-        created_at =datetime.now(),
-        updated_at = datetime.now()
-        )
-        createDebitRecord = paymentQuery.create(db=db,model=debit)
-        if createDebitRecord:
-            background_task.add_task(notifyUser,db=db,title=f"Debit Notification", message=createDebitRecord.statusMessage,userId=user.id, setting=setting)
-            email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"payment":createDebitRecord},)
-            background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Debit Notification",toAddress=user.email)
-            logger.info(f"start credit to receiver {user.wallet.walletAccount} with balance before {user.wallet.availableBalance}")
-            receipient.availableBalance =  int(receipient.availableBalance)+int(payload.amount)
-            updatedReceiver = queries.create(db=db,model=receipient)
-            logger.info(f"balance after credit posted successfully is {updatedReceiver.availableBalance}")
-            if updatedReceiver:
-                logger.info(f"create credit record for reciever {receipient.walletAccount} with balance after {receipient.availableBalance}")
-                credit = PaymentModel(
-                    wallet_id = receipient.id,
-                    user_id =receipient.user_id,
-                    amount = payload.amount,
-                    payment_type =PaymentEnum.CREDIT,
-                    reference =util.generateId(),
-                    event = "charge.success",
-                    status = "success",
-                    payment_date = datetime.now().date(),
-                    channel ="MOBILE",
-                    statusCode = "200",
-                    statusMessage = payload.description,
-                    balanceBefore = receipient.availableBalance,
-                    balanceAfter = updatedReceiver.availableBalance,
-                    created_at =datetime.now(),
-                    updated_at = datetime.now()
-                    )
-                createCreditRecord = queries.create(db=db,model=credit)
-                if createCreditRecord:
-                    background_task.add_task(notifyUser,db=db,title=f"Credit Notification", message=createCreditRecord.statusMessage,userId=user.id, setting=setting)
-                    email_credit = util.templates.TemplateResponse("credit.html",{"request": request, "user": user,"payment":createCreditRecord},)
-                    background_task.add_task(util.mailer,str(email_credit.body, "utf-8"),setting=setting,subject="Credit Notification",toAddress=user.email)
-                    return BaseResponse(statusCode="00",statusDescription=SUCCESS)
+    debitProductType = util.find_item(product.billers,"billerId","debit")
+    if debitProductType:
+        sender.availableBalance = (int(sender.availableBalance) - int(payload.amount))
+        updatedAccount = paymentQuery.create(db=db,model=sender)
+        logger.info(f"balance after debit posted successfully is {updatedAccount.availableBalance}")
+        if updatedAccount:
+            debit = PaymentModel(
+            wallet_id = sender.id,
+            user_id =sender.user_id,
+            amount = int(payload.amount*100),
+            payment_type =PaymentEnum.DEBIT,
+            reference =f"TRF-{util.generateUniqueId()}",
+            event = "charge.success",
+            payment_date = datetime.now().date(),
+            status = "success",
+            channel = "WALLET",
+            fee = "1000",
+            statusCode = "200",
+            product_type_id = debitProductType.id,
+            product_id=product.id,
+            recipient=recipient.walletAccount,
+            statusMessage = payload.description,
+            balanceBefore = sender.availableBalance,
+            balanceAfter = updatedAccount.availableBalance,
+            created_at =datetime.now(),
+            updated_at = datetime.now()
+            )
+            createDebitRecord = paymentQuery.create(db=db,model=debit)
+            if createDebitRecord:
+                background_task.add_task(notifyUser,db=db,title=f"Debit Notification", message=createDebitRecord.statusMessage,userId=user.id, setting=setting)
+                email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"payment":createDebitRecord},)
+                background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Debit Notification",toAddress=user.email)
+                logger.info(f"start credit to receiver {user.wallet.walletAccount} with balance before {user.wallet.availableBalance}")
+                recipient.availableBalance =  int(recipient.availableBalance)+int(payload.amount)
+                updatedReceiver = queries.create(db=db,model=recipient)
+                logger.info(f"balance after credit posted successfully is {updatedReceiver.availableBalance}")
+                if updatedReceiver:
+                    logger.info(f"create credit record for reciever {recipient.walletAccount} with balance after {recipient.availableBalance}")
+                    creditProductType = util.find_item(product.billers,"billerId","credit")
+                    credit = PaymentModel(
+                        wallet_id = recipient.id,
+                        user_id =recipient.user_id,
+                        amount = int(payload.amount*100),
+                        payment_type =PaymentEnum.CREDIT,
+                        reference =f"TRF-{util.generateUniqueId()}",
+                        event = "charge.success",
+                        status = "success",
+                        payment_date = datetime.now().date(),
+                        channel ="WALLET",
+                        statusCode = "200",
+                        product_id=product.id,
+                        product_type_id = creditProductType.id if creditProductType else 1,
+                        recipient=recipient.walletAccount,
+                        statusMessage = payload.description,
+                        balanceBefore = recipient.availableBalance,
+                        balanceAfter = updatedReceiver.availableBalance,
+                        created_at =datetime.now(),
+                        updated_at = datetime.now()
+                        )
+                    createCreditRecord = queries.create(db=db,model=credit)
+                    if createCreditRecord:
+                        background_task.add_task(notifyUser,db=db,title=f"Credit Notification", message=createCreditRecord.statusMessage,userId=user.id, setting=setting)
+                        email_credit = util.templates.TemplateResponse("credit.html",{"request": request, "user": user,"payment":createCreditRecord},)
+                        background_task.add_task(util.mailer,str(email_credit.body, "utf-8"),setting=setting,subject="Credit Notification",toAddress=user.email)
+                        return BaseResponse(statusCode="00",statusDescription=SUCCESS,data={"transactionId":createDebitRecord.reference})
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)
                 response.status_code = status.HTTP_400_BAD_REQUEST
                 return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)   
     response.status_code = status.HTTP_400_BAD_REQUEST
     return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)            
 def debitBusTicket(db:Session,request:Request,response:Response,setting:Setting,payload:BuyTicketRequest,user:CustomerModel,background_task:BackgroundTasks):

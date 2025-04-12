@@ -57,7 +57,7 @@ async def getNotificationRequest(
     id:str,
     request: Request,
     response: Response,
-    user: Annotated[Admin, Depends(validateAdmin)],
+    user: Annotated[Customer, Depends(verified_user)],
     setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
 ):
@@ -85,19 +85,17 @@ async def readNotificationRequest(
     id:str,
     request: Request,
     response: Response,
-    user: Annotated[Admin, Depends(validateAdmin)],
+    user: Annotated[Customer, Depends(verified_user)],
     setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
 ):
     try:
         if user:
             return notificationservice.readNotification(
-                id=id,
+                notificationId=id,
                 db=db,
-                setting=setting,
-                request=request,
                 response=response,
-                user=user,
+                userId=user.id,
             )
     except Exception as ex:
         logger.error(ex)
@@ -113,19 +111,17 @@ async def deleteNotificationRequest(
     id:str,
     request: Request,
     response: Response,
-    user: Annotated[Admin, Depends(validateAdmin)],
+    user: Annotated[Customer, Depends(verified_user)],
     setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
 ):
     try:
         if user:
             return notificationservice.deleteNotification(
-                id=id,
+                notificationId=id,
                 db=db,
-                setting=setting,
-                request=request,
                 response=response,
-                user=user,
+                userId=user.id,
             )
     except Exception as ex:
         logger.error(ex)

@@ -179,7 +179,7 @@ async def get_payments(
 @router.get("/transactions/{id}/{paymentType}", 
     response_model=PaymentResponse,
     response_model_exclude_unset=True,name="get single payment")
-async def get_payment(
+async def get_single_payment(
     id:str,
     paymentType:str,
     request: Request,
@@ -190,13 +190,14 @@ async def get_payment(
 ):
     try:
         if user:
-            return paymentservice.payment(
-                id=id,
-                db=db,
-                setting=setting,
+            return paymentservice.getSinglePayment(
                 request=request,
                 response=response,
+                setting=setting,
+                db=db,
                 user=user,
+                transactionId=id,
+                transactionType=paymentType
             )
     except Exception as ex:
         logger.error(ex)
@@ -325,6 +326,7 @@ async def fund_wallet(
 ):
     try:
         if user:
+
             return paymentservice.nfcdebitService(payload=payload,request=request,response=response,setting=setting,db=db,user=user,background_task=background_task)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(
