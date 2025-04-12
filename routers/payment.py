@@ -16,6 +16,7 @@ from services import productservice,paymentservice
 from utils.database import get_db
 from datetime import date
 from schemas.payment import *
+from schemas.ticket import TicketResponse,TicketsResponse
 from schemas.customer import Customer,CreatePINRequest
 from schemas.setting import Setting
 from models.model import CustomerModel
@@ -130,7 +131,7 @@ async def fund_notifications(
         )
 
 # payments
-@router.get("s", 
+@router.get("/transactions", 
     response_model=PaymentsResponse,
     response_model_exclude_unset=True,name="get customer payemnt")
 async def get_payments(
@@ -139,12 +140,20 @@ async def get_payments(
     user: Annotated[Customer, Depends(verified_user)],
     setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
-    startDate: str = Query(str(date.today())),
-    endDate: str = Query(str(date.today())),
-    transaction_type: str = Query(None),
+    startDate: Optional[str] = Query(str(date.today())),
+    endDate: Optional[str] = Query(str(date.today())),
+    transaction_type: Optional[str] = Query(None),
 ):
     try:
-        return paymentservice.payments(
+        if user:
+            if startDate and endDate:
+                start = datetime.strptime(startDate, "%Y-%m-%d")
+                end = datetime.strptime(endDate, "%Y-%m-%d")
+                if end < start:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return PaymentsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
+            if transaction_type and transaction_type.lower() == "all":
+                return paymentservice.payments(
                 request=request,
                 response=response,
                 setting=setting,
@@ -152,17 +161,27 @@ async def get_payments(
                 user=user,
                 startDate=startDate,
                 endDate=endDate,
-                transactionType=transaction_type
-            )
+                transactionType=transaction_type)
+            return paymentservice.payments(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                user=user,
+                startDate=startDate,
+                endDate=endDate,
+                transactionType=transaction_type)
+
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return PaymentsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-@router.get("/{id}", 
+@router.get("/transactions/{id}/{paymentType}", 
     response_model=PaymentResponse,
     response_model_exclude_unset=True,name="get single payment")
 async def get_payment(
     id:str,
+    paymentType:str,
     request: Request,
     response: Response,
     user: Annotated[Customer, Depends(verified_user)],
@@ -231,6 +250,65 @@ async def buy_train_ticket(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+@router.get("/tickets", 
+    response_model=TicketsResponse,
+    response_model_exclude_unset=True,name="get customer payemnt")
+async def get_tickets(
+    request: Request,
+    response: Response,
+    user: Annotated[Customer, Depends(verified_user)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    startDate: Optional[str] = Query(str(date.today())),
+    endDate: Optional[str] = Query(str(date.today())),
+    transaction_type: Optional[str] = Query(None),
+):
+    try:
+        if user:
+            if startDate and endDate:
+                start = datetime.strptime(startDate, "%Y-%m-%d")
+                end = datetime.strptime(endDate, "%Y-%m-%d")
+                if end < start:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
+            return paymentservice.getAllTickets(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                user=user,
+                startDate=startDate,
+                endDate=endDate,
+                transactionType=transaction_type)
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+
+# single ticket payment
+@router.get("/ticket/{ticketId}/{mode}",
+    response_model=TicketResponse,
+    response_model_exclude_unset=True,tags=["tickets"])
+async def get_ticket(
+    ticketId: str,
+    mode:str,
+    request: Request,
+    response: Response,
+    user: Annotated[CustomerModel, Depends(verified_user)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if user:
+            return paymentservice.singleTicket(response=response,db=db,user=user,ticketId=ticketId,mode=mode)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return TicketResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
 
 # nfc debit payment
 @router.post("/nfc/debit",
@@ -247,7 +325,7 @@ async def fund_wallet(
 ):
     try:
         if user:
-            return paymentservice.debitService(payload=payload,request=request,response=response,setting=setting,db=db,user=user,background_task=background_task)
+            return paymentservice.nfcdebitService(payload=payload,request=request,response=response,setting=setting,db=db,user=user,background_task=background_task)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
@@ -371,3 +449,26 @@ async def wallet_payment(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+# redeem ticket
+@router.post("/redeem/ticket",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["tickets"])
+async def redeem_ticket(
+    payload: RedeemRequest,
+    request: Request,
+    response: Response,
+    user: Annotated[Customer, Depends(verified_user)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        if user:
+            return paymentservice.debitBusTicket(user=user,request=request,db=db,response=response,setting=setting,payload=payload,background_task=background_task)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )

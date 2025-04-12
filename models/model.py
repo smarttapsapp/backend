@@ -16,6 +16,7 @@ from sqlalchemy.dialects.mysql import LONGTEXT
 from datetime import datetime, timedelta
 import pytz
 import uuid
+from utils.constant import *
 
 # from utils.database import Base
 from enum import Enum as PythonEnum
@@ -117,7 +118,8 @@ class PaymentEnum(PythonEnum):
 class TicketStatusEnum(PythonEnum):
     BOOKED = "booked"
     CANCELLED = "cancelled"
-    USED = "used"
+    USED = USEDTICKET
+    EXPIRED = EXPIREDTICKET
 class TicketModeEnum(PythonEnum):
     BUS = "bus"
     TRAIN = "train"
@@ -599,7 +601,6 @@ class LoanStatusModel(Base):
     description = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
 class TrainScheduleModel(Base):
     __tablename__ = 'train_schedule'
     
@@ -618,10 +619,6 @@ class ScheduleSeatModel(Base):
     id = Column(Integer, primary_key=True)
     seat_id = Column(Integer, ForeignKey('seats.id'), nullable=False)
     schedule_id = Column(Integer, ForeignKey('schedules.id'), nullable=False)
-
-
-
-
 class SeatModel(Base):
     __tablename__ = 'seats'
     
@@ -635,9 +632,6 @@ class SeatModel(Base):
     availabilityStatus = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-
-
 class ParkModel(Base):
     __tablename__ = 'parks'
     id = Column(Integer, primary_key=True)
@@ -655,8 +649,6 @@ class ParkModel(Base):
     status = Column(Boolean, default=False)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-
 class StationModel(Base):
     __tablename__ = 'stations'
     
@@ -739,21 +731,26 @@ class ScheduleModel(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     trains = relationship("TrainModel", secondary="train_schedule", back_populates="schedules")
     buses = relationship("BusModel", secondary="bus_schedule", back_populates="schedules")
-
 class TicketModel(Base):
     __tablename__ = 'tickets'
     
     id = Column(Integer, primary_key=True)
     customer_id = Column(Integer, ForeignKey('customers.id'), nullable=False)  # Creator of the ticket
     customer = relationship('CustomerModel', backref='tickets')
+    bus_id = Column(Integer, ForeignKey('buses.id'), nullable=True)
+    route_id = Column(Integer, ForeignKey('routes.id'), nullable=True)
+    bus = relationship('BusModel', backref='tickets')
+    route = relationship('RouteModel', backref='tickets')
     schedule_id = Column(Integer, ForeignKey('schedules.id'), nullable=False)  # Train schedule
     schedule = relationship('ScheduleModel', backref='tickets')
+    ticket_number =  Column(String(50), unique=True)
     seat_number = Column(String(50), nullable=True)  # Seat number
     price= Column(String(25), nullable=True)  # Ticket price
     qr_code = Column(String(255), nullable=False,unique=True)  # QR code string or URL
     status= Column(Enum(TicketStatusEnum), default=TicketStatusEnum.BOOKED)  # Ticket status
     mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS)  # Ticket status
-    purchase_time = Column(DateTime, default=func.now())  # Purchase time
+    booked_at = Column(DateTime, default=func.now())  
+    expired_at = Column(DateTime, default=func.now())# Purchase time
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 

@@ -11,6 +11,7 @@ from services.notificationservice import notifyUser
 from utils.constant import *
 from schemas.customer import *
 from schemas.payment import *
+from schemas.ticket import TicketResponse,TicketsResponse
 from schemas.admin import Admin
 from fastapi import (
     status,
@@ -137,12 +138,12 @@ def payments(request: Request,response: Response,setting: Setting,db: Session,us
             return PaymentsResponse(
                 statusCode= str(status.HTTP_200_OK),
                 statusDescription=SUCCESS,
-                data=paymentQuery.getPaymentHistories(db=db,userId=user.id,start=startDate,end=endDate,transType=transactionType)
+                data=queries.getPaymentHistoriesByTransaction(db=db,userId=user.id,startDate=startDate,endDate=endDate,transType=transactionType)
             )
         return PaymentsResponse(
                 statusCode= str(status.HTTP_200_OK),
                 statusDescription=SUCCESS,
-                data=paymentQuery.getAllByUser(db=db,userId=user.id,start=startDate,end=endDate,transType=transactionType)
+                data=queries.getPaymentHistories(db=db,userId=user.id,startDate=startDate,endDate=endDate)
             )
     except Exception as ex:
         logger.info(ex)
@@ -277,7 +278,7 @@ def payment(
                statusDescription=str(ex),
          
         )
-def debitService(
+def nfcdebitService(
         payload:DebitRequest,
         request: Request,
     response: Response,
@@ -288,7 +289,7 @@ def debitService(
 ):
     try:
         logger.info(f"started debit transaction via NFC for sender {payload.senderAccount} to receiver {payload.walletAccount}")
-        if payload.senderAccount != payload.senderAccount:
+        if payload.senderAccount != user.wallet.walletAccount:
             duplicate = paymentQuery.getPaymentByReference(db=db,reference=payload.transactionId)
             if duplicate:
                 logger.info(f"duplicate transaction found {duplicate.reference}")
@@ -305,7 +306,7 @@ def debitService(
                             if timeDifference > 5:
                                 if lastTransaction.amount != payload.amount:
                                     lastTransactionTime = datetime.strptime(lastTransaction.updated_at, "%Y-%m-%d %H:%M:%S")
-                                    return debit(payload=payload,request=request,response=response,setting=setting,db=db,user=user,sender=sender,background_task=background_task)
+                                    return debitNfc(payload=payload,request=request,response=response,setting=setting,db=db,user=user,sender=sender,background_task=background_task)
                                 else:
                                     response.status_code = status.HTTP_400_BAD_REQUEST
                                     return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = INSUFFICIENTFUND)
@@ -313,7 +314,7 @@ def debitService(
                                 response.status_code = status.HTTP_400_BAD_REQUEST
                                 return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = DUPLICATE)
                         else:
-                            return debit(payload=payload,request=request,response=response,setting=setting,db=db,user=user,sender=sender,background_task=background_task)
+                            return debitNfc(payload=payload,request=request,response=response,setting=setting,db=db,user=user,sender=sender,background_task=background_task)
                     else:
                         response.status_code = status.HTTP_400_BAD_REQUEST
                         return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = INSUFFICIENTFUND)
@@ -327,7 +328,7 @@ def debitService(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return PaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex),)
-def debit(
+def debitNfc(
         payload:DebitRequest,
         request: Request,
     response: Response,
@@ -668,18 +669,18 @@ def debitBusTicket(db:Session,request:Request,response:Response,setting:Setting,
                             )
                             createDebitRecord = paymentQuery.create(db=db,model=debit)
                             if createDebitRecord:
-                                logger.info(f"create ticket record for bus {payload.busId} with balance after {user.wallet.availableBalance}")
+                                ticketId =  f"BUS-{util.generateId()}"
+                                logger.info(f"create ticket record for bus {payload.busId} with balance after {user.wallet.availableBalance} ticket reference is {ticketId}")
                                 ticket = TicketModel(
                                     bus_id = bus.id,
                                     customer_id = user.id,
-                                    ticket_type = payload.ticketType,
-                                    ticket_number = f"BUS-{util.generateId()}",
-                                    ticket_status = "active",
+                                    route_id = bus.route_id,
+                                    schedule_id = payload.scheduleId,
+                                    qr_code = f"{ticketId}|{bus.bus_number}|{TicketModeEnum.BUS.value}|{user.wallet.walletAccount}",
+                                    mode = TicketModeEnum.BUS,
                                     price = payload.amount,
-                                    ticket_date = payload.ticketDate,
-                                    ticket_time = payload.ticketTime,
-                                    ticket_seat = payload.seatNumber,
-                                    ticket_reference = f"BUS-{util.generateId()}",
+                                    ticket_number = ticketId,
+                                    booked_at =datetime.now(),
                                     created_at =datetime.now(),
                                     updated_at = datetime.now()
                                 )
@@ -687,7 +688,7 @@ def debitBusTicket(db:Session,request:Request,response:Response,setting:Setting,
                                 background_task.add_task(notifyUser,db=db,title=f"Bus Ticket Purchase", message=createDebitRecord.statusMessage,userId=user.id, setting=setting)
                                 email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"payment":createDebitRecord},)
                                 background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Bus Ticket Purchase",toAddress=user.email)
-                                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":createDebitRecord.id})
+                                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":createTicketRecord.ticket_number})
                     else:
                         logger.info(f"{INSUFFICIENTFUND} with user {user.firstname}")
                         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -708,3 +709,70 @@ def debitBusTicket(db:Session,request:Request,response:Response,setting:Setting,
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex),)
+def redeemTicket(db:Session,request:Request,response:Response,payload:RedeemRequest,setting:Setting,background_task:BackgroundTasks):
+    try:
+        ticket = queries.ticketByTicketNumber(db=db,mode=TicketModeEnum[payload.mode],ticketId=payload.ticketId)
+        if ticket:
+            if ticket.status == TicketStatusEnum.BOOKED:
+                if ticket.expired_at > datetime.now():
+                    if ticket.bus.bus_number == payload.busNumber:
+                        ticket.status = TicketStatusEnum.USED
+                        ticket.updated_at = datetime.now()
+                        updatedTicket = queries.create(db=db,model=ticket)
+                        background_task.add_task(notifyUser,db=db,title=f"Redeem Ticket", message=f"Ticket {ticket.ticket_number} Redeemed Successful",userId=ticket.bus.user_id, setting=setting)
+                        email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": ticket.bus.user,"ticket":ticket},)
+                        background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Redeem Ticket",toAddress=ticket.bus.user.email)
+                        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Ticket cannot be use on this bus",)
+                else:
+                    ticket.status = TicketStatusEnum.EXPIRED
+                    ticket.updated_at = datetime.now()
+                    updatedTicket = queries.create(db=db,model=ticket)
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=EXPIREDTICKET,)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=ticket.status,)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDTICKET,)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+def getAllTickets(request: Request,response: Response,setting: Setting,db: Session,user: Customer,startDate: str,endDate: str,transactionType: str):
+    try:
+        logger.info(
+            f"started querying payments from {startDate} to {endDate} for {transactionType}"
+        )
+        if transactionType:
+            return TicketsResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=queries.getTicketsHistoriesByTransaction(db=db,userId=user.id,startDate=startDate,endDate=endDate,transType=transactionType)
+            )
+        return TicketsResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=queries.getTicketHistories(db=db,userId=user.id,startDate=startDate,endDate=endDate)
+            )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return TicketsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+def singleTicket(response: Response,db: Session,user: Customer,ticketId: str,mode:str):
+    try:
+        logger.info(
+            f"started querying ticket {ticketId} for {user.email} {TicketModeEnum[mode.upper()]}"
+        )
+        return TicketResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=queries.ticketByTicketNumber(db=db,mode=TicketModeEnum[mode.upper()],ticketId=ticketId)
+            )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return TicketResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

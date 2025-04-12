@@ -107,3 +107,29 @@ def query_routes_by_stations(db: Session,departure:int,arrival:int,mode:str):
 
 def busById(db: Session,busId:int):
     return db.query(BusModel).filter(BusModel.id == busId).first()
+def getPaymentHistories(db: Session,userId:int,startDate:str,endDate:str):
+    if startDate and endDate:
+        start = datetime.strptime(startDate, "%Y-%m-%d").date()
+        end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
+        return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.statusCode=="200").filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
+    return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.statusCode=="200").order_by(desc(PaymentModel.created_at)).all()
+def getPaymentHistoriesByTransaction(db: Session,userId:int,startDate:str,endDate:str,transType:str):
+    if startDate and endDate:
+        start = datetime.strptime(startDate, "%Y-%m-%d").date()
+        end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
+        return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.payment_type == transType).filter(PaymentModel.statusCode=="200").filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
+    return db.query(PaymentModel).filter(PaymentModel.payment_type == transType).filter(PaymentModel.user_id == userId).filter(PaymentModel.statusCode=="200").order_by(desc(PaymentModel.created_at)).all()
+def ticketByTicketNumber(db:Session,mode:TicketModeEnum,ticketId:str):
+    return db.query(TicketModel).filter(TicketModel.ticket_number == ticketId).filter(TicketModel.mode == mode).first()
+def getTicketHistories(db: Session,userId:int,startDate:str,endDate:str):
+    if startDate and endDate:
+        start = datetime.strptime(startDate, "%Y-%m-%d").date()
+        end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
+        return db.query(TicketModel).filter(TicketModel.customer_id == userId).filter(TicketModel.created_at.between(start,end)).order_by(desc(TicketModel.created_at)).all()
+    return db.query(TicketModel).filter(TicketModel.customer_id == userId).order_by(desc(TicketModel.created_at)).all()
+def getTicketsHistoriesByTransaction(db: Session,userId:int,startDate:str,endDate:str,transType:str):
+    if startDate and endDate:
+        start = datetime.strptime(startDate, "%Y-%m-%d").date()
+        end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
+        return db.query(TicketModel).filter(TicketModel.customer_id == userId).filter(TicketModel.mode == transType).filter(TicketModel.created_at.between(start,end)).order_by(desc(TicketModel.created_at)).all()
+    return db.query(TicketModel).filter(TicketModel.mode == transType).filter(TicketModel.customer_id == userId).order_by(desc(TicketModel.created_at)).all()
