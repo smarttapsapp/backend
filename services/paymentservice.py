@@ -29,46 +29,61 @@ def fundViaPaystack(
         response: Response,
         setting: Setting,amount:str):
     try:
-        payment = PaymentModel(
-            wallet_id = user.wallet.id,
-            user_id = user.id,
-            amount = amount,
-            payment_type = PaymentEnum.CREDIT,
-            created_at = datetime.now(),
-            updated_at= datetime.now(),
-        )
-        createdPayment = paymentQuery.create_payment(db=db,payment=payment)
-        appResponse = None
-        if createdPayment:
-            headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
-            params = {"email": user.email,"amount": amount}
-            result = util.httpV2(setting.paystack_url,params=params,headers=headers)
-            logger.info(result)
-            if result.status_code == 200:
-                paystackResponse = result.json()
-                if paystackResponse and paystackResponse["status"] is True:
-                    createdPayment.reference = paystackResponse["data"]["reference"]
-                    createdPayment.access_code = paystackResponse["data"]["access_code"]
-                    createdPayment.statusCode = str(status.HTTP_200_OK)
-                    createdPayment.statusMessage = paystackResponse["message"]
-                    appResponse = BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=paystackResponse["message"],data=paystackResponse["data"])
+        product = queries.getBillByVas(db=db,vasType="payment")
+        if product:
+            creditProductType = util.find_item(product.billers,"billerId","credit")
+            if creditProductType:
+                payment = PaymentModel(
+                    wallet_id = user.wallet.id,
+                    user_id = user.id,
+                    amount = amount,
+                    channel = "PAYSTACK",
+                    product_type_id = creditProductType.id,
+                    product_id=product.id,
+                    recipient=user.wallet.walletAccount,
+                    payment_type = PaymentEnum.CREDIT,
+                    created_at = datetime.now(),
+                    updated_at= datetime.now(),
+                )
+                createdPayment = paymentQuery.create_payment(db=db,payment=payment)
+                appResponse = None
+                if createdPayment:
+                    headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
+                    params = {"email": user.email,"amount": amount}
+                    result = util.httpV2(setting.paystack_url,params=params,headers=headers)
+                    logger.info(result)
+                    if result.status_code == 200:
+                        paystackResponse = result.json()
+                        if paystackResponse and paystackResponse["status"] is True:
+                            createdPayment.reference = paystackResponse["data"]["reference"]
+                            createdPayment.access_code = paystackResponse["data"]["access_code"]
+                            createdPayment.statusCode = str(status.HTTP_200_OK)
+                            createdPayment.statusMessage = paystackResponse["message"]
+                            appResponse = BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=paystackResponse["message"],data=paystackResponse["data"])
+                        else:
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            createdPayment.statusCode = str(status.HTTP_400_BAD_REQUEST)
+                            createdPayment.statusMessage = paystackResponse["message"]
+                            appResponse = BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse["message"])
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        createdPayment.statusCode = str(status.HTTP_400_BAD_REQUEST)
+                        createdPayment.statusMessage = "Failed"
+                        appResponse = BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed")
+                    createdPayment.event = "initialize"
+                    updatePayment = paymentQuery.create_payment(db=db,payment=createdPayment)
+                    if updatePayment:
+                        return appResponse
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed")
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
-                    createdPayment.statusCode = str(status.HTTP_400_BAD_REQUEST)
-                    createdPayment.statusMessage = paystackResponse["message"]
-                    appResponse = BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse["message"])
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
-                createdPayment.statusCode = str(status.HTTP_400_BAD_REQUEST)
-                createdPayment.statusMessage = "Failed"
-                appResponse = BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed")
-            createdPayment.event = "initialize"
-            updatePayment = paymentQuery.create_payment(db=db,payment=createdPayment)
-            if updatePayment:
-                return appResponse
-            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed")
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
         else:
-            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -306,8 +321,8 @@ def debitNfc(
             statusCode = "200",
             product_type_id = debitProductType.id,
             product_id=product.id,
-            statusMessage = payload.description,
             recipient=user.wallet.walletAccount,
+            statusMessage = payload.description,
             balanceBefore = sender.availableBalance,
             balanceAfter = updatedAccount.availableBalance,
             created_at =datetime.now(),
