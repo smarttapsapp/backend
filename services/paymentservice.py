@@ -702,23 +702,24 @@ def debitBusTicket(db:Session,request:Request,response:Response,setting:Setting,
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex),)
-def redeemTicket(db:Session,request:Request,response:Response,payload:RedeemRequest,setting:Setting,background_task:BackgroundTasks):
+def redeemTicket(user:Customer,db:Session,request:Request,response:Response,payload:RedeemRequest,setting:Setting,background_task:BackgroundTasks):
     try:
         ticket = queries.ticketByTicketNumber(db=db,mode=TicketModeEnum[payload.mode],ticketId=payload.ticketId)
         if ticket:
             if ticket.status == TicketStatusEnum.BOOKED:
                 if ticket.expired_at > datetime.now():
-                    if ticket.bus.bus_number == payload.busNumber:
-                        ticket.status = TicketStatusEnum.USED
-                        ticket.updated_at = datetime.now()
-                        updatedTicket = queries.create(db=db,model=ticket)
-                        background_task.add_task(notifyUser,db=db,title=f"Redeem Ticket", message=f"Ticket {ticket.ticket_number} Redeemed Successful",userId=ticket.bus.user_id, setting=setting)
-                        email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": ticket.bus.user,"ticket":ticket},)
-                        background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Redeem Ticket",toAddress=ticket.bus.user.email)
-                        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS)
-                    else:
-                        response.status_code = status.HTTP_400_BAD_REQUEST
-                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Ticket cannot be use on this bus",)
+                    if ticket.customer.wallet.walletAccount == payload.walletAccount:
+                        if ticket.bus.bus_number == payload.busNumber:
+                            ticket.status = TicketStatusEnum.USED
+                            ticket.updated_at = datetime.now()
+                            updatedTicket = queries.create(db=db,model=ticket)
+                            background_task.add_task(notifyUser,db=db,title=f"Redeem Ticket", message=f"Ticket {ticket.ticket_number} Redeemed Successful",userId=ticket.bus.user_id, setting=setting)
+                            email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": ticket.bus.user,"ticket":ticket},)
+                            background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Redeem Ticket",toAddress=ticket.bus.user.email)
+                            return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                        else:
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Ticket cannot be use on this bus",)
                 else:
                     ticket.status = TicketStatusEnum.EXPIRED
                     ticket.updated_at = datetime.now()

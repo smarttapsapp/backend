@@ -466,7 +466,7 @@ async def redeem_ticket(
 ):
     try:
         if user:
-            return paymentservice.debitBusTicket(user=user,request=request,db=db,response=response,setting=setting,payload=payload,background_task=background_task)
+            return paymentservice.redeemTicket(user=user,db=db,request=request,response=response,setting=setting,payload=payload,background_task=background_task)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST

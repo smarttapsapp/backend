@@ -92,6 +92,9 @@ class RedeemRequest(BaseModel):
     busNumber:str
     mode:str
     walletAccount:str
+    status:str
+    expireAt:str
+    amount: str
 class DebitRequest(PINRequest):
     walletAccount:str
     senderAccount:str

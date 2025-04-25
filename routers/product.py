@@ -11,6 +11,7 @@ from fastapi import (
     Request,BackgroundTasks
 )
 from schemas.admin import Admin
+import time
 from utils.database import get_db
 from sqlalchemy.orm import Session
 from schemas.park import ParksResponse
@@ -149,9 +150,14 @@ async def get_Trains_Routes(
     arrival: str = Query(None),
     seatType: str = Query("Standard"),
     timeOperation: str = Query("Morning"),
+    trip: str = Query(0),
+    tripDate: str = Query(None),
+    adult: str = Query(1),
+    minor: str = Query(0),
 ):
     try:
         if user:
+            time.sleep(5)
             return productservice.searchTrainRoutes(request=request,response=response,setting=setting,db=db,user=user,departure=departure,arrival=arrival,seatType=seatType,operationTime=timeOperation)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
@@ -160,6 +166,32 @@ async def get_Trains_Routes(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+
+@router.get("/schedule/{mode}/{routeId}",
+    response_model=RouteResponse,
+    response_model_exclude_unset=True,)
+async def get_Trains_Routes(
+    request: Request,
+    response: Response,
+    user: Annotated[Customer, Depends(verified_user)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    mode: str,
+    routeId: str 
+):
+    try:
+        if user:
+            time.sleep(5)
+            return productservice.searchTrainByRoute(routeId=routeId,mode=mode,request=request,response=response,setting=setting,db=db,user=user)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return RouteResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return RouteResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+
+
 @router.get("/beneficiaries/{billerType}",
     response_model=BeneficiariesResponse,
     response_model_exclude_unset=True,)

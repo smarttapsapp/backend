@@ -54,7 +54,17 @@ def searchTrainRoutes(request: Request,response: Response,setting: Setting,db: S
         data = []
         data = productQuery.query_train_routes(db=db,departure=departure,arrival=arrival,seatType=seatType,takeOffTime=operationTime)
         return RoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=data)
-        return ParksResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=[])
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return RoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+def searchTrainByRoute(routeId:int,mode:str,request: Request,response: Response,setting: Setting,db: Session,user: Customer):
+    try:
+        logger.info(f"Started searching for train from route {routeId} mode {mode}") 
+        route = queries.queryRouteByIdAndMode(db=db,routeId=routeId,mode=mode)
+        if route:
+            return RouteResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=route)
+        return RouteResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST

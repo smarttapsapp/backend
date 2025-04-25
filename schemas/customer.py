@@ -24,6 +24,7 @@ class CustomerBase(BaseModel):
     bvn_verified: bool = False
     email_verified: bool = False
     address_submitted: bool = False
+    is_next_of_kin: bool = False
 class Customer(CustomerBase):
     point_ratings: Union[str, None] = "0"
     account_ratings: Union[str, None] = "0"
@@ -72,6 +73,11 @@ class ChangePasswordRequest(BaseModel):
     oldPassword: str
     password: str
     confirmPassword: str
+class NextOfKinRequest(BaseModel):
+    fullName: str
+    address: str
+    phone: str
+    relationship: str
 class CustomersResponse(BaseResponse):
     data: Union[List[Customer],None] = None
 class CustomerResponse(BaseResponse):

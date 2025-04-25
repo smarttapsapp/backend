@@ -34,7 +34,7 @@ def query_bus_routes_arrival(db: Session, departure: str, arrival: str, searchTy
 def query_stations(db: Session):
     return db.query(StationModel).all()
 def query_train_routes(db: Session, departure: str, arrival: str, seatType: str, takeOffTime: str):
-    return db.query(RouteModel).all()
+    return db.query(RouteModel).filter(RouteModel.mode == TicketModeEnum.TRAIN).all()
 def querySinglebeneficiary(db: Session,transactionType:str,userId:int, customerId: str):
     return db.query(BeneficiaryModel).filter(BeneficiaryModel.user_id == userId).filter(BeneficiaryModel.customerId == customerId).filter(BeneficiaryModel.transaction_type == transactionType).first()
 def queryBeneficiaryByTransactionType(db: Session,transactionType:str,userId:int):

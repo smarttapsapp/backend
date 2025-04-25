@@ -78,8 +78,6 @@ class AdminRoleEnum(PythonEnum):
     ACCOUNTANT = "accountant"
     AUDIT = "audit"
     SUPPORT = "support"
-    CUSTOMER = "customer"
-    AGGREGATOR = "aggregator"
     BUSINESS = "business"
 
 class AdminTypeEnum(PythonEnum):
@@ -128,6 +126,7 @@ class RoleModel(Base):
     __tablename__ = "roles"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(25), nullable=False, default="Support")
+    tag = Column(Enum(AdminRoleEnum), nullable=False, default=AdminRoleEnum.SUPPORT)
     description = Column(String(255))
     status = Column(Boolean, default=False)
     admin = relationship("AdminModel",  uselist=False,back_populates="role")

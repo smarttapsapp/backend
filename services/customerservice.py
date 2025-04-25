@@ -145,7 +145,7 @@ def submitEmailForVerification(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(
                 statusCode =str(status.HTTP_400_BAD_REQUEST),
-               statusDescription = str(ex), )
+               statusDescription = SYSTEMBUSY, )
 def bvnverification(
     request: Request,
     user: Customer,
@@ -198,7 +198,7 @@ def bvnverification(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),
-               statusDescription = str(ex), )
+               statusDescription = SYSTEMBUSY, )
 def ninverification(
     request: Request,
     user: Customer,
@@ -251,7 +251,7 @@ def ninverification(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),
-               statusDescription = str(ex),)
+               statusDescription = SYSTEMBUSY,)
 def handleOTPVerification(
     request: Request,
     user: Customer,
@@ -288,6 +288,7 @@ def handleOTPVerification(
                             createdOtp = queries.create(db=db,model=latestOtp)
                             if createdOtp:
                                 background_task.add_task(notifyUser,db=db,title=f"{payload.action.capitalize()} Verification", message=f"Your {payload.action.capitalize()} Verification Successful",userId=user.id, setting=setting)
+                                background_task.add_task(upgradeAccount,db=db,user=userRecord,setting=setting,request=request,background_task=background_task)
                                 email_body = util.templates.TemplateResponse(
                                         "success.html",{"request": request, "user": userRecord,"message":f"Your {payload.action.capitalize()} Verification Successful"},
                                     )
@@ -356,7 +357,7 @@ def handleOTPVerification(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(
                 statusCode =str(status.HTTP_400_BAD_REQUEST),
-               statusDescription = str(ex),)
+               statusDescription = SYSTEMBUSY,)
 def changepin(
     request: Request,
     user: CustomerModel,
@@ -395,7 +396,7 @@ def changepin(
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = str(ex),)
+        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SYSTEMBUSY,)
 def changepassword(
     request: Request,
     user: Customer,
@@ -434,4 +435,73 @@ def changepassword(
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = str(ex),)
+        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SYSTEMBUSY,)
+def updateNextOfKin(
+        payload: NextOfKinRequest,
+    request: Request,
+    user: Customer,
+    response: Response,
+    setting: Setting,
+    db: Session,
+    background_task: BackgroundTasks,
+):
+    try:
+        logger.info(
+            f"started updating next of kin of account {user.firstname} with {payload.model_dump_json()}"
+        )
+        userRecord = queries.updateUserNextOfKin(
+            db=db, userId=user.id,name=payload.fullName,phone=payload.phone,address=payload.address,relationship=payload.relationship
+        )
+        if userRecord:
+            background_task.add_task(notifyUser,db=db,title=f"Next Of Kin Update", message=f"Your Next of Kin details was submitted successfuly.",userId=user.id, setting=setting)
+            email_body = util.templates.TemplateResponse("success.html",{"request": request, "user": userRecord,"message":f"Your Next of Kin details was submitted successfuly."},)
+            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="Next Of Kin",toAddress=user.email,)
+            response.status_code = status.HTTP_200_OK
+            return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription = SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = UPDATEACCTERR,)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),
+               statusDescription = SYSTEMBUSY, )
+def upgradeAccount(db:Session,user:CustomerModel,setting:Setting,request:Request,background_task:BackgroundTasks):
+    try:
+        if user.bvn_verified and user.nin_verified and user.email_verified:
+            user.account_type = AccountEnum.MERCHANT
+            user.account_ratings = AccountRatingEnum.SILVER
+            updated = queries.create(db=db, model=user)
+            if updated:
+                background_task.add_task(notifyUser,db=db,title=f"Account Upgrade", message=ACCOUNTUPGRADE,userId=user.id, setting=setting)
+                role = queries.getRoleByTag(db=db,tag=AdminRoleEnum.BUSINESS)
+                if role:
+                    password = util.generateOTP()
+                    merchant = AdminModel(
+                    firstname=user.firstname,
+                    lastname=user.lastname,
+                    phonenumber=user.phonenumber,
+                    email=user.email,
+                    password=util.get_password_hash(password),
+                    role_id=role.id,
+                    status=True,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                )
+                    queries.create(db=db, model=merchant)
+                    email_body = util.templates.TemplateResponse(
+                        "success.html",
+                        {"request": request, "user": user,"message":ACCOUNTUPGRADE.replace("<password>",password).replace("<username>",user.email)},
+                    )
+                    background_task.add_task(
+                        util.mailer,
+                        str(email_body.body, "utf-8"),
+                        setting=setting,
+                        subject="Account Upgrade Successful",
+                        toAddress=user.email,
+                    )
+                return updated
+        return None
+    except Exception as ex:
+        logger.info(ex)
+        return None

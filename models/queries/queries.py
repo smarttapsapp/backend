@@ -46,6 +46,21 @@ def updateUserNiN(db: Session, userId: int,nin:str):
     res = db.execute(statement=stmt)
     db.commit()
     return  res 
+def updateUserNextOfKin(db: Session, userId: int,name:str,phone:str,address:str,relationship:str):
+    stmt = (update(CustomerModel)
+            .where(CustomerModel.id == userId)
+            .values(
+                updated_at=datetime.now(),
+                next_of_kin_name= name,
+                next_of_kin_phone= phone,
+                next_of_kin_address= address,
+                next_of_kin_relationship= relationship,
+                is_next_of_kin=True
+                    )
+            .execution_options(synchronize_session="fetch"))
+    res = db.execute(statement=stmt)
+    db.commit()
+    return  res 
 def get_latest_otp_by_servicename(userId:int,servicename: str, db: Session):
     return db.query(OTPModel).filter(OTPModel.user_id==userId,OTPModel.status == "OPEN",OTPModel.servicename == servicename).order_by(desc(OTPModel.id)).first()
 def notifications(db: Session,userId:int):
@@ -99,6 +114,10 @@ def getLastpaymentByAccount(db: Session, accountId: int):
 
 def query_stations(db: Session,mode:str):
     return db.query(StationModel).filter(StationModel.mode == mode).all()
+
+def queryRouteByIdAndMode(db: Session,routeId:int,mode:str):
+    return db.query(RouteModel).filter(RouteModel.id == routeId).filter(RouteModel.mode == mode).first()
+
 def query_routes(db: Session,mode:str):
     return db.query(RouteModel).filter(RouteModel.mode == mode).all()
 def query_routes_by_stations(db: Session,departure:int,arrival:int,mode:str):
@@ -134,3 +153,7 @@ def getTicketsHistoriesByTransaction(db: Session,userId:int,startDate:str,endDat
         end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
         return db.query(TicketModel).filter(TicketModel.customer_id == userId).filter(TicketModel.mode == transType).filter(TicketModel.created_at.between(start,end)).order_by(desc(TicketModel.created_at)).all()
     return db.query(TicketModel).filter(TicketModel.mode == transType).filter(TicketModel.customer_id == userId).order_by(desc(TicketModel.created_at)).all()
+def getRoleByTag(db: Session,tag:str):
+    return db.query(RoleModel).filter(RoleModel.tag == tag).first()
+def getRoleById(db: Session,roleId:int):
+    return db.query(RoleModel).filter(RoleModel.id == roleId).first()
