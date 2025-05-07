@@ -232,7 +232,7 @@ def ninverification(
                         util.mailer,
                         str(email_body.body, "utf-8"),
                         setting=setting,
-                        subject="BVN OTP Verification",
+                        subject="NIN OTP Verification",
                         toAddress=user.email,
                     )
                 response.status_code = status.HTTP_200_OK

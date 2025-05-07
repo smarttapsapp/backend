@@ -98,6 +98,7 @@ def update_user_agent_records(db: Session, id: int, user: Customer):
     userRecord.email_verified = user.email_verified
     userRecord.nin_submitted = user.nin_submitted
     userRecord.nin_verified = user.nin_verified
+    userRecord.bvn_verified = user.bvn_verified
     userRecord.account_type = user.account_type
     userRecord.account_status = user.account_status
     userRecord.updated_at = datetime.now()
