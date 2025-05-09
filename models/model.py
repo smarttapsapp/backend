@@ -129,20 +129,20 @@ class RoleModel(Base):
     tag = Column(Enum(AdminRoleEnum), nullable=False, default=AdminRoleEnum.SUPPORT)
     description = Column(String(255))
     status = Column(Boolean, default=False)
-    admin = relationship("AdminModel",  uselist=False,back_populates="role")
+    admins = relationship("AdminModel",  uselist=False,back_populates="role")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
 class AdminModel(Base):
     __tablename__ = "admins"
     id = Column(Integer, primary_key=True, index=True)
     role_id = Column(Integer, ForeignKey("roles.id"))
-    role = relationship("RoleModel", back_populates="admin")
     firstname = Column(String(25))
     lastname = Column(String(25))
     phonenumber = Column(String(13))
     email = Column(String(255))
     password = Column(String(255), nullable=True)
     status = Column(Boolean, default=False)
+    role = relationship("RoleModel", back_populates="admins")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
 class CustomerModel(Base):

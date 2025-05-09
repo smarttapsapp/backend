@@ -138,6 +138,15 @@ def getPaymentHistoriesByTransaction(db: Session,userId:int,startDate:str,endDat
         end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
         return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.payment_type == transType).filter(PaymentModel.statusCode=="200").filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
     return db.query(PaymentModel).filter(PaymentModel.payment_type == transType).filter(PaymentModel.user_id == userId).filter(PaymentModel.statusCode=="200").order_by(desc(PaymentModel.created_at)).all()
+def getAllPaymentsHistories(db: Session,startDate:str,endDate:str,userId:str=None):
+    if startDate and endDate:
+        start = datetime.strptime(startDate, "%Y-%m-%d").date()
+        end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
+        if userId:
+            return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
+        return db.query(PaymentModel).filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
+    
+
 def paymentByTransactionNumber(db:Session,mode:PaymentEnum,transactionId:str,userId=int):
     return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.reference == transactionId).filter(PaymentModel.payment_type == mode).first()
 def ticketByTicketNumber(db:Session,mode:TicketModeEnum,ticketId:str):

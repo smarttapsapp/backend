@@ -80,44 +80,6 @@ def authenticate_user(
         statusCode=str(status.HTTP_400_BAD_REQUEST),
         statusDescription=INVALIDACCOUNT
         )
-async def resetPasswordInitiate(
-    request: Request,
-    user: Customer,
-    response: Response,
-    setting: Setting,
-    db: Session,
-    background_task: BackgroundTasks,
-):
-    try:
-        logger.info(f"started resetPasswordInitiate")
-        otp = util.generateOTP()
-        dbOtp = OTPModel(
-            otp=otp,
-            user_id=user.id,
-            status=OTPStatusEnum.OPEN,
-            servicename="resetPasswordInitiate",
-            created_at=datetime.now(),
-            expired_at=datetime.now()+timedelta(minutes=5),
-            updated_at=datetime.now(),
-        )
-        createdOTP = authQuery.create_otp(db=db, otp=dbOtp)
-        if createdOTP:
-            return sendSms(otp=createdOTP,response=response,setting=setting,background_task=background_task)
-        else:
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(
-                statusCode=str(status.HTTP_400_BAD_REQUEST),
-                statusDescription=SYSTEMBUSY,
-            )
-    except Exception as ex:
-        logger.info(ex)
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse.model_validate(
-            {
-                "statusCode": str(status.HTTP_400_BAD_REQUEST),
-                "statusDescription": SYSTEMBUSY,
-            }
-        )
 async def verifyAccountOpening(
     request: Request,
     response: Response,
@@ -216,12 +178,142 @@ def generateAndSendOTP(db: Session, userId:int,setting: Setting,background_task:
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription="Unable to send otp at the moment",
             )
+def authenticateUser(
+    request: Request,
+    response: Response,
+    setting: Setting,
+    db: Session,
+    background_task: BackgroundTasks, 
+    payload: AdminLoginRequest,):
+    try:
+        logger.info(f"started authentication for {payload.username}")
+        user = authQuery.getCheckAdmin(username=payload.username, db=db)
+        logger.info(user.lastname)
+        if user:
+            if util.verify_password(payload.password, user.password):
+                authToken = util.create_access_token(setting=setting,credentials={"username": user.email,"password": payload.password},exp=60)
+                response.set_cookie(
+                    key="access_token",
+                    value=authToken[0],
+                    expires=authToken[1],
+                    max_age=authToken[1], 
+                    httponly=True, 
+                    samesite="None",
+                    path="/",
+                      secure=True)
+                return BaseResponse(
+                    statusCode= str(status.HTTP_200_OK),
+                    statusDescription= f"Login Successful",
+                
+            )
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(
+                    statusCode=str(status.HTTP_400_BAD_REQUEST),
+                    statusDescription=INVALIDACCOUNT,
+                )
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(
+                    statusCode=str(status.HTTP_400_BAD_REQUEST),
+                    statusDescription=INVALIDACCOUNT,
+                )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+def profile(db: Session,
+        request: Request,
+        response: Response,
+        setting: Setting,
+        admin:AdminModel,):
+    if admin:
+        return BaseResponse(statusCode= str(status.HTTP_200_OK),statusDescription= SUCCESS,data=AdminProfile.from_orm(admin).model_dump())
+def sendSms(otp: OTPModel,response: Response,setting: Setting, background_task: BackgroundTasks):
+    #latestOtp = adminQuery.get_latest_otp(db=db, userId=userId)
+    if otp:
+        logger.info(otp)
+        logger.info(otp.user)
+        background_task.add_task(util.send_sms_message,setting=setting,toPhoneNumber=otp.user.phonenumber,message=f"Your activation code is {otp.otp}",transactionId=util.generateId())
+        authToken = util.create_access_token(
+            setting=setting,
+            credentials={
+                "username": otp.user.phonenumber,
+                "password": otp.otp,
+                },
+                exp=5,
+                )
+        response.status_code = status.HTTP_200_OK
+        return BaseResponse(
+            statusCode=str(status.HTTP_200_OK),
+            statusDescription=f"Please enter the OTP sent to {otp.user.phonenumber[0:4]}xxxxxx{otp.user.phonenumber[-2:]} to complete your registration",
+            data={
+                "idToken":authToken[0],
+                "expiresIn":authToken[1]},
+        )
+    response.status_code = status.HTTP_400_BAD_REQUEST
+    return BaseResponse(
+        statusCode=str(status.HTTP_400_BAD_REQUEST),
+        statusDescription="OTP Issue. Try after sometime"
+    )
+def generateAndSendOTP(db: Session, userId:int,setting: Setting,background_task:BackgroundTasks,response: Response):
+    newOtp = authQuery.create_otp(db=db,otp=OTPModel(otp=util.generateOTP(), servicename="openAccount", user_id=userId,tenant=tenant,
+                created_at=datetime.now(),
+                expired_at=(datetime.now() + timedelta(minutes=15)),
+            updated_at=datetime.now(),))
+    if newOtp:
+        return sendSms(otp=newOtp,background_task=background_task,response=response,setting=setting)
+    else:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription="Unable to send otp at the moment",
+            )
+# resert password
+async def resetPasswordInitiate(
+    request: Request,
+    user: Admin,
+    response: Response,
+    setting: Setting,
+    db: Session,
+    background_task: BackgroundTasks,
+):
+    try:
+        logger.info(f"started resetPasswordInitiate")
+        otp = util.generateOTP()
+        dbOtp = OTPModel(
+            otp=otp,
+            user_id=user.id,
+            status=OTPStatusEnum.OPEN,
+            servicename="resetPasswordInitiate",
+            created_at=datetime.now(),
+            expired_at=datetime.now()+timedelta(minutes=5),
+            updated_at=datetime.now(),
+        )
+        createdOTP = authQuery.create_otp(db=db, otp=dbOtp)
+        if createdOTP:
+            return sendSms(otp=createdOTP,response=response,setting=setting,background_task=background_task)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(
+                statusCode=str(status.HTTP_400_BAD_REQUEST),
+                statusDescription=SYSTEMBUSY,
+            )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse.model_validate(
+            {
+                "statusCode": str(status.HTTP_400_BAD_REQUEST),
+                "statusDescription": SYSTEMBUSY,
+            }
+        )
 def resetPasswordFinal(db:Session,response:Response,token:str,setting: Setting, background_task: BackgroundTasks,payload:ResetPasswordRequest):
     try:
         data = util.jwt.decode(token, setting.secret_key, algorithms=[setting.algorithm])
         if data:
             logger.info(data)
-            user = get_user_phone(db=db,phonenumber=data["username"])
+            user = authQuery.getOne(db=db,email=data["username"])
             logger.info(user)
             if user:
                 if data["password"] == payload.otp:

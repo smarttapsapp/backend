@@ -13,7 +13,7 @@ from jose import jwt, JWTError
 from schemas.device import Device
 from utils.database import get_db
 from sqlalchemy.orm import Session
-from fastapi import Depends,Header,status
+from fastapi import Depends,Header,status,Request
 from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -22,11 +22,11 @@ from schemas.request import PINRequest
 logger = logging.getLogger(__name__)
 # initialise fast api instance
 middlewares = [
-    Middleware(TrustedHostMiddleware, allowed_hosts=["*"]#util.get_setting().allowed_hosts
+    Middleware(TrustedHostMiddleware, allowed_hosts=util.get_setting().allowed_hosts
                ),
     Middleware(
         CORSMiddleware,
-        allow_origins=["*"],#util.get_setting().allowed_origins,
+        allow_origins=util.get_setting().allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -165,7 +165,7 @@ async def validateDevice(
         logger.info(ex)
         raise device_exception
 async def validateAdmin(
-    token: str = Depends(util.oauth2_scheme),
+        request:Request,
     setting: Setting = Depends(getSystemSetting),
     db: Session = Depends(get_db),
 ):
@@ -174,26 +174,29 @@ async def validateAdmin(
         error={"statusCode": "401", "statusDescription": "Your session has expired!"},
     )
     try:
-        payload = jwt.decode(
+        token = request.cookies.get("access_token")
+        logger.info(token)
+        if token:
+            payload = jwt.decode(
             token, setting.secret_key, algorithms=[setting.algorithm]
         )
-        logger.info(payload)
-        user = adminQuery.admin(
+            logger.info(payload)
+            user = adminQuery.admin(
             db=db,
             username=payload["username"],
         )
-        if user:
-            logger.info(user.status)
-            if user.status:
+            if user:
                 logger.info(user.status)
-                return Admin.from_orm(user)
-            raise util.UnicornException(
+                if user.status:
+                    logger.info(user.status)
+                    return user
+                raise util.UnicornException(
                 status=status.HTTP_401_UNAUTHORIZED,
                 error={
                     "statusCode": str(status.HTTP_401_UNAUTHORIZED),
                     "statusDescription": f"Your account is {user.status.value}",
-                },
-            )
+                },)
+            raise credentials_exception
         raise credentials_exception
     except JWTError:
         raise credentials_exception

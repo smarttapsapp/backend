@@ -354,6 +354,13 @@ print(result_str)
 def decodeId(id:str):
     decoded_bytes = base64.b64decode(id)
     return decoded_bytes.decode('utf-8')
+
+def get_first_day_of_month():
+    today = datetime.today()
+    return datetime(today.year, today.month, 1).strftime("%Y-%m-%d")
+
+def get_today():
+    return datetime.today().strftime("%Y-%m-%d")
 class DebitStatusEnum(PythonEnum):
     APPROVE = "approved"
     INSUFICIENT = "insuficient Fund"

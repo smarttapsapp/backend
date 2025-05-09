@@ -7,6 +7,7 @@ from schemas.response import BaseResponse
 
 class RoleBase(BaseModel):
     name: Union[str, None] = None
+    tag:str
     status: Union[bool, None] = False
 
 

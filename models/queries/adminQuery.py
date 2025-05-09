@@ -7,4 +7,4 @@ import logging
 logger = logging.getLogger(__name__)
 
 def admin(db: Session,username:str):
-    return db.query(AdminModel).filter_by(username=username).first()
+    return db.query(AdminModel).filter(AdminModel.email ==username).first()

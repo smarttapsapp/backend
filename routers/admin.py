@@ -17,12 +17,13 @@ from utils.dependencies import (
 from utils.database import get_db
 from services import adminservice
 from schemas.admin import *
+from models.model import *
 from schemas.setting import Setting
 import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/admin")
+router = APIRouter()
 
 # admin
 @router.post(
@@ -39,13 +40,13 @@ async def login(
     background_task: BackgroundTasks,
 ):
     try:
-        return adminservice.authenticate_user(
-            db=db,
+        return adminservice.authenticateUser(
+            request=request,
             response=response,
             setting=setting,
-            request=request,
-            payload=payload,
+            db=db,
             background_task=background_task,
+            payload=payload,
         )
     except Exception as ex:
         logger.error(ex)
@@ -54,6 +55,60 @@ async def login(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=SYSTEMBUSY,
         )
+@router.post("/logout", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,name="user balance")
+async def postLogout(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if admin:
+            logger.info(request.cookies.get("access_token"))
+            logger.info(f"{admin.id} logged out")
+            response.delete_cookie("access_token",path="/",
+                    httponly=True, 
+                    samesite="None",)
+            return BaseResponse(
+            statusCode=str(status.HTTP_200_OK),
+            statusDescription=SUCCESS,
+        )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+
+@router.get("/profile", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,name="user profile")
+async def getAdminProfile(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if admin:
+            return adminservice.profile(
+                db=db,request=request,response=response,setting=setting,admin=admin
+            )
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=INVALIDACCOUNT,
+        )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex),)
+
 @router.post(
     "/users",
     response_model=BaseResponse,

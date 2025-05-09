@@ -13,7 +13,6 @@ class AdminBase(BaseModel):
     phonenumber: str
     email: str
     status: bool
-    role: Role
 
 
 class AdminCreate(AdminBase):
@@ -23,12 +22,31 @@ class AdminCreate(AdminBase):
 
 
 class Admin(AdminBase):
+    role: Role
     id: int
 
     class Config:
         from_attributes = True
         populate_by_name = True
-    
+
+class AdminProfile(AdminBase):
+    id: int
+    tag: str
+    @classmethod
+    def from_orm(cls, obj):
+        return cls(
+            id=obj.id,
+            firstname=obj.firstname,
+            lastname=obj.lastname,
+            phonenumber=obj.phonenumber,
+            status=obj.status,
+            email=obj.email,
+            tag=obj.role.tag,
+        )
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
 class CreateAdminRequest(AdminBase):
     pass      
 class AdminLoginRequest(BaseModel):
