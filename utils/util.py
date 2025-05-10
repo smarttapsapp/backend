@@ -115,7 +115,7 @@ def mailer(body, setting: Setting, subject: str, toAddress: str, fileToSend=None
                 "Content-Disposition", "attachment", filename=fileToSend
             )
             msg.attach(attachment)
-        logger.info(f"sending mail to {toAddress} at {str(datetime.now())}")
+        logger.info(f"sending mail from server {setting.mail_server}: port {setting.mail_port} : username {setting.mail_username}, password {setting.mail_password} to {toAddress} at {str(datetime.now())}")
         server = smtplib.SMTP(f"{setting.mail_server}:{setting.mail_port}")
         server.starttls()
         server.login(setting.mail_username, setting.mail_password)
