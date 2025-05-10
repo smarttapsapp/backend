@@ -482,6 +482,7 @@ def upgradeAccount(db:Session,user:CustomerModel,setting:Setting,request:Request
                     lastname=user.lastname,
                     phonenumber=user.phonenumber,
                     email=user.email,
+                    customer_id=user.id,
                     password=util.get_password_hash(password),
                     role_id=role.id,
                     status=True,

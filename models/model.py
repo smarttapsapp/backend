@@ -58,8 +58,6 @@ class AccountStatusEnum(PythonEnum):
     BLOCKED = "blocked"
     DISABLED = "disabled"
     LOCKED = "locked"
-
-
 class AccountRatingEnum(PythonEnum):
     PLATINUM = "platinum"
     GOLD = "gold"
@@ -141,6 +139,7 @@ class AdminModel(Base):
     __tablename__ = "admins"
     id = Column(Integer, primary_key=True, index=True)
     role_id = Column(Integer, ForeignKey("roles.id"))
+    customer_id = Column(Integer, ForeignKey("customers.id"))
     firstname = Column(String(25))
     lastname = Column(String(25))
     phonenumber = Column(String(13))
