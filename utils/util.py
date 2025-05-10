@@ -34,83 +34,51 @@ templates = Jinja2Templates(directory="templates/email")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
-
-def http(url, params={}, headers={"content-type": "application/json"}):
-    logger.info("INFO|%s|%s|%s" % (str(http.__name__), str(url), str(params)))
-    startTime = datetime.now()
-    if len(params) > 0:
-        resp = requests.post(url, data=json.dumps(params), headers=headers, timeout=10)
-    else:
-        resp = requests.get(url, headers=headers, timeout=10)
-    endTime = datetime.now()
-    responseTime = (endTime - startTime).total_seconds()
-    text = "_URL:: %s,_HEADER:: %s, _PARAM:: %s, _RESPONSE:: %s _STATUSCODE:: %s _TIME:: %s " % (
-        str(resp.request.url),
-        str(resp.request.headers),
-        str(resp.request.body),
-        str(resp.content),
-        str(resp.status_code),
-        str(responseTime),
-    )
-    logger.info(text)
-    return resp.json()
-
-def httpV2(url, params={}, headers={"content-type": "application/json"}):
-    logger.info("INFO|%s|%s|%s" % (str(http.__name__), str(url), str(params)))
-    startTime = datetime.now()
-    if len(params) > 0:
-        resp = requests.post(url, data=json.dumps(params), headers=headers, timeout=10)
-    else:
-        resp = requests.get(url, headers=headers, timeout=10)
-    endTime = datetime.now()
-    responseTime = (endTime - startTime).total_seconds()
-    text = "_URL:: %s,_HEADER:: %s, _PARAM:: %s, _RESPONSE:: %s _STATUSCODE:: %s _TIME:: %s " % (
-        str(resp.request.url),
-        str(resp.request.headers),
-        str(resp.request.body),
-        str(resp.content),
-        str(resp.status_code),
-        str(responseTime),
-    )
-    logger.info(text)
-    return resp
-
-def getInterswitchToken(clientkey: str, clientsecret: str, url: str):
+def create_response(url,method=None,body=None,headers=None,status_code=500, message="Service Unavailable"):
+    response = requests.Response()
+    headers = headers or {"content-type": "application/json"}
+    method = method or "GET"
+    request = requests.Request(method, url, headers=headers, data=body).prepare()
+    response.status_code = status_code
+    response._content = json.dumps({"statusCode":str(status_code),"statusDescription":message,}).encode()  # Encode message as bytes
+    response.headers = headers
+    response.request = request
+    return response
+def http(url, params={}, headers={"content-type": "application/json"},contentType="json",method="GET",files=None,timeout=10):
+    print("INFO|%s|%s|%s" % (str(http.__name__), str(url), str(params)))
     startTime = datetime.now()
     try:
-        auth = base64.b64encode((f"{clientkey}:{clientsecret}").encode("utf-8")).decode(
-            "utf-8"
-        )
-        params = {"scope": "profile", "grant_type": "client_credentials"}
-        headers = {
-            "authorization": f"Basic {auth}",
-            "content-type": "application/x-www-form-urlencoded",
-        }
-        resp = requests.post(f"{url}passport/oauth/token", data=params, headers=headers)
-        if resp.status_code == 200:
-            return json.loads(resp.text)
-        endTime = datetime.now()
-        responseTime = (endTime - startTime).total_seconds()
-        string = "API|%s|%s|%s|%s|%s" % (
-            str(resp.status_code),
-            str(resp.request.body),
-            resp.content,
-            str(resp.request.url),
-            str(responseTime),
-        )
-        logger.info(string)
-    except Exception as e:
-        logger.info(
-            "INFO|%s|%s|%s|%s"
-            % (
-                datetime.now().strftime("%Y-%m-%d, %H:%M:%S"),
-                str(getInterswitchToken.__name__),
-                str("token exception"),
-                str(e),
-            )
-        )
-    return None
-
+        if len(params) > 0:
+            if contentType =="formData":
+                print("am here")
+                resp = requests.post(url, data = params,files=files,timeout=timeout)
+            else:
+                resp = requests.post(url, data = json.dumps(params), headers=headers, timeout=timeout)
+        else:
+            if method=="POST":
+                resp = requests.post(url,headers=headers,timeout=timeout)
+            else:
+                resp = requests.get(url, headers=headers, timeout=timeout)
+    except requests.Timeout:
+        print("Request timed out.")
+        resp =  create_response(url=url,method=method,body=params,headers=headers,status_code=408,message="Request timed out.")
+    except requests.ConnectionError:
+        print("Connection error.")
+        resp =  create_response(url=url,method=method,body=params,headers=headers,status_code=503,message="Connection error try again later")
+    except requests.RequestException as e:
+        resp = create_response(url=url,method=method,body=params,headers=headers,status_code=500,message="System busy try again later")
+    endTime = datetime.now()
+    responseTime = (endTime - startTime).total_seconds()
+    text = "_URL:: %s,_HEADER:: %s, _PARAM:: %s, _RESPONSE:: %s _STATUSCODE:: %s _TIME:: %s " % (
+        str(resp.request.url),
+        str(resp.request.headers),
+        str(resp.request.body),
+        str(resp.content),
+        str(resp.status_code),
+        str(responseTime),
+    )
+    print(text)
+    return resp.json()
 def mailer(body, setting: Setting, subject: str, toAddress: str, fileToSend=None):
     try:
         msg = MIMEMultipart()
@@ -123,7 +91,6 @@ def mailer(body, setting: Setting, subject: str, toAddress: str, fileToSend=None
             ctype, encoding = mimetypes.guess_type(fileToSend)
             if ctype is None or encoding is not None:
                 ctype = "application/octet-stream"
-
             maintype, subtype = ctype.split("/", 1)
             if maintype == "text":
                 fp = open(fileToSend)
@@ -157,7 +124,6 @@ def mailer(body, setting: Setting, subject: str, toAddress: str, fileToSend=None
     except Exception as e:
         logger.error(f"Error sending email at {datetime.now()} {str(e)}")
         pass
-
 def send_sms_message(setting: Setting, toPhoneNumber: str, message: str,transactionId:str):
     try:
         logger.info(f"started sending SMS to {toPhoneNumber} with text {message} with transactionId {transactionId}")
@@ -181,10 +147,8 @@ def send_sms_message(setting: Setting, toPhoneNumber: str, message: str,transact
     except Exception as ex:
         logger.error(str(ex))
         pass
-
 def amountToKobo(amount):
     return str(int(float(amount) * 100))
-
 def formatPhoneWithDialingCode(msisdn):
     msisdn = msisdn.replace("+", "", 1)
     if msisdn.startswith("234") and len(msisdn) == 13:
@@ -195,8 +159,6 @@ def formatPhoneWithDialingCode(msisdn):
         return f"234{msisdn}"
     else:
         return msisdn
-
-
 def formatPhone(msisdn:str)->str:
     msisdn = msisdn.replace("+", "", 1)
     if msisdn.startswith("234") and len(msisdn) == 13:
@@ -207,7 +169,6 @@ def formatPhone(msisdn:str)->str:
         return msisdn
     else:
         return msisdn
-
 def formatPhoneShort(msisdn:str)->str:
     msisdn = msisdn.replace("+", "", 1)
     if msisdn.startswith("234") and len(msisdn) == 13:
@@ -216,36 +177,28 @@ def formatPhoneShort(msisdn:str)->str:
         return msisdn.replace("0", "", 1)
     else:
         return msisdn
-
 def mask_email(email):
     return re.sub(r'^[^@]+', '*' * len(re.search(r'^[^@]+', email).group()), email)
-
 def generateId():
     return str(int(time.time()))
-
-
 def generateOTP():
     return str(randint(100000, 999999))
-
 def find_item(items, key, value):
     return next((x for x in items if x.billerId == value), None)
 def generateUniqueId():
     return "2510" + str(uuid.uuid5(uuid.NAMESPACE_DNS, "smarttap.org").int)
-
 def formatDateOfBirth(dob:str):
     try:
         input_date = datetime.strptime(dob, "%d-%b-%y")
         return input_date.strftime("%d%m%Y")
     except Exception as ex:
         return None
-    
 def formatDateOfBirthForOpenAcct(dob:str)->Union[str,None]:
     try:
         input_date = datetime.strptime(dob,"%d%m%Y")
         return input_date.strftime("%Y-%m-%d")
     except Exception as ex:
         return None
-
 def parseVerifymeDateOfBirth(dob:str)->Union[str,None]:
     try:
         input_date = datetime.strptime(dob,"%d-%m-%Y")
@@ -269,7 +222,6 @@ def generateCheckDigit(serialNumber:str, bankCode:str):
     checkDigit = 10 - sum
     #Step 4. If your result is 10, then use 0 as your check digit
     return 0 if checkDigit == 10 else checkDigit
-
 def formXml(setting: Setting, phone: str, content: str):
     root = ET.Element("operation", {"type": "submit"})
     account = ET.SubElement(
@@ -291,8 +243,6 @@ def formXml(setting: Setting, phone: str, content: str):
     xml = ET.tostring(root, xml_declaration=True, encoding="iso-8859-1")
     logger.info(xml)
     return xml
-
-
 def stringToHex(string):
     st = ""
     for char in string:
@@ -300,8 +250,6 @@ def stringToHex(string):
         st = st + hex(ord(d))[2:]
     logger.info(st)
     return st
-
-
 def create_access_token(setting: Setting, credentials: dict, exp:Union[int,None]=20):
     encoded_credentials = credentials.copy()
 
@@ -315,15 +263,12 @@ def create_access_token(setting: Setting, credentials: dict, exp:Union[int,None]
         encoded_credentials, setting.secret_key, algorithm=setting.algorithm
     )
     return [encoded_jwt,str(exp*60)]
-
 # Hash a password using bcrypt
 def get_password_hash(password):
     pwd_bytes = password.encode("utf-8")
     salt = bcrypt.gensalt()
     hashed_password = bcrypt.hashpw(password=pwd_bytes, salt=salt)
     return hashed_password
-
-
 # Check if the provided password matches the stored password (hashed)
 def verify_password(plain_password, hashed_password):
     logger.info(plain_password)
@@ -341,47 +286,21 @@ def convert_thousand_separator_to_str(number_str):
 
     # Convert the float back to a string with the thousand separator
     return locale.format_string("%d", number, grouping=True)
-
 def getKoboValue(amount:str):
     amount = amount.replace(',', '')
     kobo = int(float(amount) * 100)
     return kobo
-# Example usage
-number_str = "1,234,567.89"
-result_str = convert_thousand_separator_to_str(number_str)
-print(result_str)
-
 def decodeId(id:str):
     decoded_bytes = base64.b64decode(id)
     return decoded_bytes.decode('utf-8')
-
 def get_first_day_of_month():
     today = datetime.today()
     return datetime(today.year, today.month, 1).strftime("%Y-%m-%d")
-
 def get_today():
     return datetime.today().strftime("%Y-%m-%d")
-class DebitStatusEnum(PythonEnum):
-    APPROVE = "approved"
-    INSUFICIENT = "insuficient Fund"
-    ERROR = "Transaction Error"
-    MERCHANT = "merchant"
-    PROCESSING = "processing"
-
-
-# def verify_password(plain_password, hashed_password):
-#    return pwd_context.verify(plain_password, hashed_password)
-
-
-# def get_password_hash(password):
-#    return pwd_context.hash(password)
-
-
 @lru_cache()
 def get_setting():
     return AppSetting()
-
-
 class UnicornException(Exception):
     def __init__(self, status: int, error: dict):
         self.status = status

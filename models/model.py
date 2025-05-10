@@ -22,7 +22,12 @@ from utils.constant import *
 from enum import Enum as PythonEnum
 
 Base = declarative_base()
-
+class DebitStatusEnum(PythonEnum):
+    APPROVE = "approved"
+    INSUFICIENT = "insuficient Fund"
+    ERROR = "Transaction Error"
+    MERCHANT = "merchant"
+    PROCESSING = "processing"
 class TimeOfOperationEnum(PythonEnum):
     MORNING = "Morning"
     AFTERNOON = "Afternoon"
