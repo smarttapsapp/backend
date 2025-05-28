@@ -112,18 +112,18 @@ def queryWallet(db:Session,walletAccount:str):
     return db.query(AccountModel).filter(AccountModel.walletAccount == walletAccount).first()
 def getLastpaymentByAccount(db: Session, accountId: int):
     return db.query(PaymentModel).filter(PaymentModel.wallet_id == accountId).order_by(desc(PaymentModel.updated_at)).first()
-
+def getstations(db: Session):
+    return db.query(StationModel).all()
+def getRoutes(db: Session):
+    return db.query(RouteModel).all()
 def query_stations(db: Session,mode:str):
     return db.query(StationModel).filter(StationModel.mode == mode).all()
-
 def queryRouteByIdAndMode(db: Session,routeId:int,mode:str):
     return db.query(RouteModel).filter(RouteModel.id == routeId).filter(RouteModel.mode == mode).first()
-
 def query_routes(db: Session,mode:str):
     return db.query(RouteModel).filter(RouteModel.mode == mode).all()
 def query_routes_by_stations(db: Session,departure:int,arrival:int,mode:str):
     return db.query(RouteModel).filter(RouteModel.mode == mode).filter(RouteModel.sourceStation_id == departure).filter(RouteModel.destinationStation_id == arrival).first()
-
 def busById(db: Session,busId:int):
     return db.query(BusModel).filter(BusModel.id == busId).first()
 def getPaymentHistories(db: Session,userId:int,startDate:str,endDate:str):
@@ -146,7 +146,6 @@ def getAllPaymentsHistories(db: Session,startDate:str,endDate:str,userId:str=Non
             return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
         return db.query(PaymentModel).filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
     
-
 def paymentByTransactionNumber(db:Session,mode:PaymentEnum,transactionId:str,userId=int):
     return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.reference == transactionId).filter(PaymentModel.payment_type == mode).first()
 def ticketByTicketNumber(db:Session,mode:TicketModeEnum,ticketId:str):
@@ -167,3 +166,10 @@ def getRoleByTag(db: Session,tag:str):
     return db.query(RoleModel).filter(RoleModel.tag == tag).first()
 def getRoleById(db: Session,roleId:int):
     return db.query(RoleModel).filter(RoleModel.id == roleId).first()
+def getTicketHistories(db: Session,startDate:str,endDate:str,adminId:int=None):
+    if startDate and endDate:
+        start = datetime.strptime(startDate, "%Y-%m-%d").date()
+        end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
+        if adminId:
+            return db.query(TicketModel).filter(TicketModel.admin_id == adminId).filter(TicketModel.statusCode=="200").filter(TicketModel.created_at.between(start,end)).order_by(desc(TicketModel.created_at)).all()
+    return db.query(TicketModel).filter(TicketModel.admin_id == adminId).order_by(desc(TicketModel.created_at)).all()

@@ -3,6 +3,7 @@ from fastapi import (
     Depends,
     status,
     Response,
+    Query,
     Request,
     BackgroundTasks,
 )
@@ -10,6 +11,7 @@ from schemas.response import *
 from schemas.request import *
 from sqlalchemy.orm import Session
 from utils.constant import *
+from utils import util
 from typing import Annotated
 from utils.dependencies import (
     getSystemSetting,validateAdmin,
@@ -17,7 +19,11 @@ from utils.dependencies import (
 from utils.database import get_db
 from services import adminservice
 from schemas.admin import *
+from schemas.station import StationsResponse
+from schemas.route import RoutesResponse
+from schemas.ticket import TicketsResponse
 from models.model import *
+from datetime import date
 from schemas.setting import Setting
 import logging
 
@@ -214,7 +220,85 @@ async def getDashboardProductRequest(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+@router.get("/stations", 
+    response_model=StationsResponse,
+    response_model_exclude_unset=True,name="get products")
+async def get_products(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if admin:
+            return adminservice.listOfStations(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                admin=admin,)
 
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return StationsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/routes", 
+    response_model=RoutesResponse,
+    response_model_exclude_unset=True,name="get routes")
+async def get_routes(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if admin:
+            return adminservice.listOfRoutes(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                admin=admin,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+
+@router.get("/tickets", 
+    response_model=TicketsResponse,
+    response_model_exclude_unset=True,name="get customer payemnt")
+async def get_Admin_payments(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    startDate: str = Query(default=util.get_first_day_of_month()),
+    endDate: Optional[str] = Query(str(date.today())),
+):
+    try:
+        if admin:
+            if startDate and endDate:
+                start = datetime.strptime(startDate, "%Y-%m-%d")
+                end = datetime.strptime(endDate, "%Y-%m-%d")
+                if end < start:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
+            return adminservice.listOfTickets(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                admin=admin,
+                startDate=startDate,
+                endDate=endDate)
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 
 
 

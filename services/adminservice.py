@@ -2,7 +2,7 @@
 import logging
 from sqlalchemy.orm import Session
 from models.model import *
-from models.queries import authQuery
+from models.queries import authQuery,queries
 from datetime import datetime,timedelta
 from schemas import otp
 from utils import util
@@ -10,6 +10,9 @@ from schemas.setting import Setting
 from utils.constant import *
 from schemas.customer import *
 from schemas.admin import *
+from schemas.station import StationsResponse
+from schemas.route import RoutesResponse
+from schemas.ticket import TicketsResponse
 from fastapi import (
     status,
     Response,
@@ -358,3 +361,50 @@ def resetPasswordFinal(db:Session,response:Response,token:str,setting: Setting, 
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+# admin service
+def listOfRoutes(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+    try:
+        logger.info(f"started querying products")
+        if admin.role.tag == AdminRoleEnum.BUSINESS:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return RoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
+        else:
+            return RoutesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getRoutes(db=db))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return RoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+
+def listOfStations(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+    try:
+        logger.info(f"started querying products")
+        if admin.role.tag == AdminRoleEnum.BUSINESS:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return StationsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
+        else:
+            return StationsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getstations(db=db))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return StationsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+def listOfTickets(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
+    try:
+        logger.info(
+            f"started querying tickets list from {startDate} to {endDate}"
+        )
+        if admin.role.tag == AdminRoleEnum.BUSINESS:
+            return TicketsResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=queries.getTicketHistoriesByBusinesses(db=db,userId=admin.id,startDate=startDate,endDate=endDate)
+            )
+        else:
+            return TicketsResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=queries.getTicketHistories(db=db,startDate=startDate,endDate=endDate)
+            )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return TicketsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

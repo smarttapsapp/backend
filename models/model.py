@@ -740,7 +740,8 @@ class TicketModel(Base):
     __tablename__ = 'tickets'
     
     id = Column(Integer, primary_key=True)
-    customer_id = Column(Integer, ForeignKey('customers.id'), nullable=False)  # Creator of the ticket
+    customer_id = Column(Integer, ForeignKey('customers.id'), nullable=False)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=False)
     customer = relationship('CustomerModel', backref='tickets')
     bus_id = Column(Integer, ForeignKey('buses.id'), nullable=True)
     route_id = Column(Integer, ForeignKey('routes.id'), nullable=True)

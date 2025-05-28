@@ -24,14 +24,15 @@ from schemas.station import StationsResponse
 from schemas.bus import BusesResponse
 from schemas.route import RouteResponse
 from schemas.beneficiary import *
-from models.model import CustomerModel
-from utils.dependencies import getSystemSetting, verified_user,validateTransactionPIN
+from models.model import CustomerModel,AdminModel
+from utils.dependencies import getSystemSetting, verified_user,validateTransactionPIN,validateAdmin
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
     tags=["products"],
 )
+adminRouter = APIRouter(tags=["products"])
 @router.get("/bills",
     response_model=ProductsResponse,
     response_model_exclude_unset=True,)
@@ -68,7 +69,6 @@ async def get_All_Billers(
             statusCode=str(status.HTTP_500_INTERNAL_SERVER_ERROR),
             statusDescription=str(ex),
         )
-
 @router.get("/routes/{mode}",
     response_model=RoutesResponse,
     response_model_exclude_unset=True,)
@@ -90,7 +90,6 @@ async def get_available_routes(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,data=[])
-
 @router.get("/bus_search",
     response_model=RouteResponse,
     response_model_exclude_unset=True,)
@@ -114,7 +113,6 @@ async def get_Bus_Routes(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return RouteResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-
 @router.get("/stations/{mode}",
     response_model=StationsResponse,
     response_model_exclude_unset=True,)
@@ -136,7 +134,6 @@ async def get_Train_Stations(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return StationsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,data=[])
-
 @router.get("/train_search",
     response_model=RoutesResponse,
     response_model_exclude_unset=True,)
@@ -166,7 +163,6 @@ async def get_Trains_Routes(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-
 @router.get("/schedule/{mode}/{routeId}",
     response_model=RouteResponse,
     response_model_exclude_unset=True,)
@@ -190,8 +186,6 @@ async def get_Trains_Routes(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return RouteResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-
-
 @router.get("/beneficiaries/{billerType}",
     response_model=BeneficiariesResponse,
     response_model_exclude_unset=True,)
@@ -261,3 +255,27 @@ async def delete_beneficiary(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex), )
+#==============================================Admin ==============================================
+@adminRouter.get("/products", 
+    response_model=ProductsResponse,
+    response_model_exclude_unset=True,name="get products")
+async def get_products(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if admin:
+            return productservice.listOfProduct(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                admin=admin,)
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return ProductsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

@@ -45,10 +45,10 @@ async def unicorn_exception_handler(request: Request, exc: util.UnicornException
 # admin API
 app.include_router(admin.router,prefix="/admin")
 app.include_router(configuration.router,prefix="/admin")
-app.include_router(customer.router,prefix="/admin")
+app.include_router(customer.adminRouter,prefix="/admin")
 app.include_router(notification.adminRouter,prefix="/admin")
 app.include_router(payment.adminRouter,prefix="/admin")
-app.include_router(product.router,prefix="/admin")
+app.include_router(product.adminRouter,prefix="/admin")
 app.mount("/mobile", mobileApp)
 app.mount("/static", StaticFiles(directory="templates"), name="static")
 # Add the logging middleware to FastAPI

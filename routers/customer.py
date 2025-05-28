@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from fastapi import (
     Depends,
     status,
+    Query,
     Response,
     Request,Form,UploadFile,
     BackgroundTasks,
@@ -9,18 +10,20 @@ from fastapi import (
 from schemas.customer import *
 from schemas.setting import Setting
 from models.model import CustomerModel
+from models.model import AdminModel
 from sqlalchemy.orm import Session
 from utils.constant import *
+from datetime import date
 from typing import Annotated
-from utils.dependencies import getSystemSetting, verified_user,validateTransactionPIN
+from utils.dependencies import getSystemSetting, verified_user,validateTransactionPIN,validateAdmin
 from utils.database import get_db
 from services import customerservice
 from utils import util
 import logging
 
 logger = logging.getLogger(__name__)
-router = APIRouter(
-)
+router = APIRouter()
+adminRouter = APIRouter(tags=["customer"])
 
 @router.get(
     "/profile",
@@ -309,9 +312,6 @@ async def update_customer_information(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=SYSTEMBUSY,
         )
-
-
-
 @router.get(
     "/analysis",
     response_model=BaseResponse,
@@ -347,8 +347,6 @@ async def get_customer_analytics(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=SYSTEMBUSY,
         )
-
-
 @router.put("/photo/update",
     response_model=BaseResponse,
     response_model_exclude_unset=True,)
@@ -410,3 +408,37 @@ async def upload_customer_profile_image(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=SYSTEMBUSY,
         )
+#==============================================Admin ==============================================
+@adminRouter.get("/customers", 
+    response_model=CustomersResponse,
+    response_model_exclude_unset=True,name="get customer payemnt")
+async def get_Admin_customers(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    startDate: str = Query(default=util.get_first_day_of_month()),
+    endDate: Optional[str] = Query(str(date.today())),
+):
+    try:
+        if admin:
+            if startDate and endDate:
+                start = datetime.strptime(startDate, "%Y-%m-%d")
+                end = datetime.strptime(endDate, "%Y-%m-%d")
+                if end < start:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return CustomersResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
+            return customerservice.listOfCustomer(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                admin=admin,
+                startDate=startDate,
+                endDate=endDate)
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return CustomersResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

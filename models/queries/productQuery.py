@@ -8,16 +8,10 @@ logger = logging.getLogger(__name__)
 
 def get_all_bill(db: Session):
     return db.query(ProductModel).filter(ProductModel.status == True).filter(ProductModel.isWeb == True).all()
-
-
 def get_single_bill_by_id(db: Session, id: int):
     return db.query(ProductModel).filter(ProductModel.id == id).filter(ProductModel.status == True).first()
-
-
 def get_all_biller(db: Session):
     return db.query(ProductTypeModel).filter(ProductTypeModel.status == True).all()
-
-
 def get_single_biller_by_id(db: Session, id: int):
     return db.query(ProductTypeModel).filter(ProductTypeModel.id == id).first()
 def get_single_biller_by_billerId(db: Session, billerId: str):
@@ -30,7 +24,6 @@ def query_bus_routes_departure(db: Session, departure: str, arrival: str, search
     return db.query(ParkModel).filter(ParkModel.address.like(f"%{departure}%")).filter(ParkModel.address.like(f"%{arrival}%")).all()
 def query_bus_routes_arrival(db: Session, departure: str, arrival: str, searchType: str):
     return db.query(ParkModel).filter(ParkModel.address.like(f"%{departure}%")).filter(ParkModel.address.like(f"%{arrival}%")).all()
-
 def query_stations(db: Session):
     return db.query(StationModel).all()
 def query_train_routes(db: Session, departure: str, arrival: str, seatType: str, takeOffTime: str):
@@ -46,3 +39,5 @@ def create(db: Session, model: object):
     return model
 def deleteRecord(db:Session,id:int,userId:int):
     return db.query(BeneficiaryModel).filter(BeneficiaryModel.id == id).filter(BeneficiaryModel.user_id == userId).delete()
+def getProducts(db: Session):
+    return db.query(ProductModel).all()

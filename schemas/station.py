@@ -14,6 +14,7 @@ class StationRequest(StationBase):
 
 class Station(StationBase):
     id: Optional[int]
+    mode: Union[str, None] = None
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 

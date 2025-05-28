@@ -88,7 +88,6 @@ async def payment_via_QR(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-
 # fund wallet
 @router.post("/fund",
     response_model=BaseResponse,
@@ -131,7 +130,6 @@ async def fund_notifications(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-
 # payments
 @router.get("/transactions", 
     response_model=PaymentsResponse,
@@ -205,7 +203,6 @@ async def get_single_payment(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return PaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-
 # bus ticket payment
 @router.post("/bus/buyticket",
     response_model=BaseResponse,
@@ -229,7 +226,6 @@ async def buy_ticket(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-
 # train ticket payment
 @router.post("/train/buyticket",
     response_model=BaseResponse,
@@ -288,7 +284,6 @@ async def get_tickets(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-
 # single ticket payment
 @router.get("/ticket/{ticketId}/{mode}",
     response_model=TicketResponse,
@@ -312,7 +307,6 @@ async def get_ticket(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-
 # nfc debit payment
 @router.post("/nfc/debit",
     response_model=BaseResponse,
@@ -342,7 +336,6 @@ async def fund_wallet(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-
 # bill payment
 @router.post("/bill/name-enquiry",
     response_model=BillNameEnquiryResponse,
@@ -391,7 +384,6 @@ async def bill_payment(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex), )
-
 # wallet payment
 @router.get("/wallet/enquiry/{accountNumber}",
     response_model=BaseResponse,
@@ -476,7 +468,6 @@ async def redeem_ticket(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-
 #==============================================Admin ==============================================
 @adminRouter.get("/payments", 
     response_model=PaymentsResponse,

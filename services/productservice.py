@@ -8,6 +8,7 @@ from schemas.customer import *
 from sqlalchemy.orm import Session
 from schemas.setting import Setting
 from schemas.park import ParksResponse
+from schemas.product import ProductsResponse
 from schemas.bus import BusesResponse
 from schemas.station import StationsResponse
 from schemas.route import RoutesResponse,RouteResponse
@@ -131,3 +132,16 @@ def deleteBeneficiary(db: Session,beneficiaryId:str,user:Customer):
     if deleted:
         return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS)
     return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+# admin service
+def listOfProduct(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+    try:
+        logger.info(f"started querying products")
+        if admin.role.tag == AdminRoleEnum.BUSINESS:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return ProductsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
+        else:
+            return ProductsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=productQuery.getProducts(db=db))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return ProductsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
