@@ -119,8 +119,8 @@ class PaymentEnum(PythonEnum):
 class TicketStatusEnum(PythonEnum):
     BOOKED = "booked"
     CANCELLED = "cancelled"
-    USED = USEDTICKET
-    EXPIRED = EXPIREDTICKET
+    USED = "used"
+    EXPIRED = "expired"
 class TicketModeEnum(PythonEnum):
     BUS = "bus"
     TRAIN = "train"

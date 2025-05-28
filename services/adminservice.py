@@ -2,7 +2,7 @@
 import logging
 from sqlalchemy.orm import Session
 from models.model import *
-from models.queries import authQuery,queries
+from models.queries import authQuery,queries,adminQuery
 from datetime import datetime,timedelta
 from schemas import otp
 from utils import util
@@ -13,6 +13,7 @@ from schemas.admin import *
 from schemas.station import StationsResponse
 from schemas.route import RoutesResponse
 from schemas.ticket import TicketsResponse
+from schemas.notification import NotificationsResponse
 from fastapi import (
     status,
     Response,
@@ -396,15 +397,36 @@ def listOfTickets(request: Request,response: Response,setting: Setting,db: Sessi
             return TicketsResponse(
                 statusCode= str(status.HTTP_200_OK),
                 statusDescription=SUCCESS,
-                data=queries.getTicketHistoriesByBusinesses(db=db,userId=admin.id,startDate=startDate,endDate=endDate)
+                data=adminQuery.getTicketHistories(db=db,adminId=admin.id,startDate=startDate,endDate=endDate)
             )
         else:
             return TicketsResponse(
                 statusCode= str(status.HTTP_200_OK),
                 statusDescription=SUCCESS,
-                data=queries.getTicketHistories(db=db,startDate=startDate,endDate=endDate)
+                data=adminQuery.getTicketHistories(db=db,startDate=startDate,endDate=endDate)
             )
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TicketsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+def listOfNotifications(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
+    try:
+        logger.info(
+            f"started querying tickets list from {startDate} to {endDate}"
+        )
+        if admin.role.tag == AdminRoleEnum.BUSINESS:
+            return NotificationsResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=adminQuery.getNotificationHistories(db=db,adminId=admin.id,startDate=startDate,endDate=endDate)
+            )
+        else:
+            return NotificationsResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=adminQuery.getNotificationHistories(db=db,startDate=startDate,endDate=endDate)
+            )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return NotificationsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

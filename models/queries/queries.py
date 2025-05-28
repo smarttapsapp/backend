@@ -144,8 +144,7 @@ def getAllPaymentsHistories(db: Session,startDate:str,endDate:str,userId:str=Non
         end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
         if userId:
             return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
-        return db.query(PaymentModel).filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
-    
+        return db.query(PaymentModel).filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()    
 def paymentByTransactionNumber(db:Session,mode:PaymentEnum,transactionId:str,userId=int):
     return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.reference == transactionId).filter(PaymentModel.payment_type == mode).first()
 def ticketByTicketNumber(db:Session,mode:TicketModeEnum,ticketId:str):
@@ -166,10 +165,3 @@ def getRoleByTag(db: Session,tag:str):
     return db.query(RoleModel).filter(RoleModel.tag == tag).first()
 def getRoleById(db: Session,roleId:int):
     return db.query(RoleModel).filter(RoleModel.id == roleId).first()
-def getTicketHistories(db: Session,startDate:str,endDate:str,adminId:int=None):
-    if startDate and endDate:
-        start = datetime.strptime(startDate, "%Y-%m-%d").date()
-        end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
-        if adminId:
-            return db.query(TicketModel).filter(TicketModel.admin_id == adminId).filter(TicketModel.statusCode=="200").filter(TicketModel.created_at.between(start,end)).order_by(desc(TicketModel.created_at)).all()
-    return db.query(TicketModel).filter(TicketModel.admin_id == adminId).order_by(desc(TicketModel.created_at)).all()
