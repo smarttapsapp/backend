@@ -59,3 +59,7 @@ class ChangePasswordRequest(BaseModel):
     oldPassword: str
     password: str
     confirmPassword: str
+class AdminsResponse(BaseResponse):
+    data: Union[List[Admin],None] = None
+class AdminResponse(BaseResponse):
+    data: Admin = None

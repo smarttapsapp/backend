@@ -363,6 +363,19 @@ def resetPasswordFinal(db:Session,response:Response,token:str,setting: Setting, 
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 # admin service
+def listOfAdmins(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+    try:
+        logger.info(f"started querying products")
+        if admin.role.tag == AdminRoleEnum.BUSINESS:
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            return AdminsResponse(statusCode= str(status.HTTP_401_UNAUTHORIZED),statusDescription=FAILED,)
+        else:
+            return AdminsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getAllAdmin(db=db))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return AdminsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+
 def listOfRoutes(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
     try:
         logger.info(f"started querying products")
@@ -375,7 +388,6 @@ def listOfRoutes(request: Request,response: Response,setting: Setting,db: Sessio
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return RoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-
 def listOfStations(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
     try:
         logger.info(f"started querying products")

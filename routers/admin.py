@@ -142,23 +142,22 @@ async def createAdmin(
             statusDescription=SYSTEMBUSY,
         )
 @router.get("/users", 
-    response_model=BaseResponse,
+    response_model=AdminsResponse,
     response_model_exclude_unset=True,name="get all user cashpoints transactions")
 async def getAdmins(
     request: Request,
     response: Response,
-    user: Annotated[Admin, Depends(validateAdmin)],
+    admin: Annotated[Admin, Depends(validateAdmin)],
     Setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
 ):
     try:
-        if user:
-            return adminservice.getAdminUsers(
+        return adminservice.listOfAdmins(
                 db=db,
                 setting=Setting,
                 request=request,
                 response=response,
-                user=user,
+                admin=admin,
             )
     except Exception as ex:
         logger.error(ex)

@@ -8,6 +8,8 @@ logger = logging.getLogger(__name__)
 
 def admin(db: Session,username:str):
     return db.query(AdminModel).filter(AdminModel.email ==username).first()
+def getAllAdmin(db: Session,adminId:int=None):
+    return db.query(AdminModel).order_by(desc(AdminModel.created_at)).all()
 def getAdmins(db: Session,startDate:str,endDate:str,adminId:int=None):
     if startDate and endDate:
         start = datetime.strptime(startDate, "%Y-%m-%d").date()
