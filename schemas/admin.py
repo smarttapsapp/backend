@@ -12,7 +12,6 @@ class AdminBase(BaseModel):
     lastname: str
     phonenumber: str
     email: str
-    status: bool
 
 
 class AdminCreate(AdminBase):
@@ -22,6 +21,7 @@ class AdminCreate(AdminBase):
 
 
 class Admin(AdminBase):
+    status: bool
     role: Role
     id: int
 
@@ -30,6 +30,7 @@ class Admin(AdminBase):
         populate_by_name = True
 
 class AdminProfile(AdminBase):
+    status: bool
     id: int
     tag: str
     @classmethod
@@ -48,6 +49,8 @@ class AdminProfile(AdminBase):
         populate_by_name = True
 
 class CreateAdminRequest(AdminBase):
+    id:Optional[int]=None
+    tag:int
     pass      
 class AdminLoginRequest(BaseModel):
     username: EmailStr

@@ -8,8 +8,19 @@ logger = logging.getLogger(__name__)
 
 def admin(db: Session,username:str):
     return db.query(AdminModel).filter(AdminModel.email ==username).first()
+def getAllRole(db: Session,adminId:int=None):
+    return db.query(RoleModel).order_by(desc(RoleModel.created_at)).all()
+def getRole(db: Session,roleId:int=None):
+    return db.query(RoleModel).filter(RoleModel.id ==roleId).first()
 def getAllAdmin(db: Session,adminId:int=None):
     return db.query(AdminModel).order_by(desc(AdminModel.created_at)).all()
+def getAdmin(db: Session,adminId:int=None):
+    return db.query(AdminModel).filter(AdminModel.id ==adminId).first()
+def create(db: Session, model: object):
+    db.add(model)
+    db.commit()
+    db.refresh(model)
+    return model
 def getAdmins(db: Session,startDate:str,endDate:str,adminId:int=None):
     if startDate and endDate:
         start = datetime.strptime(startDate, "%Y-%m-%d").date()

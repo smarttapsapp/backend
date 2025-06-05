@@ -9,6 +9,7 @@ from utils import util
 from schemas.setting import Setting
 from utils.constant import *
 from schemas.customer import *
+from schemas.role import *
 from schemas.admin import *
 from schemas.station import StationsResponse
 from schemas.route import RoutesResponse
@@ -28,18 +29,19 @@ def createAccount(
         response: Response,
         setting: Setting,
         db: Session,
-        payload: CustomerRequest,
+        payload: CreateAdminRequest,
         background_task: BackgroundTasks,):
     try:
-        user = authQuery.getCheckAdmin(db=db,username=payload.email)
-        if user:
-            response.status_code = status.HTTP_302_FOUND
-            return BaseResponse(
-                    statusCode=str(status.HTTP_302_FOUND),
-                    statusDescription=ALREADYEXIST,
-                )
+        if payload.id:
+            logger.info(f"updating user {payload.firstname} at {str(datetime.now())}")
         else:
-            return createUserAccount(db=db,setting=setting,payload=payload,background_task=background_task,request=request,response=response)
+            logger.info(f"creating new user {payload.firstname} at {str(datetime.now())}")
+            user = authQuery.getCheckAdmin(db=db,username=payload.email)
+            if user:
+                response.status_code = status.HTTP_302_FOUND
+                return BaseResponse(statusCode=str(status.HTTP_302_FOUND),statusDescription=ALREADYEXIST,)
+            else:
+                return createUserAccount(db=db,setting=setting,payload=payload,background_task=background_task,request=request,response=response)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -107,34 +109,82 @@ async def verifyAccountOpening(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription= SYSTEMBUSY)
-def createUserAccount(db: Session,setting: Setting,payload: CustomerRequest, background_task: BackgroundTasks, request: Request,response: Response):
+def createUserAccount(db: Session,setting: Setting,payload: CreateAdminRequest, background_task: BackgroundTasks, request: Request,response: Response):
     try:
-        logger.info("started getting bvn records from bvn provider")
-        password = util.generateOTP()
-        user = AdminModel(
-            firstname=payload.firstname,
-            lastname=payload.lastname,
-            email=payload.email,
-            phonenumber=payload.phonenumber,
-            status=payload.status,
-            role=payload.role,
-            password=util.get_password_hash(password),
-            businesscode=payload.code
-            )
-        createdAccount = authQuery.create_account(db=db, user=user)
-        if createdAccount:
-            email_body = util.templates.TemplateResponse(
-                    "onboarding.html",
-                    {"request": request, "user": user,"password":password},
+        logger.info("started creating new admin account")
+        role = adminQuery.getRole(db=db,roleId=payload.tag)
+        if role:
+            password = util.generateOTP()
+            newAdmin = AdminModel(
+                    firstname=payload.firstname,
+                    lastname=payload.lastname,
+                    phonenumber=payload.phonenumber,
+                    email=payload.email,
+                    password=util.get_password_hash(password),
+                    role_id=role.id,
+                    status=True,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
                 )
-            background_task.add_task(
+            createdAccount = adminQuery.create(db=db, model=newAdmin)
+            if createdAccount:
+                email_body = util.templates.TemplateResponse(
+                    "onboarding.html",
+                    {"request": request, "user": newAdmin,"password":password},
+                )
+                background_task.add_task(
                     util.mailer,
                     str(email_body.body, "utf-8"),
                     setting=setting,
                     subject="Onboarding Notification",
-                    toAddress=user.email,
+                    toAddress=newAdmin.email,
                 )
-            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ACCTERROR)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ACCTERROR)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=CREATEACCTERR)
+    
+def updateAccount(db: Session,setting: Setting,payload: CreateAdminRequest, background_task: BackgroundTasks, request: Request,response: Response):
+    try:
+        logger.info("started creating new admin account")
+        role = adminQuery.getRole(db=db,roleId=payload.tag)
+        if role:
+            password = util.generateOTP
+            newAdmin = AdminModel(
+                    firstname=payload.firstname,
+                    lastname=payload.lastname,
+                    phonenumber=payload.phonenumber,
+                    email=payload.email,
+                    password=util.get_password_hash(password),
+                    role_id=role.id,
+                    status=True,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                )
+            createdAccount = adminQuery.create(db=db, model=newAdmin)
+            if createdAccount:
+                email_body = util.templates.TemplateResponse(
+                    "onboarding.html",
+                    {"request": request, "user": newAdmin,"password":password},
+                )
+                background_task.add_task(
+                    util.mailer,
+                    str(email_body.body, "utf-8"),
+                    setting=setting,
+                    subject="Onboarding Notification",
+                    toAddress=newAdmin.email,
+                )
+                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ACCTERROR)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ACCTERROR)
@@ -375,7 +425,18 @@ def listOfAdmins(request: Request,response: Response,setting: Setting,db: Sessio
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return AdminsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-
+def listOfRoles(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+    try:
+        logger.info(f"started querying products")
+        if admin.role.tag == AdminRoleEnum.BUSINESS:
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            return RolesResponse(statusCode= str(status.HTTP_401_UNAUTHORIZED),statusDescription=FAILED,)
+        else:
+            return RolesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getAllRole(db=db))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return AdminsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 def listOfRoutes(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
     try:
         logger.info(f"started querying products")

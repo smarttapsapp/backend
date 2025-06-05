@@ -19,6 +19,7 @@ from utils.dependencies import (
 from utils.database import get_db
 from services import adminservice
 from schemas.admin import *
+from schemas.role import *
 from schemas.station import StationsResponse
 from schemas.route import RoutesResponse
 from schemas.ticket import TicketsResponse
@@ -117,21 +118,21 @@ async def getAdminProfile(
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex),)
 
 @router.post(
-    "/users",
+    "/add",
     response_model=BaseResponse,
     response_model_exclude_unset=True,
     name="Open account on Better",
 )
 async def createAdmin(
     request: Request,
-    payload: AdminCreate,
+    payload: CreateAdminRequest,
     responses: Response,
     Setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
 ):
     try:
-        userRequest = AdminCreate.model_validate(payload)
+        userRequest = CreateAdminRequest.model_validate(payload)
         logger.info(userRequest.model_dump_json())
         return adminservice.createAccount(request=request,response=responses,setting=Setting,db=db,payload=payload,background_task=background_task)
     except Exception as ex:
@@ -143,7 +144,7 @@ async def createAdmin(
         )
 @router.get("/users", 
     response_model=AdminsResponse,
-    response_model_exclude_unset=True,name="get all user cashpoints transactions")
+    response_model_exclude_unset=True,name="get all user")
 async def getAdmins(
     request: Request,
     response: Response,
@@ -166,6 +167,32 @@ async def getAdmins(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+@router.get("/roles", 
+    response_model=RolesResponse,
+    response_model_exclude_unset=True,name="get all user")
+async def getRoles(
+    request: Request,
+    response: Response,
+    admin: Annotated[Admin, Depends(validateAdmin)],
+    Setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        return adminservice.listOfRoles(
+                db=db,
+                setting=Setting,
+                request=request,
+                response=response,
+                admin=admin,
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return RolesResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+
 #dashboard 
 @router.get("/dashboard", 
     response_model=BaseResponse,
