@@ -14,6 +14,9 @@ from schemas.admin import *
 from schemas.station import StationsResponse
 from schemas.route import RoutesResponse
 from schemas.ticket import TicketsResponse
+from schemas.bus import BusesResponse
+from schemas.park import ParksResponse
+from schemas.train import TrainsResponse
 from schemas.notification import NotificationsResponse
 from fastapi import (
     status,
@@ -63,7 +66,7 @@ def authenticate_user(
                 logger.info(authToken)
                 return BaseResponse(
                     statusCode= str(status.HTTP_200_OK),
-                    statusDescription= f"Login Successful",
+                    statusDescription= SUCCESS,
                     data={
                         "user":Admin.from_orm(user),
                         "idToken":authToken[0],
@@ -149,8 +152,7 @@ def createUserAccount(db: Session,setting: Setting,payload: CreateAdminRequest, 
     except Exception as ex:
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=CREATEACCTERR)
-    
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=CREATEACCTERR)    
 def updateAccount(db: Session,setting: Setting,payload: CreateAdminRequest, background_task: BackgroundTasks, request: Request,response: Response):
     try:
         logger.info("started creating new admin account")
@@ -257,7 +259,7 @@ def authenticateUser(
                       secure=True)
                 return BaseResponse(
                     statusCode= str(status.HTTP_200_OK),
-                    statusDescription= f"Login Successful",
+                    statusDescription= SUCCESS,
                 
             )
             else:
@@ -412,6 +414,53 @@ def resetPasswordFinal(db:Session,response:Response,token:str,setting: Setting, 
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+#analytics
+def analytics(
+        admin:AdminModel,
+        request: Request,
+        response: Response,
+        setting: Setting,
+        db: Session):
+    try:
+        customer = adminQuery.customersAnalytics(db=db)
+        logger.info(f"this is the customer analytics {customer}")
+        if customer:
+            debit = adminQuery.debitPaymentsAnalytics(db=db)
+            logger.info(f"this is the debit analytics {debit}")
+            if debit:
+                credit = adminQuery.creditPaymentsAnalytics(db=db)
+                if credit:
+                    return BaseResponse(
+                    statusCode=str(status.HTTP_200_OK),statusDescription= f"Successful",
+                    data={
+                        "customer":customer,
+                        "debit":debit,
+                        "credit":credit
+                    },)
+                else:
+                    return BaseResponse(
+                    statusCode=str(status.HTTP_200_OK),statusDescription= SUCCESS,
+                    data={
+                        "customer":customer,
+                        "debit":debit,
+                        "credit":None
+                    },)
+            else:
+                return BaseResponse(
+                    statusCode=str(status.HTTP_200_OK),statusDescription= SUCCESS,
+                    data={
+                        "customer":customer,
+                        "debit":None,
+                        "credit":None
+                    },)
+        else:
+            return BaseResponse(
+                    statusCode=str(status.HTTP_200_OK),statusDescription= SUCCESS,)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+
 # admin service
 def listOfAdmins(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
     try:
@@ -437,6 +486,43 @@ def listOfRoles(request: Request,response: Response,setting: Setting,db: Session
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return AdminsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+# transport service
+def listOfParks(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
+    try:
+        logger.info(f"started querying buses")
+        if admin.role.tag == AdminRoleEnum.BUSINESS:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return ParksResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SUCCESS,data=adminQuery.getParks(db=db,startDate=startDate,endDate=endDate))
+        else:
+            return ParksResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getParks(db=db,startDate=startDate,endDate=endDate))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return ParksResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+def listOfBuses(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
+    try:
+        logger.info(f"started querying buses")
+        if admin.role.tag == AdminRoleEnum.BUSINESS:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BusesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SUCCESS,data=adminQuery.getBusesByBusiness(db=db))
+        else:
+            return BusesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getBuses(db=db))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BusesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+def listOfTrains(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
+    try:
+        logger.info(f"started querying trains")
+        if admin.role.tag == AdminRoleEnum.BUSINESS:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return TrainsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SUCCESS,data=adminQuery.getTrainsByBusiness(db=db))
+        else:
+            return TrainsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getTrains(db=db))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return TrainsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 def listOfRoutes(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
     try:
         logger.info(f"started querying products")
@@ -482,6 +568,7 @@ def listOfTickets(request: Request,response: Response,setting: Setting,db: Sessi
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TicketsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+# notifications
 def listOfNotifications(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
     try:
         logger.info(

@@ -73,8 +73,6 @@ class POSStatusEnum(PythonEnum):
     REQUESTED = "requested"
     PAYMENT = "payment"
     APPROVED = "approved"
-
-
 class AdminRoleEnum(PythonEnum):
     SUPERADMIN = "superadmin"
     ADMIN = "admin"
@@ -82,16 +80,13 @@ class AdminRoleEnum(PythonEnum):
     AUDIT = "audit"
     SUPPORT = "support"
     BUSINESS = "business"
-
 class AdminTypeEnum(PythonEnum):
     INTERNAL = "INTERNAL"
     EXTERNAL = "EXTERNAL"
-
 class AdminStatusEnum(PythonEnum):
     ACTIVE = "active"
     NOTACTIVE = "notactive"
     PENDING = "pending"
-
 class OTPStatusEnum(PythonEnum):
     SENT = "sent"
     PENDING = "pending"
@@ -99,14 +94,11 @@ class OTPStatusEnum(PythonEnum):
     OPEN = "open"
     LOGGED = "logged"
     CLOSED = "closed"
-
-
 class TransactionChannelEnum(PythonEnum):
     WEB = "web"
     MOBILE = "mobile"
     USSD = "ussd"
     POS = "pos"
-
 class TransactionStatusEnum(PythonEnum):
     SUCCESS = "success"
     PENDING = "pending"
@@ -115,7 +107,6 @@ class TransactionStatusEnum(PythonEnum):
 class PaymentEnum(PythonEnum):
     DEBIT = "DEBIT"
     CREDIT = "CREDIT"
-
 class TicketStatusEnum(PythonEnum):
     BOOKED = "booked"
     CANCELLED = "cancelled"
@@ -124,7 +115,6 @@ class TicketStatusEnum(PythonEnum):
 class TicketModeEnum(PythonEnum):
     BUS = "bus"
     TRAIN = "train"
-
 class RoleModel(Base):
     __tablename__ = "roles"
     id = Column(Integer, primary_key=True, index=True)

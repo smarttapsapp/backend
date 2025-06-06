@@ -22,6 +22,9 @@ from schemas.admin import *
 from schemas.role import *
 from schemas.station import StationsResponse
 from schemas.route import RoutesResponse
+from schemas.train import TrainsResponse
+from schemas.bus import BusesResponse
+from schemas.park import ParksResponse
 from schemas.ticket import TicketsResponse
 from schemas.notification import NotificationsResponse
 from models.model import *
@@ -200,18 +203,17 @@ async def getRoles(
 async def getDashboardRequest(
     request: Request,
     response: Response,
-    user: Annotated[Admin, Depends(validateAdmin)],
+    admin: Annotated[Admin, Depends(validateAdmin)],
     Setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
 ):
     try:
-        if user:
-            return adminservice.getDashboardAnalytics(
+        return adminservice.analytics(
                 db=db,
                 setting=Setting,
                 request=request,
                 response=response,
-                user=user,
+                admin=admin,
             )
     except Exception as ex:
         logger.error(ex)
@@ -326,8 +328,8 @@ async def get_ticket(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.get("/parks", 
-    response_model=TicketsResponse,
-    response_model_exclude_unset=True,name="get customer payemnt")
+    response_model=ParksResponse,
+    response_model_exclude_unset=True,name="get parks")
 async def get_parks(
     request: Request,
     response: Response,
@@ -344,8 +346,8 @@ async def get_parks(
                 end = datetime.strptime(endDate, "%Y-%m-%d")
                 if end < start:
                     response.status_code = status.HTTP_400_BAD_REQUEST
-                    return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
-            return adminservice.listOfTickets(
+                    return ParksResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
+            return adminservice.listOfParks(
                 request=request,
                 response=response,
                 setting=setting,
@@ -357,9 +359,9 @@ async def get_parks(
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+        return ParksResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.get("/buses", 
-    response_model=TicketsResponse,
+    response_model=BusesResponse,
     response_model_exclude_unset=True,name="get customer payemnt")
 async def get_buses(
     request: Request,
@@ -378,7 +380,7 @@ async def get_buses(
                 if end < start:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
-            return adminservice.listOfTickets(
+            return adminservice.listOfBuses(
                 request=request,
                 response=response,
                 setting=setting,
@@ -392,7 +394,7 @@ async def get_buses(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.get("/trains", 
-    response_model=TicketsResponse,
+    response_model=TrainsResponse,
     response_model_exclude_unset=True,name="get customer payemnt")
 async def get_trains(
     request: Request,
@@ -411,7 +413,7 @@ async def get_trains(
                 if end < start:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
-            return adminservice.listOfTickets(
+            return adminservice.listOfTrains(
                 request=request,
                 response=response,
                 setting=setting,

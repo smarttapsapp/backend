@@ -36,5 +36,3 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         logging.info(f"Processed in {process_time:.4f} seconds")
 
         return Response(content=response_body, status_code=response.status_code, headers=dict(response.headers))
-
-        return response
