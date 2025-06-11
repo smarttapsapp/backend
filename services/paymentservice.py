@@ -21,6 +21,58 @@ from fastapi import (
 )
 
 logger = logging.getLogger(__name__)
+def saveFundThreshold(
+        user:CustomerModel,
+        request: Request,
+        db: Session,
+        response: Response,
+        setting: Setting,payload:AutoFundRequest,
+        background_task:BackgroundTasks,):
+    try:
+        if user.hasAuthToken:
+            logger.info(f"card info is available {user.cards}")
+            user.autoFund = True
+            user.autoFundThreshold = payload.thresholdAmount
+            user.autoFundAmount = payload.amount
+            user.updated_at = datetime.now()
+            saved = queries.create(db=db,model=user)
+            if saved:
+                message = f'You have setup auto fund of ₦{util.kobo_to_naira(payload.amount):,.2f} for your purse with a threshold of ₦{util.kobo_to_naira(payload.thresholdAmount):,.2f} at {datetime.now().strftime("%B %d, %Y %I:%M %p")}'
+                background_task.add_task(notifyUser,db=db,title=f"Auto Fund Purse", message=message,userId=user.id, setting=setting)
+                email_debit = util.templates.TemplateResponse("autofund.html",{"request": request, "user": user,"message":message},)
+                background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Auto Fund Purse",toAddress=user.email)
+                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=AUTOFUNDERROR)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+def toggleFundThreshold(
+        user:CustomerModel,
+        request: Request,
+        db: Session,
+        response: Response,
+        setting: Setting,
+        background_task:BackgroundTasks,):
+    try:
+        user.autoFund = not user.autoFund
+        user.updated_at = datetime.now()
+        saved = queries.create(db=db,model=user)
+        if saved:
+            message = f'You have succesfully deactivated auto fund from your purse at {datetime.now().strftime("%B %d, %Y %I:%M %p")}'
+            background_task.add_task(notifyUser,db=db,title=f"Deactivate Auto Fund Purse", message=message,userId=user.id, setting=setting)
+            email_debit = util.templates.TemplateResponse("autofund.html",{"request": request, "user": user,"message":message},)
+            background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Deactivate Auto Fund Purse",toAddress=user.email)
+            return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 
 def fundViaPaystack(
         user:Customer,
@@ -50,7 +102,7 @@ def fundViaPaystack(
                 if createdPayment:
                     headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
                     params = {"email": user.email,"amount": amount}
-                    result = util.httpV2(setting.paystack_url,params=params,headers=headers)
+                    result = util.http(setting.paystack_url,params=params,headers=headers)
                     logger.info(result)
                     if result.status_code == 200:
                         paystackResponse = result.json()
@@ -176,17 +228,23 @@ def getSinglePayment(
     try:
         logger.info(f"started transaction querying for {transactionId}")
         payment = queries.paymentByTransactionNumber(db=db,mode=PaymentEnum[transactionType.upper()],transactionId=transactionId,userId=user.id)
-        return PaymentResponse(
+        if payment:
+            return PaymentResponse(
                 statusCode= str(status.HTTP_200_OK),
                 statusDescription=SUCCESS,
                 data=Transaction.from_orm(payment)
             )
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return PaymentResponse(
+               statusCode=str(status.HTTP_400_BAD_REQUEST),
+               statusDescription=UNKNOWNTRANSACTION,
+        )
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return PaymentResponse(
                statusCode=str(status.HTTP_400_BAD_REQUEST),
-               statusDescription=str(ex),
+               statusDescription=SYSTEMBUSY,
         )
 def payment(
     request: Request,

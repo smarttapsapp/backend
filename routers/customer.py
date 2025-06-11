@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from utils.constant import *
 from datetime import date
 from typing import Annotated
-from utils.dependencies import getSystemSetting, verified_user,validateTransactionPIN,validateAdmin
+from utils.dependencies import getSystemSetting, verified_user,validateTransactionPIN,validateAdmin,validateCustomer
 from utils.database import get_db
 from services import customerservice
 from utils import util
@@ -33,7 +33,7 @@ adminRouter = APIRouter(tags=["customer"])
 async def get_customer_profile(
     request: Request,
     responses: Response,
-    user: Annotated[Customer, Depends(verified_user)],
+    user: Annotated[CustomerModel, Depends(validateCustomer)],
     Setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,

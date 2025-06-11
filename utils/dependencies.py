@@ -91,7 +91,7 @@ async def verified_user(
         logger.info(user)
         if user is None:
             raise credentials_exception
-        return Customer.model_validate(user)
+        return user
     except JWTError:
         raise credentials_exception
 async def validateTransactionPIN(
@@ -135,6 +135,31 @@ async def validateTransactionPIN(
                     "statusDescription": f"Your account is {user.account_status}",
                 },
             )
+    except JWTError:
+        raise credentials_exception
+
+async def validateCustomer(
+    request: Request,
+    token: str = Depends(util.oauth2_scheme),
+    setting: Setting = Depends(getSystemSetting),
+    db: Session = Depends(get_db),
+):
+    credentials_exception = util.UnicornException(
+        status=status.HTTP_401_UNAUTHORIZED,
+        error={"statusCode": "401", "statusDescription": "Your session has expired!"},
+    )
+    try:
+        if token:
+            payload = jwt.decode(token, setting.secret_key, algorithms=[setting.algorithm])
+            logger.info(payload)
+            customer = authQuery.userByEmailOrPhone(db=db,email=payload["username"],phonenumber=payload["username"],)
+            if customer:
+                print(request)
+                if customer.account_status == AccountStatusEnum.ACTIVE:
+                    return customer
+                raise util.UnicornException(status=status.HTTP_401_UNAUTHORIZED,error={"statusCode": str(status.HTTP_401_UNAUTHORIZED),"statusDescription": f"Your account is {customer.account_status}",},)
+            raise util.UnicornException(status=status.HTTP_401_UNAUTHORIZED,error={"statusCode": str(status.HTTP_401_UNAUTHORIZED),"statusDescription":UNKNOWNUSER,},)
+        raise util.UnicornException(status=status.HTTP_401_UNAUTHORIZED,error={"statusCode": str(status.HTTP_401_UNAUTHORIZED),"statusDescription":"Your session has expired!",},)
     except JWTError:
         raise credentials_exception
 async def get_device_header(device: Annotated[str, Header()]):

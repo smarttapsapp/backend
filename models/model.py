@@ -188,6 +188,9 @@ class CustomerModel(Base):
     authToken = Column(String(100), nullable=True)
     hasAuthToken = Column(Boolean, default=False)
     hideBalance = Column(Boolean, default=False)
+    autoFund = Column(Boolean, default=False)
+    autoFundThreshold = Column(String(50),default="0")
+    autoFundAmount = Column(String(50),default="0")
     account_status = Column(
         Enum(AccountStatusEnum), nullable=False, default=AccountStatusEnum.REG
     )
@@ -268,6 +271,9 @@ class AccountModel(Base):
     payments = relationship('PaymentModel', backref='wallet')
     walletAccount = Column(String(11))
     availableBalance= Column(String(50),default="0")
+    #autoFundThreshold = Column(String(50),default="0")
+    #autoFundAmount = Column(String(50),default="0")
+    autoFund = Column(Boolean, default=False)
     referenceNo= Column(String(11),nullable=True)
     accountStatus= Column(String(20),default=AccountStatusEnum.ACTIVE)
     created_at = Column(DateTime, default=func.now())
@@ -630,6 +636,7 @@ class SeatModel(Base):
 class ParkModel(Base):
     __tablename__ = 'parks'
     id = Column(Integer, primary_key=True)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
     name = Column(String(150), nullable=False)
     parkImage = Column(String(255), nullable=True)
     address = Column(String(255), nullable=True)
@@ -731,7 +738,7 @@ class TicketModel(Base):
     
     id = Column(Integer, primary_key=True)
     customer_id = Column(Integer, ForeignKey('customers.id'), nullable=False)
-    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=False)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=False,default=0)
     customer = relationship('CustomerModel', backref='tickets')
     bus_id = Column(Integer, ForeignKey('buses.id'), nullable=True)
     route_id = Column(Integer, ForeignKey('routes.id'), nullable=True)

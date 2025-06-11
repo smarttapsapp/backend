@@ -78,7 +78,7 @@ def http(url, params={}, headers={"content-type": "application/json"},contentTyp
         str(responseTime),
     )
     print(text)
-    return resp.json()
+    return resp
 def mailer(body, setting: Setting, subject: str, toAddress: str, fileToSend=None):
     try:
         msg = MIMEMultipart()
@@ -149,6 +149,9 @@ def send_sms_message(setting: Setting, toPhoneNumber: str, message: str,transact
         pass
 def amountToKobo(amount):
     return str(int(float(amount) * 100))
+def kobo_to_naira(kobo_amount):
+    naira = kobo_amount / 100
+    return round(naira, 2)
 def formatPhoneWithDialingCode(msisdn):
     msisdn = msisdn.replace("+", "", 1)
     if msisdn.startswith("234") and len(msisdn) == 13:

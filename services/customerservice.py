@@ -25,7 +25,7 @@ def profile(
         response: Response,
         setting: Setting,
         db: Session,
-        user: Customer,
+        user: CustomerModel,
         background_task: BackgroundTasks,):
     try:
         return CustomerResponse(

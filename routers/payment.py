@@ -11,7 +11,7 @@ from fastapi import (
 from sqlalchemy.orm import Session
 from utils.constant import *
 from typing import Annotated
-from utils.dependencies import getSystemSetting, verified_user,validateTransactionPIN,validateAdmin
+from utils.dependencies import getSystemSetting, verified_user,validateTransactionPIN,validateAdmin,validateCustomer
 from services import productservice,paymentservice
 from utils.database import get_db
 from datetime import date
@@ -111,6 +111,50 @@ async def fund_wallet(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+@router.post("/threshold",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,)
+async def fund_wallet_threshold(
+    payload: AutoFundRequest,
+    request: Request,
+    response: Response,
+    user: Annotated[CustomerModel, Depends(validateCustomer)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        if user:
+            return paymentservice.saveFundThreshold(user=user,request=request,db=db,response=response,setting=setting,payload=payload,background_task=background_task)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.delete("/threshold",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,)
+async def fund_wallet_threshold(
+    request: Request,
+    response: Response,
+    user: Annotated[CustomerModel, Depends(validateCustomer)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        if user:
+            return paymentservice.toggleFundThreshold(user=user,request=request,db=db,response=response,setting=setting,background_task=background_task)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+
 @router.post("/notification",
     response_model=BaseResponse,
     response_model_exclude_unset=True,)
@@ -311,7 +355,7 @@ async def get_ticket(
 @router.post("/nfc/debit",
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["NFC payment"])
-async def fund_wallet(
+async def fund_wallet_nfc(
     payload: DebitRequest,
     request: Request,
     response: Response,
@@ -336,7 +380,36 @@ async def fund_wallet(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-# bill payment
+@router.get("/nfc/debit", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,name="get customer payemnt")
+async def confirm_nfc_payment(
+    request: Request,
+    response: Response,
+    user: Annotated[Customer, Depends(verified_user)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    transactionId: Optional[str] = Query(None),
+):
+    try:
+        if transactionId:
+            return paymentservice.getSinglePayment(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                user=user,
+                transactionId=transactionId,
+                transactionType='DEBIT'
+            )
+        else:
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING,)
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+#  bill payment
 @router.post("/bill/name-enquiry",
     response_model=BillNameEnquiryResponse,
     response_model_exclude_unset=True,tags=["Bills Payement"])

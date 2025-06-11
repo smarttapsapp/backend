@@ -70,10 +70,9 @@ class PaymentResponse(BaseResponse):
     data: Transaction = None
 class FundRequest(BaseModel):
     amount:str
-    @validator("amount")
-    def amount_validator(cls, amount):
-        formattedAmount = util.amountToKobo(amount=amount)
-        return formattedAmount
+class AutoFundRequest(BaseModel):
+    amount:str
+    thresholdAmount:str
 class BuyTicketRequest(PINRequest):
     busId:int
     scheduleId: int
