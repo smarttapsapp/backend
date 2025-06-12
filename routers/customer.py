@@ -5,7 +5,7 @@ from fastapi import (
     Query,
     Response,
     Request,Form,UploadFile,
-    BackgroundTasks,
+    BackgroundTasks,File
 )
 from schemas.customer import *
 from schemas.setting import Setting
@@ -347,63 +347,23 @@ async def get_customer_analytics(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=SYSTEMBUSY,
         )
-@router.put("/photo/update",
+@router.post("/photo/update",
     response_model=BaseResponse,
     response_model_exclude_unset=True,)
 async def upload_customer_profile_image(
-    payload: CreatePINRequest,
     request: Request,
-    responses: Response,
-    user: Annotated[Customer, Depends(verified_user)],
+    response: Response,
+    user: Annotated[Customer, Depends(validateCustomer)],
     Setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
+    img: UploadFile = File(...),
 ):
     try:
-        if user:
-            validated_data = CreatePINRequest(**payload.model_dump())
-            if updateUserPIN(
-                db=db, userId=user.id, pin=get_password_hash(validated_data.pin)
-            ):
-                email_template = "createpin.html"
-                email_body = templates.TemplateResponse(
-                    email_template,
-                    {"request": request, "user": user},
-                )
-                background_task.add_task(
-                    util.mailer,
-                    str(email_body.body, "utf-8"),
-                    setting=Setting,
-                    subject="Create PIN",
-                    toAddress=user.email,
-                )
-                responses.status_code = status.HTTP_200_OK
-                return BaseResponse(
-                    statusCode=str(status.HTTP_200_OK),
-                    statusDescription=f"PIN successfully created",
-                )
-            else:
-                responses.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(
-                    statusCode=str(status.HTTP_400_BAD_REQUEST),
-                    statusDescription=SYSTEMBUSY,
-                )
-        else:
-            responses.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(
-                statusCode=str(status.HTTP_400_BAD_REQUEST),
-                statusDescription=INVALIDACCOUNT,
-            )
-    except ValidationError as e:
-        logger.error(e)
-        responses.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(
-            statusCode=str(status.HTTP_400_BAD_REQUEST),
-            statusDescription=str(e),
-        )
+        return customerservice.uploadProfileImage(response=response,db=db,user=user,setting=Setting,request=request,background_task=background_task,img=img)
     except Exception as ex:
         logger.error(ex)
-        responses.status_code = status.HTTP_400_BAD_REQUEST
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=SYSTEMBUSY,

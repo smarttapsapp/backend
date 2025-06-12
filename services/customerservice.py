@@ -2,20 +2,20 @@
 import logging
 from sqlalchemy.orm import Session
 from models.model import *
+from pathlib import Path
 from models.queries import queries,customerQuery
 from datetime import datetime,timedelta
-from schemas import otp
 from services.notificationservice import notifyUser
 from utils import util
 from schemas.setting import Setting
 from utils.constant import *
 from schemas.customer import *
-from schemas.admin import Admin
+import shutil
 from fastapi import (
     status,
     Response,
     Request,
-    BackgroundTasks,
+    BackgroundTasks,UploadFile
 )
 
 logger = logging.getLogger(__name__)
@@ -506,6 +506,32 @@ def upgradeAccount(db:Session,user:CustomerModel,setting:Setting,request:Request
     except Exception as ex:
         logger.info(ex)
         return None
+async def uploadProfileImage(response: Response,db:Session,user:CustomerModel,setting:Setting,request:Request,background_task:BackgroundTasks,img: UploadFile,
+):
+    try:
+        logger.info(
+            f"started uploading profile image for {user.firstname} at {datetime.now()}"
+        )
+        if img.content_type.startswith("image/"):
+            UPLOAD_DIR = Path("static/profiles")
+            UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+            file_ext = img.filename.split(".")[-1]
+            unique_name = f"{uuid.uuid4().hex}.{file_ext}"
+            file_path = UPLOAD_DIR / unique_name
+            with file_path.open("wb") as buffer:
+                shutil.copyfileobj(img.file, buffer)
+            image_url = f"/static/profiles/{unique_name}"
+            user.profile_picture = image_url
+            user.updated_at = datetime.now()
+            saved = queries.create(db=db,model=user)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription="Invalid Image",)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+
 # admin service
 def listOfCustomer(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
     try:
