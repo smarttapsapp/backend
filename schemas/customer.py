@@ -32,6 +32,7 @@ class Customer(CustomerBase):
     account_status: Union[str, None] = "0"
     date_of_birth: Union[str, None] = "0"
     autoFund: Union[bool, None] = False
+    profile_picture: Union[str, None] = None
     wallet:Union[Account,None] = None
     id: Optional[int]
     created_at: Union[datetime, None] = func.now()

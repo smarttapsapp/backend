@@ -512,18 +512,26 @@ async def uploadProfileImage(response: Response,db:Session,user:CustomerModel,se
         logger.info(
             f"started uploading profile image for {user.firstname} at {datetime.now()}"
         )
+        logger.info(img.content_type)
         if img.content_type.startswith("image/"):
-            UPLOAD_DIR = Path("static/profiles")
+            UPLOAD_DIR = Path("templates/profiles")
             UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+            filename = Path(user.profile_picture).name
+            logger.info(filename)
+            file_path = UPLOAD_DIR / filename 
+            logger.info(file_path)
+            if file_path.exists():
+                file_path.unlink()
             file_ext = img.filename.split(".")[-1]
             unique_name = f"{uuid.uuid4().hex}.{file_ext}"
             file_path = UPLOAD_DIR / unique_name
             with file_path.open("wb") as buffer:
                 shutil.copyfileobj(img.file, buffer)
-            image_url = f"/static/profiles/{unique_name}"
+            image_url = f"profiles/{unique_name}"
             user.profile_picture = image_url
             user.updated_at = datetime.now()
             saved = queries.create(db=db,model=user)
+            return  BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription = SUCCESS)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription="Invalid Image",)

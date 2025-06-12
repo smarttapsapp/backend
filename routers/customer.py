@@ -360,7 +360,7 @@ async def upload_customer_profile_image(
     img: UploadFile = File(...),
 ):
     try:
-        return customerservice.uploadProfileImage(response=response,db=db,user=user,setting=Setting,request=request,background_task=background_task,img=img)
+        return await customerservice.uploadProfileImage(response=response,db=db,user=user,setting=Setting,request=request,background_task=background_task,img=img)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
