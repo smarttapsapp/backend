@@ -273,7 +273,7 @@ class AccountModel(Base):
     availableBalance= Column(String(50),default="0")
     #autoFundThreshold = Column(String(50),default="0")
     #autoFundAmount = Column(String(50),default="0")
-    autoFund = Column(Boolean, default=False)
+    #autoFund = Column(Boolean, default=False)
     referenceNo= Column(String(11),nullable=True)
     accountStatus= Column(String(20),default=AccountStatusEnum.ACTIVE)
     created_at = Column(DateTime, default=func.now())
