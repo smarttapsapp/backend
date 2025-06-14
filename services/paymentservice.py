@@ -234,9 +234,9 @@ def getSinglePayment(
                 statusDescription=SUCCESS,
                 data=Transaction.from_orm(payment)
             )
-        response.status_code = status.HTTP_400_BAD_REQUEST
+        response.status_code = status.HTTP_404_NOT_FOUND
         return PaymentResponse(
-               statusCode=str(status.HTTP_400_BAD_REQUEST),
+               statusCode=str(status.HTTP_404_NOT_FOUND),
                statusDescription=UNKNOWNTRANSACTION,
         )
     except Exception as ex:

@@ -1,3 +1,4 @@
+import time 
 import logging
 from fastapi import APIRouter
 from fastapi import (
@@ -393,6 +394,7 @@ async def confirm_nfc_payment(
 ):
     try:
         if transactionId:
+            #time.sleep(5)  # Simulate a delay for processing
             return paymentservice.getSinglePayment(
                 request=request,
                 response=response,

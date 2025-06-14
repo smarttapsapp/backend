@@ -14,7 +14,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         if request.method in ["POST", "PUT", "PATCH"]:
             request_body = await request.body()
 
-            logging.info(f"Request Body: {request_body}")
+            logging.info(f"Request Body: {str(request_body)}")
 
         # Process request and get the response
         response = await call_next(request)
