@@ -516,12 +516,13 @@ async def uploadProfileImage(response: Response,db:Session,user:CustomerModel,se
         if img.content_type.startswith("image/"):
             UPLOAD_DIR = Path("templates/profiles")
             UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-            filename = Path(user.profile_picture).name
-            logger.info(filename)
-            file_path = UPLOAD_DIR / filename 
-            logger.info(file_path)
-            if file_path.exists():
-                file_path.unlink()
+            if user.profile_picture:
+                filename = Path(user.profile_picture).name
+                logger.info(filename)
+                file_path = UPLOAD_DIR / filename 
+                logger.info(file_path)
+                if file_path.exists():
+                    file_path.unlink()
             file_ext = img.filename.split(".")[-1]
             unique_name = f"{uuid.uuid4().hex}.{file_ext}"
             file_path = UPLOAD_DIR / unique_name
