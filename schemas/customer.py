@@ -25,6 +25,7 @@ class CustomerBase(BaseModel):
     email_verified: bool = False
     address_submitted: bool = False
     is_next_of_kin: bool = False
+    cashout_enabled: Union[bool, None] = False
 class Customer(CustomerBase):
     point_ratings: Union[str, None] = "0"
     account_ratings: Union[str, None] = "0"

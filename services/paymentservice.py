@@ -73,7 +73,6 @@ def toggleFundThreshold(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-
 def fundViaPaystack(
         user:Customer,
         request: Request,
@@ -102,8 +101,7 @@ def fundViaPaystack(
                 if createdPayment:
                     headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
                     params = {"email": user.email,"amount": amount}
-                    result = util.http(setting.paystack_url,params=params,headers=headers)
-                    logger.info(result)
+                    result = util.http(f"{setting.paystack_url}transaction/initialize",params=params,headers=headers)
                     if result.status_code == 200:
                         paystackResponse = result.json()
                         if paystackResponse and paystackResponse["status"] is True:
@@ -828,6 +826,140 @@ def singleTicket(response: Response,db: Session,user: Customer,ticketId: str,mod
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TicketResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+
+# cashout
+async def getbanks(request: Request,response: Response,setting: Setting,user: Customer):
+    try:
+        logger.info(
+            f"started querying bank list from paystack for {user.email}"
+        )
+        headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
+        result = util.http(f"{setting.paystack_url}bank?currency=NGN",headers=headers)
+        if result.status_code == 200:
+            paystackResponse = result.json()
+            if paystackResponse and paystackResponse["status"] is True:
+                banks = paystackResponse.get("data", [])
+                if banks:
+                    return BaseResponse(
+                        statusCode= str(status.HTTP_200_OK),
+                        statusDescription=SUCCESS,
+                        data=banks)
+            response.status_code = status.HTTP_200_OK
+            return BaseResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=result.json().get("data", []))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def addCashoutRecipient(
+        payload:AddCashoutRequest,
+        request: Request,
+        response: Response,
+        setting: Setting,
+        db: Session,
+        user: CustomerModel,
+        background_task:BackgroundTasks
+):
+        try:
+            logger.info(f"Started adding cashout recipient {user.firstname} {user.lastname} for {user.email}")
+            headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
+            params ={ "type": "nuban","name":f"{user.firstname} {user.lastname}","account_number": payload.accountNumber,"bank_code": payload.bankCode, "currency": "NGN" }
+            result = util.http(f"{setting.paystack_url}transferrecipient",params=params,headers=headers)
+            if result.status_code == 201:
+                paystackResponse = result.json()
+                if paystackResponse and paystackResponse["status"] is True:
+                    recipientData = paystackResponse.get("data", {})
+                    if recipientData:
+                        user.cashout_enabled = True
+                        user.cashout_account = payload.accountNumber
+                        user.cashout_code = recipientData.get("recipient_code")
+                        user.cashout_bank = payload.bankCode
+                        updatedUser = queries.create(db=db,model=user)
+                        if updatedUser:
+                            background_task.add_task(notifyUser,db=db,title=f"Cashout Recipient Added", message=f"Cashout recipient {user.firstname}{user.lastname} added successfully",userId=user.id, setting=setting)
+                            email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"recipient":recipientData},)
+                            background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Cashout Recipient Added",toAddress=user.email)
+                            return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                else:
+                    logger.info(f"Failed to add cashout recipient {user.firstname} {user.lastname} for {user.email}")
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse['message'],)
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse['message'],)
+            else:
+                logger.info(f"Failed to add cashout recipient {user.firstname} {user.lastname} for {user.email}")
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=result.json()['message'],)
+        except Exception as ex:
+            logger.info(ex)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def addCashout(
+        payload:CashoutRequest,
+        request: Request,
+        response: Response,
+        setting: Setting,
+        db: Session,
+        user: CustomerModel,
+        background_task:BackgroundTasks
+):
+        try:
+            logger.info(f"Started adding cashout request of {payload.amount} for {user.firstname} {user.lastname} for {user.email}")
+
+            if user.cashout_enabled and user.cashout_code and user.cashout_account and user.cashout_bank:
+                if float(user.wallet.availableBalance) >= float(payload.amount):
+                    logger.info(f"balance is sufficient {user.wallet.availableBalance}")
+                    newBalance = float(user.wallet.availableBalance) - float(payload.amount)
+                    user.wallet.availableBalance = newBalance
+                    updatedUser = paymentQuery.create(db=db,model=user)
+                    if updatedUser:
+                        logger.info(f"Start processing cashout records ...............")
+                        cashout = PaymentModel(
+                            wallet_id = user.wallet.id,
+                            user_id =user.id,
+                            amount = payload.amount,
+                            payment_type =PaymentEnum.DEBIT,
+                            reference =f"CASH-{util.generateId()}",
+                            event = "charge.processing",
+                            status = "started",
+                            channel = "MOBILE",
+                            fee = "1000",
+                            statusCode = "200",
+                            statusMessage = f"Cashout to {user.cashout_account} {user.cashout_bank}",
+                            balanceBefore = user.wallet.availableBalance,
+                            balanceAfter = newBalance,
+                            product_id=1,  # Assuming product_id is 1 for cashout
+                            created_at =datetime.now(),
+                            updated_at = datetime.now()
+                        )
+                        createCashoutRecord = paymentQuery.create(db=db,model=cashout)
+                        if createCashoutRecord:
+                            headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
+                            params ={"source": "balance","amount": payload.amount,"reference":createCashoutRecord.reference,"recipient": user.cashout_code,"reason": payload.desc }
+                            result = util.http(f"{setting.paystack_url}transfer",params=params,headers=headers)
+                            if result.status_code == 200:
+                                paystackResponse = result.json()
+                                if paystackResponse and paystackResponse["status"] is True:
+                                    recipientData = paystackResponse.get("data", {})
+                                    createCashoutRecord.status = "processing"
+                                    createCashoutRecord.event = "charge.processing"
+                                    createCashoutRecord.statusCode = "200"
+                            background_task.add_task(notifyUser,db=db,title=f"Cashout Notification", message=createCashoutRecord.statusMessage,userId=user.id, setting=setting)
+                            email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"payment":createCashoutRecord},)
+                            background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Cashout Notification",toAddress=user.email)
+                            return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":createCashoutRecord.reference})
+            else:
+                logger.info(f"Cashout not enabled for {user.firstname} {user.lastname} for {user.email}")
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Cashout not enabled or invalid recipient details")
+        except Exception as ex:
+            logger.info(ex)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+
+
+# Admin Payments
 def adminPayments(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
     try:
         logger.info(

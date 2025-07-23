@@ -132,3 +132,9 @@ class WalletDebitRequest(PINRequest):
     receiverAccountName: str
     description:str
     amount: float
+class AddCashoutRequest(PINRequest):
+    bankCode:str
+    accountNumber:str
+class CashoutRequest(PINRequest):
+    amount:str
+    desc:Optional[str] = None

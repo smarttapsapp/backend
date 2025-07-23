@@ -508,7 +508,7 @@ def upgradeAccount(db:Session,user:CustomerModel,setting:Setting,request:Request
         return None
 async def uploadProfileImage(response: Response,db:Session,user:CustomerModel,setting:Setting,request:Request,background_task:BackgroundTasks,img: UploadFile,
 ):
-    try:
+    try: #
         logger.info(
             f"started uploading profile image for {user.firstname} at {datetime.now()}"
         )
