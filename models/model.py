@@ -181,6 +181,7 @@ class CustomerModel(Base):
     cashout_account = Column(String(50), nullable=True)
     cashout_code = Column(String(50), nullable=True)
     cashout_bank = Column(String(50), nullable=True)
+    cashout_limit = Column(String(50), default="10000000")
     commission_enabled = Column(Boolean, default=False)
     is_owner = Column(Boolean, default=True)
     is_next_of_kin = Column(Boolean, default=False)

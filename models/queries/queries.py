@@ -165,3 +165,8 @@ def getRoleByTag(db: Session,tag:str):
     return db.query(RoleModel).filter(RoleModel.tag == tag).first()
 def getRoleById(db: Session,roleId:int):
     return db.query(RoleModel).filter(RoleModel.id == roleId).first()
+def getProductTypeBYname(db: Session,name:str):
+    return db.query(ProductTypeModel).filter(ProductTypeModel.billerType == name).first()
+def getDailyCashoutTransactionsByUser(db: Session,productId:int,userId:int):
+    logger.info(f"Started getting daily cashout total for user {userId} @ {str(datetime.now())}")
+    return db.query(func.sum(PaymentModel.amount)).filter(PaymentModel.user_id == userId,PaymentModel.product_type_id == productId).scalar().first()
