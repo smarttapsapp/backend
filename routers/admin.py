@@ -182,7 +182,7 @@ async def getRoles(
     db: Annotated[Session, Depends(get_db)],
 ):
     try:
-        return adminservice.listOfRoles(
+        return await adminservice.listOfRoles(
                 db=db,
                 setting=Setting,
                 request=request,
