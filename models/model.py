@@ -6,7 +6,7 @@ from sqlalchemy import (
     String,
     DateTime,
     Enum,
-    LargeBinary,
+    LargeBinary,Table,
     Text,
     DECIMAL,func
 )
@@ -673,13 +673,23 @@ class StationModel(Base):
     arrival = relationship("RouteModel", foreign_keys="RouteModel.destinationStation_id", back_populates="destinationStation")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+bus_route = Table('bus_route',
+    Base.metadata,
+    Column('bus_id', Integer, ForeignKey('buses.id'), primary_key=True),
+    Column('route_id', Integer, ForeignKey('routes.id'), primary_key=True)
+)
+train_route = Table('train_route',
+    Base.metadata,
+    Column('train_id', Integer, ForeignKey('trains.id'), primary_key=True),
+    Column('route_id', Integer, ForeignKey('routes.id'), primary_key=True)
+)
 class BusModel(Base):
     __tablename__ = 'buses'
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False, unique=True)
     seatCount = Column(Integer)
     bus_number = Column(String(10),)
-    route_id = Column(Integer, ForeignKey("routes.id"))
+    #route_id = Column(Integer, ForeignKey("routes.id"))
     park_id = Column(Integer, ForeignKey("parks.id"))
     description = Column(String(255), nullable=True)
     types = Column(Enum(MovableEnum), nullable=False, default=MovableEnum.BUS)
@@ -689,22 +699,9 @@ class BusModel(Base):
     base_price = Column(String(25), nullable=True)
     availabilityStatus = Column(Boolean, default=False)
     busImage = Column(String(255), nullable=True)
+    routes = relationship('RouteModel',secondary=bus_route,back_populates='buses')
     park = relationship("ParkModel", backref="buses")
     schedules =  relationship("ScheduleModel", secondary="bus_schedule", back_populates="buses")
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-class TrainModel(Base):
-    __tablename__ = 'trains'
-    
-    id = Column(Integer, primary_key=True)
-    trainNumber = Column(String(50), nullable=False, unique=True)
-    trainName = Column(String(50), nullable=False)
-    route_id = Column(Integer, ForeignKey("routes.id"))
-    image = Column(String(255), nullable=True)
-    #route = relationship("RouteModel",  uselist=False,back_populates="trains")
-    schedules =  relationship("ScheduleModel", secondary="train_schedule", back_populates="trains")
-    description = Column(String(255), nullable=True)
-    seats = relationship("SeatModel", backref="train")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 class RouteModel(Base):
@@ -717,10 +714,29 @@ class RouteModel(Base):
     destinationStation_id = Column(Integer, ForeignKey("stations.id"))
     sourceStation = relationship("StationModel", foreign_keys=[sourceStation_id], back_populates="depature")
     destinationStation = relationship("StationModel", foreign_keys=[destinationStation_id], back_populates="arrival")
-    trains = relationship("TrainModel", backref="route")
-    buses = relationship("BusModel", backref="route")
+    #trains = relationship("TrainModel", backref="route")
+    trains = relationship('TrainModel',secondary=train_route,back_populates='routes')
+    #buses = relationship("BusModel", backref="route")
+    buses = relationship('BusModel',secondary=bus_route,back_populates='routes')
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+class TrainModel(Base):
+    __tablename__ = 'trains'
+    
+    id = Column(Integer, primary_key=True)
+    trainNumber = Column(String(50), nullable=False, unique=True)
+    trainName = Column(String(50), nullable=False)
+    #route_id = Column(Integer, ForeignKey("routes.id"))
+    image = Column(String(255), nullable=True)
+    routes = relationship('RouteModel',secondary=train_route,back_populates='trains')
+    #route = relationship("RouteModel",  uselist=False,back_populates="trains")
+    schedules =  relationship("ScheduleModel", secondary="train_schedule", back_populates="trains")
+    description = Column(String(255), nullable=True)
+    seats = relationship("SeatModel", backref="train")
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
 class ScheduleModel(Base):
     __tablename__ = 'schedules'
     

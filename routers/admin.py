@@ -924,9 +924,3 @@ async def get_setting(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 
-
-
-
-
-
-
