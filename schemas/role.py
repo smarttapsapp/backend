@@ -8,13 +8,14 @@ from schemas.response import BaseResponse
 class RoleBase(BaseModel):
     name: Union[str, None] = None
     tag:str
-    status: Union[bool, None] = False
 
 
 class RoleRequest(RoleBase):
+    status: Union[bool, None] = False
     user: Union[List[str], None] = None
 
 class Role(RoleBase):
+    status: Union[bool, None] = False
     id: Optional[int]
 
     class Config:
@@ -26,3 +27,6 @@ class RolesResponse(BaseResponse):
     
 class RoleResponse(BaseResponse):
     data: Role = None
+
+class AddRoleRequest(RoleBase):
+    pass

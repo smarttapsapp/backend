@@ -114,8 +114,16 @@ def getLastpaymentByAccount(db: Session, accountId: int):
     return db.query(PaymentModel).filter(PaymentModel.wallet_id == accountId).order_by(desc(PaymentModel.updated_at)).first()
 def getstations(db: Session):
     return db.query(StationModel).all()
+def getStationById(db: Session,stationId:int):
+    return db.query(StationModel).filter(StationModel.id == stationId).first()
+def deleteStation(db: Session ,stationId:int):
+    return db.query(StationModel).filter(StationModel.id == stationId).delete()
 def getRoutes(db: Session):
     return db.query(RouteModel).all()
+def getRouteById(db: Session,routeId:int):
+    return db.query(RouteModel).filter(RouteModel.id == routeId).first()
+def deleteRoute(db: Session ,routeId:int):
+    return db.query(RouteModel).filter(RouteModel.id == routeId).delete()
 def query_stations(db: Session,mode:str):
     return db.query(StationModel).filter(StationModel.mode == mode).all()
 def queryRouteByIdAndMode(db: Session,routeId:int,mode:str):
@@ -165,6 +173,14 @@ def getRoleByTag(db: Session,tag:str):
     return db.query(RoleModel).filter(RoleModel.tag == tag).first()
 def getRoleById(db: Session,roleId:int):
     return db.query(RoleModel).filter(RoleModel.id == roleId).first()
+def deleteRole(db: Session ,roleId:int):
+    return db.query(RoleModel).filter(RoleModel.id == roleId).delete()
+def getParks(db: Session):
+    return db.query(ParkModel).all()
+def getParkById(db: Session,parkId:int):
+    return db.query(ParkModel).filter(ParkModel.id == parkId).first()
+def deletePark(db: Session ,parkId:int):
+    return db.query(ParkModel).filter(ParkModel.id == parkId).delete()
 def getProductTypeBYname(db: Session,name:str):
     return db.query(ProductTypeModel).filter(ProductTypeModel.billerType == name).first()
 def getDailyCashoutTransactionsByUser(db: Session,productId:int,userId:int):
