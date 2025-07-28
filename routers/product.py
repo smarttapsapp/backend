@@ -91,7 +91,7 @@ async def get_available_routes(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,data=[])
 @router.get("/bus_search",
-    response_model=RouteResponse,
+    response_model=RoutesResponse,
     response_model_exclude_unset=True,)
 async def get_Bus_Routes(
     request: Request,
@@ -105,14 +105,14 @@ async def get_Bus_Routes(
 ):
     try:
         if user:
-            return productservice.searchMovablesRoutes(request=request,response=response,setting=setting,db=db,user=user,departure=departure,arrival=arrival,mode=searchType)
+            return await productservice.searchMovablesRoutes(request=request,response=response,setting=setting,db=db,user=user,departure=departure,arrival=arrival,mode=searchType)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
-            return RouteResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)
+            return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return RouteResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+        return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.get("/stations/{mode}",
     response_model=StationsResponse,
     response_model_exclude_unset=True,)

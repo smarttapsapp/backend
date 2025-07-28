@@ -35,7 +35,7 @@ def getSingleBiller(db: Session, id: int):
     bill = productQuery.get_single_biller_by_id(db=db, id=id)
     logger.info(bill)
     return bill
-def searchMovablesRoutes(request: Request,response: Response,setting: Setting,db: Session,user: Customer,departure: str,arrival: str,mode: str):
+async def searchMovablesRoutes(request: Request,response: Response,setting: Setting,db: Session,user: Customer,departure: str,arrival: str,mode: str):
     try:
         logger.info(f"Started searching for {mode} route by {user.firstname}") 
         data = []
@@ -43,12 +43,13 @@ def searchMovablesRoutes(request: Request,response: Response,setting: Setting,db
             logger.info(f"Searching for {mode} route from {departure} to {arrival}")
             route = queries.query_routes_by_stations(db=db,departure=departure,arrival=arrival,mode=mode)
             if route:
-                return RouteResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=route)
-        return RouteResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=[])
+                return RoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=route)
+        data = queries.query_routes(db=db,mode=mode)
+        return RoutesResponse(statusCode=str(status.HTTP_404_NOT_FOUND),statusDescription=SUCCESS,data=data)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return RouteResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+        return RoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 def searchTrainRoutes(request: Request,response: Response,setting: Setting,db: Session,user: Customer,departure: str,arrival: str,seatType: str,operationTime:str):
     try:
         logger.info(f"Started searching for train from {departure} to {arrival} with {seatType} for {operationTime}") 

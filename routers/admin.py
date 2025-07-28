@@ -500,6 +500,7 @@ async def get_ticket(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+#parks
 @router.get("/parks", 
     response_model=ParksResponse,
     response_model_exclude_unset=True,name="get parks")
@@ -618,7 +619,7 @@ async def deletePark(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-
+#bus
 @router.get("/buses", 
     response_model=BusesResponse,
     response_model_exclude_unset=True,name="get customer payemnt")
@@ -737,7 +738,7 @@ async def deleteBus(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-
+#train
 @router.get("/trains", 
     response_model=TrainsResponse,
     response_model_exclude_unset=True,name="get customer payemnt")

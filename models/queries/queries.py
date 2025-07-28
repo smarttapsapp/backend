@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session,aliased
 from sqlalchemy import desc
 from sqlalchemy.sql import select,update
 from models.model import *
@@ -130,8 +130,18 @@ def queryRouteByIdAndMode(db: Session,routeId:int,mode:str):
     return db.query(RouteModel).filter(RouteModel.id == routeId).filter(RouteModel.mode == mode).first()
 def query_routes(db: Session,mode:str):
     return db.query(RouteModel).filter(RouteModel.mode == mode).all()
-def query_routes_by_stations(db: Session,departure:int,arrival:int,mode:str):
-    return db.query(RouteModel).filter(RouteModel.mode == mode).filter(RouteModel.sourceStation_id == departure).filter(RouteModel.destinationStation_id == arrival).first()
+def query_routes_by_stations(db: Session,departure:str,arrival:str,mode:str):
+    SourceStation = aliased(StationModel)
+    DestinationStation = aliased(StationModel)
+    return (
+        db.query(RouteModel)
+        .join(SourceStation, RouteModel.sourceStation)
+        .join(DestinationStation, RouteModel.destinationStation)
+        .filter(RouteModel.mode == mode)
+        .filter(func.lower(SourceStation.stationName).like(f"%{departure.lower()}%"))
+        .filter(func.lower(DestinationStation.stationName).like(f"%{arrival.lower()}%"))
+        .all()
+    )
 def busById(db: Session,busId:int):
     return db.query(BusModel).filter(BusModel.id == busId).first()
 def getPaymentHistories(db: Session,userId:int,startDate:str,endDate:str):
