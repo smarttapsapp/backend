@@ -335,10 +335,11 @@ async def getDashboardProductRequest(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+# station
 @router.get("/stations", 
     response_model=StationsResponse,
-    response_model_exclude_unset=True,name="get products")
-async def get_products(
+    response_model_exclude_unset=True,tags=["station"])
+async def get_stations(
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
@@ -358,10 +359,95 @@ async def get_products(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return StationsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.post("/station/add", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["station"])
+async def addStation(
+    payload:AddRoleRequest,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await adminservice.addRole(
+            payload=payload,
+                db=db,
+                setting=setting,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.post("/station/{id}/edit", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["station"])
+async def updateStation(
+    payload:AddRoleRequest,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await adminservice.updateRole(
+            payload=payload,
+                db=db,
+                setting=setting,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.delete("/station/{id}/delete", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["station"])
+async def deleteStation(
+    id:int,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await adminservice.deleteRole(
+            roleId=id,
+                db=db,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
 #routes
 @router.get("/routes", 
     response_model=RoutesResponse,
-    response_model_exclude_unset=True,name="get routes")
+    response_model_exclude_unset=True,tags=["route"])
 async def get_routes(
     request: Request,
     response: Response,
@@ -466,7 +552,7 @@ async def deleteRoute(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-    
+# TICKET
 @router.get("/tickets", 
     response_model=TicketsResponse,
     response_model_exclude_unset=True,name="get customer payemnt")
@@ -503,7 +589,7 @@ async def get_ticket(
 #parks
 @router.get("/parks", 
     response_model=ParksResponse,
-    response_model_exclude_unset=True,name="get parks")
+    response_model_exclude_unset=True,tags=["park"])
 async def get_parks(
     request: Request,
     response: Response,
@@ -536,7 +622,7 @@ async def get_parks(
         return ParksResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.post("/park/add", 
     response_model=BaseResponse,
-    response_model_exclude_unset=True,tags=["parks"])
+    response_model_exclude_unset=True,tags=["park"])
 async def addPark(
     payload:AddRoleRequest,
     request: Request,
@@ -622,7 +708,7 @@ async def deletePark(
 #bus
 @router.get("/buses", 
     response_model=BusesResponse,
-    response_model_exclude_unset=True,name="get customer payemnt")
+    response_model_exclude_unset=True,tags=["bus"])
 async def get_buses(
     request: Request,
     response: Response,
@@ -713,7 +799,7 @@ async def updateBus(
         )
 @router.delete("/bus/{id}/delete", 
     response_model=BaseResponse,
-    response_model_exclude_unset=True,tags=["role"])
+    response_model_exclude_unset=True,tags=["bus"])
 async def deleteBus(
     id:int,
     request: Request,
@@ -741,7 +827,7 @@ async def deleteBus(
 #train
 @router.get("/trains", 
     response_model=TrainsResponse,
-    response_model_exclude_unset=True,name="get customer payemnt")
+    response_model_exclude_unset=True,tags=["train"])
 async def get_trains(
     request: Request,
     response: Response,
@@ -860,7 +946,7 @@ async def deleteTraine(
 
 @router.get("/notifications", 
     response_model=NotificationsResponse,
-    response_model_exclude_unset=True)
+    response_model_exclude_unset=True,tags=["notification"])
 async def get_notifications(
     request: Request,
     response: Response,

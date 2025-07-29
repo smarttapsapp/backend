@@ -689,7 +689,6 @@ class BusModel(Base):
     name = Column(String(100), nullable=False, unique=True)
     seatCount = Column(Integer)
     bus_number = Column(String(10),)
-    #route_id = Column(Integer, ForeignKey("routes.id"))
     park_id = Column(Integer, ForeignKey("parks.id"))
     description = Column(String(255), nullable=True)
     types = Column(Enum(MovableEnum), nullable=False, default=MovableEnum.BUS)
