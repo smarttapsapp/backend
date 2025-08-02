@@ -21,12 +21,13 @@ from services import adminservice
 from schemas.admin import *
 from schemas.role import *
 from schemas.station import StationsResponse
-from schemas.route import RoutesResponse
+from schemas.route import RoutesResponse,AddRouteRequest
 from schemas.train import TrainsResponse
-from schemas.bus import BusesResponse
+from schemas.bus import BusesResponse,AddBusRequest
 from schemas.park import ParksResponse
 from schemas.ticket import TicketsResponse
 from schemas.notification import NotificationsResponse
+from schemas.schedule import SchedulesResponse
 from models.model import *
 from datetime import date
 from schemas.setting import Setting
@@ -51,7 +52,7 @@ async def login(
     background_task: BackgroundTasks,
 ):
     try:
-        return adminservice.authenticateUser(
+        return await adminservice.authenticateUser(
             request=request,
             response=response,
             setting=setting,
@@ -107,7 +108,7 @@ async def getAdminProfile(
 ):
     try:
         if admin:
-            return adminservice.profile(
+            return await adminservice.profile(
                 db=db,request=request,response=response,setting=setting,admin=admin
             )
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -137,7 +138,7 @@ async def createAdmin(
     try:
         userRequest = CreateAdminRequest.model_validate(payload)
         logger.info(userRequest.model_dump_json())
-        return adminservice.createAccount(request=request,response=responses,setting=Setting,db=db,payload=payload,background_task=background_task)
+        return await adminservice.createAccount(request=request,response=responses,setting=Setting,db=db,payload=payload,background_task=background_task)
     except Exception as ex:
         logger.error(ex)
         responses.status_code = status.HTTP_400_BAD_REQUEST
@@ -156,7 +157,7 @@ async def getAdmins(
     db: Annotated[Session, Depends(get_db)],
 ):
     try:
-        return adminservice.listOfAdmins(
+        return await adminservice.listOfAdmins(
                 db=db,
                 setting=Setting,
                 request=request,
@@ -294,7 +295,7 @@ async def getDashboardRequest(
     db: Annotated[Session, Depends(get_db)],
 ):
     try:
-        return adminservice.analytics(
+        return await adminservice.analytics(
                 db=db,
                 setting=Setting,
                 request=request,
@@ -321,7 +322,7 @@ async def getDashboardProductRequest(
 ):
     try:
         if user:
-            return adminservice.getDashboardByProducts(
+            return await  adminservice.getDashboardByProducts(
                 db=db,
                 setting=Setting,
                 request=request,
@@ -348,7 +349,7 @@ async def get_stations(
 ):
     try:
         if admin:
-            return adminservice.listOfStations(
+            return await adminservice.listOfStations(
                 request=request,
                 response=response,
                 setting=setting,
@@ -457,7 +458,7 @@ async def get_routes(
 ):
     try:
         if admin:
-            return adminservice.listOfRoutes(
+            return await adminservice.listOfRoutes(
                 request=request,
                 response=response,
                 setting=setting,
@@ -471,7 +472,7 @@ async def get_routes(
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["route"])
 async def addRoute(
-    payload:AddRoleRequest,
+    payload:AddRouteRequest,
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
@@ -480,7 +481,7 @@ async def addRoute(
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.addRole(
+        return await adminservice.addRoute(
             payload=payload,
                 db=db,
                 setting=setting,
@@ -552,6 +553,115 @@ async def deleteRoute(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+#schedules
+@router.get("/schedules", 
+    response_model=SchedulesResponse,
+    response_model_exclude_unset=True,tags=["schedule"])
+async def get_schedules(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if admin:
+            return await adminservice.listOfSchedules(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                admin=admin,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return SchedulesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.post("/schedule/add", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["schedule"])
+async def addSchedule(
+    payload:AddRoleRequest,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await adminservice.addRole(
+            payload=payload,
+                db=db,
+                setting=setting,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.post("/schedule/{id}/edit", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["schedule"])
+async def updateSchedule(
+    payload:AddRoleRequest,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await adminservice.updateRole(
+            payload=payload,
+                db=db,
+                setting=setting,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.delete("/schedule/{id}/delete", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["schedule"])
+async def deleteSchedule(
+    id:int,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await adminservice.deleteRole(
+            roleId=id,
+                db=db,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+
 # TICKET
 @router.get("/tickets", 
     response_model=TicketsResponse,
@@ -573,7 +683,7 @@ async def get_ticket(
                 if end < start:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
-            return adminservice.listOfTickets(
+            return await adminservice.listOfTickets(
                 request=request,
                 response=response,
                 setting=setting,
@@ -607,7 +717,7 @@ async def get_parks(
                 if end < start:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return ParksResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
-            return adminservice.listOfParks(
+            return await  adminservice.listOfParks(
                 request=request,
                 response=response,
                 setting=setting,
@@ -726,7 +836,7 @@ async def get_buses(
                 if end < start:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
-            return adminservice.listOfBuses(
+            return await  adminservice.listOfBuses(
                 request=request,
                 response=response,
                 setting=setting,
@@ -743,7 +853,7 @@ async def get_buses(
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["bus"])
 async def addBus(
-    payload:AddRoleRequest,
+    payload:AddBusRequest,
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
@@ -752,7 +862,7 @@ async def addBus(
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.addRole(
+        return await adminservice.addBus(
             payload=payload,
                 db=db,
                 setting=setting,
@@ -845,7 +955,7 @@ async def get_trains(
                 if end < start:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
-            return adminservice.listOfTrains(
+            return await adminservice.listOfTrains(
                 request=request,
                 response=response,
                 setting=setting,
@@ -861,7 +971,7 @@ async def get_trains(
 @router.post("/train/add", 
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["train"])
-async def addRole(
+async def addTrain(
     payload:AddRoleRequest,
     request: Request,
     response: Response,
@@ -919,7 +1029,7 @@ async def updateTrain(
 @router.delete("/train/{id}/delete", 
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["train"])
-async def deleteTraine(
+async def deleteTrain(
     id:int,
     request: Request,
     response: Response,
@@ -964,7 +1074,7 @@ async def get_notifications(
                 if end < start:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return NotificationsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
-            return adminservice.listOfNotifications(
+            return await adminservice.listOfNotifications(
                 request=request,
                 response=response,
                 setting=setting,
@@ -997,7 +1107,7 @@ async def get_setting(
                 if end < start:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
-            return adminservice.listOfTickets(
+            return await adminservice.listOfTickets(
                 request=request,
                 response=response,
                 setting=setting,

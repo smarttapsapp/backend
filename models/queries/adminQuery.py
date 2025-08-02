@@ -20,7 +20,6 @@ def customersAnalytics(db: Session):
     func.sum(case((CustomerModel.account_status == "disabled", 1), else_=0)).label("disabled_customers")
 ).one()
     return dict(row._mapping)
-
 def creditPaymentsAnalytics(db: Session):
     row = db.query(
     func.count().label("total_payment"),
@@ -55,20 +54,69 @@ def getAllAdmin(db: Session,adminId:int=None):
     return db.query(AdminModel).order_by(desc(AdminModel.created_at)).all()
 def getAdmin(db: Session,adminId:int=None):
     return db.query(AdminModel).filter(AdminModel.id ==adminId).first()
-
-def getTrains(db: Session):
+# trains
+def getTrains(db: Session,adminId:int=None):
+    if adminId:
+        return db.query(TrainModel).filter(TrainModel.admin_id ==adminId).order_by(desc(TrainModel.created_at)).all()
     return db.query(TrainModel).order_by(desc(TrainModel.created_at)).all()
+def getTrain(db: Session,busNumber:str):
+    return db.query(TrainModel).filter(TrainModel.trainNumber==busNumber).first()
+def deleteTrain(db: Session,id:int):
+    return db.query(TrainModel).filter(TrainModel.id ==id).delete()
 def countTrains(db: Session):
     return db.query(TrainModel).count()
 def getTrainsByBusiness(db: Session,adminId:int=None):
     return db.query(TrainModel).filter(TrainModel.route_id ==adminId).order_by(desc(TrainModel.created_at)).all()
-
-def getBuses(db: Session):
+#buses
+def getBuses(db: Session,adminId:int=None):
+    if adminId:
+        return db.query(BusModel).filter(BusModel.admin_id ==adminId).order_by(desc(BusModel.created_at)).all()
     return db.query(BusModel).order_by(desc(BusModel.created_at)).all()
+def getBus(db: Session,busNumber:str):
+    return db.query(BusModel).filter(BusModel.bus_number ==busNumber).first()
+def deleteBus(db: Session,id:int):
+    return db.query(BusModel).filter(BusModel.id ==id).delete()
 def countBuses(db: Session):
     return db.query(BusModel).count()
 def getBusesByBusiness(db: Session,parkId:int=None):
     return db.query(BusModel).filter(BusModel.park_id ==parkId).order_by(desc(BusModel.created_at)).all()
+# stations
+def getstations(db: Session,adminId:int=None):
+    if adminId:
+        return db.query(StationModel).filter(StationModel.admin_id ==adminId).order_by(desc(StationModel.created_at)).all()
+    return db.query(StationModel).all()
+def getStationById(db: Session,stationId:int):
+    return db.query(StationModel).filter(StationModel.id == stationId).first()
+def deleteStation(db: Session ,stationId:int):
+    return db.query(StationModel).filter(StationModel.id == stationId).delete()
+# routes
+def getRoutes(db: Session,adminId:int=None):
+    if adminId:
+        return db.query(RouteModel).filter(RouteModel.admin_id ==adminId).order_by(desc(RouteModel.created_at)).all()
+    return db.query(RouteModel).all()
+def getRouteById(db: Session,routeId:int):
+    return db.query(RouteModel).filter(RouteModel.id == routeId).first()
+def getRouteByStartStopStation(db: Session,start:int,stop:int,adminId:int):
+    return db.query(RouteModel).filter(RouteModel.admin_id == adminId).filter(RouteModel.sourceStation_id == start).filter(RouteModel.destinationStation_id == stop).first()
+def getRoutesByIds(db:Session,ids:list[int],adminId:int=None):
+    if adminId:
+        return db.query(RouteModel).filter(RouteModel.admin_id ==adminId).filter(RouteModel.id.in_(ids)).all()
+    return db.query(RouteModel).filter(RouteModel.id.in_(ids)).all()
+def deleteRoute(db: Session ,routeId:int):
+    return db.query(RouteModel).filter(RouteModel.id == routeId).delete()
+# schedules
+def getSchedules(db: Session,adminId:int=None):
+    if adminId:
+        return db.query(ScheduleModel).filter(ScheduleModel.admin_id ==adminId).order_by(desc(ScheduleModel.created_at)).all()
+    return db.query(ScheduleModel).all()
+def getSchedulesByIds(db:Session,ids:list[int],adminId:int=None):
+    if adminId:
+        return db.query(ScheduleModel).filter(ScheduleModel.admin_id ==adminId).filter(ScheduleModel.id.in_(ids)).all()
+    return db.query(ScheduleModel).filter(ScheduleModel.id.in_(ids)).all()
+def getScheduleById(db: Session,scheduleId:int):
+    return db.query(ScheduleModel).filter(ScheduleModel.id == scheduleId).first()
+def deleteSchedule(db: Session ,scheduleId:int):
+    return db.query(ScheduleModel).filter(ScheduleModel.id == scheduleId).delete()
 
 def getParks(db: Session,startDate:str,endDate:str,adminId:int=None):
     if startDate and endDate:

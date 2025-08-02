@@ -686,6 +686,7 @@ train_route = Table('train_route',
 class BusModel(Base):
     __tablename__ = 'buses'
     id = Column(Integer, primary_key=True)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
     name = Column(String(100), nullable=False, unique=True)
     seatCount = Column(Integer)
     bus_number = Column(String(10),)
@@ -708,6 +709,7 @@ class RouteModel(Base):
     
     id = Column(Integer, primary_key=True)
     routeName = Column(String(50), nullable=True,)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
     mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS)  # schedule mode
     sourceStation_id = Column(Integer, ForeignKey("stations.id"))
     destinationStation_id = Column(Integer, ForeignKey("stations.id"))
@@ -719,27 +721,25 @@ class RouteModel(Base):
     buses = relationship('BusModel',secondary=bus_route,back_populates='routes')
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
 class TrainModel(Base):
     __tablename__ = 'trains'
     
     id = Column(Integer, primary_key=True)
     trainNumber = Column(String(50), nullable=False, unique=True)
     trainName = Column(String(50), nullable=False)
-    #route_id = Column(Integer, ForeignKey("routes.id"))
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
     image = Column(String(255), nullable=True)
     routes = relationship('RouteModel',secondary=train_route,back_populates='trains')
-    #route = relationship("RouteModel",  uselist=False,back_populates="trains")
     schedules =  relationship("ScheduleModel", secondary="train_schedule", back_populates="trains")
     description = Column(String(255), nullable=True)
     seats = relationship("SeatModel", backref="train")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
 class ScheduleModel(Base):
     __tablename__ = 'schedules'
     
     id = Column(Integer, primary_key=True)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
     train_id = Column(Integer, ForeignKey("trains.id"), nullable=True)
     bus_id = Column(Integer, ForeignKey('buses.id'), nullable=True)
     route_id = Column(Integer, ForeignKey('routes.id'), nullable=False)

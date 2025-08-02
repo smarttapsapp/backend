@@ -12,9 +12,10 @@ from schemas.customer import *
 from schemas.role import *
 from schemas.admin import *
 from schemas.station import StationsResponse
-from schemas.route import RoutesResponse
+from schemas.schedule import SchedulesResponse
+from schemas.route import RoutesResponse,AddRouteRequest
 from schemas.ticket import TicketsResponse
-from schemas.bus import BusesResponse
+from schemas.bus import BusesResponse,AddBusRequest
 from schemas.park import ParksResponse
 from schemas.train import TrainsResponse
 from schemas.notification import NotificationsResponse
@@ -27,7 +28,7 @@ from fastapi import (
 
 logger = logging.getLogger(__name__)
 
-def createAccount(
+async def createAccount(
         request: Request,
         response: Response,
         setting: Setting,
@@ -52,7 +53,7 @@ def createAccount(
                     statusCode=str(status.HTTP_400_BAD_REQUEST),
                     statusDescription=SYSTEMBUSY,
                 )
-def authenticate_user(
+async def authenticate_user(
         request:Request,
         db: Session,
     response: Response,
@@ -234,7 +235,7 @@ def generateAndSendOTP(db: Session, userId:int,setting: Setting,background_task:
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription="Unable to send otp at the moment",
             )
-def authenticateUser(
+async def authenticateUser(
     request: Request,
     response: Response,
     setting: Setting,
@@ -278,7 +279,7 @@ def authenticateUser(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
-def profile(db: Session,
+async def profile(db: Session,
         request: Request,
         response: Response,
         setting: Setting,
@@ -364,7 +365,7 @@ async def resetPasswordInitiate(
                 "statusDescription": SYSTEMBUSY,
             }
         )
-def resetPasswordFinal(db:Session,response:Response,token:str,setting: Setting, background_task: BackgroundTasks,payload:ResetPasswordRequest):
+async def resetPasswordFinal(db:Session,response:Response,token:str,setting: Setting, background_task: BackgroundTasks,payload:ResetPasswordRequest):
     try:
         data = util.jwt.decode(token, setting.secret_key, algorithms=[setting.algorithm])
         if data:
@@ -415,7 +416,7 @@ def resetPasswordFinal(db:Session,response:Response,token:str,setting: Setting, 
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 #analytics
-def analytics(
+async def analytics(
         admin:AdminModel,
         request: Request,
         response: Response,
@@ -462,7 +463,7 @@ def analytics(
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
 
 # admin service
-def listOfAdmins(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+async def listOfAdmins(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
     try:
         logger.info(f"started querying products")
         if admin.role.tag == AdminRoleEnum.BUSINESS:
@@ -546,7 +547,7 @@ async def deleteRole(db: Session, background_task: BackgroundTasks, request: Req
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
 
 # transport service
-def listOfParks(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
+async def listOfParks(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
     try:
         logger.info(f"started querying buses")
         if admin.role.tag == AdminRoleEnum.BUSINESS:
@@ -558,19 +559,169 @@ def listOfParks(request: Request,response: Response,setting: Setting,db: Session
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return ParksResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-def listOfBuses(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
+# buses
+async def listOfBuses(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
     try:
         logger.info(f"started querying buses")
         if admin.role.tag == AdminRoleEnum.BUSINESS:
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return BusesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SUCCESS,data=adminQuery.getBusesByBusiness(db=db))
+            return BusesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getBuses(db=db,adminId=admin.id))
         else:
             return BusesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getBuses(db=db))
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BusesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-def listOfTrains(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
+async def addBus(db: Session,setting: Setting,payload: AddBusRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started creating/updating bus @ {datetime.now()}")
+        if admin.role.tag in [AdminRoleEnum.BUSINESS,AdminRoleEnum.SUPERADMIN]:
+            adminId = admin.id if admin.role.tag == AdminRoleEnum.BUSINESS else None
+            routes = adminQuery.getRoutesByIds(db=db,ids=payload.busroutes,adminId=adminId)
+            if routes:
+                schedules =  adminQuery.getSchedulesByIds(db=db,ids=payload.busschedules,adminId=adminId)
+                if schedules:
+                    previous = adminQuery.getBus(db=db,busNumber=payload.bus_number)
+                    if previous and previous.admin_id == admin.id:
+                        previous.airCondition = payload.airCondition
+                        previous.tv = payload.tv
+                        previous.base_price = payload.base_price
+                        previous.camera = payload.camera
+                        previous.name = payload.name
+                        previous.seatCount = payload.seatCount
+                        previous.description = payload.description
+                        previous.schedules = schedules
+                        previous.routes = routes
+                        previous.updated_at = datetime.now()
+                    else:
+                        previous = BusModel(admin_id=admin.id,seatCount=payload.seatCount,name=payload.name,bus_number=payload.bus_number,description=payload.description,tv=payload.tv,camera=payload.camera,airCondition=payload.airCondition,base_price=payload.base_price,created_at=datetime.now(),updated_at=datetime.now(),schedules=schedules,routes=routes)
+                    created = queries.create(db=db, model=previous)
+                    if created:
+                        email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                        background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
+                        return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOSCHEDULE)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOROUTE)
+        else:
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            return BaseResponse(statusCode = str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def updateBus(db: Session,setting: Setting,payload: AddBusRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started creating new admin role @ {datetime.now()}")
+        role = adminQuery.getRole(db=db,roleId=payload.tag)
+        if role:
+            role.name = payload.name
+            role.tag =AdminRoleEnum(payload.tag)
+            role.updated_at=datetime.now()
+            created = queries.create(db=db, model=role)
+            if created:
+                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
+                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def deleteBus(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,roleId: int):
+    try:
+        logger.info(f"started deleting role {roleId} @ {datetime.now()}")
+        role = queries.deleteRole(db=db,roleId=roleId)
+        if role:
+            response.status_code = status.HTTP_200_OK
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+# schedules
+async def listOfSchedules(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+    try:
+        logger.info(f"started querying available schedules")
+        if admin.role.tag == AdminRoleEnum.BUSINESS:
+            return SchedulesResponse(statusCode= str(status.HTTP_401_UNAUTHORIZED),statusDescription=SUCCESS,data=adminQuery.getSchedules(db=db,adminId=admin.id))
+        else:
+            return SchedulesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getSchedules(db=db))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return SchedulesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def addSchedule(db: Session,setting: Setting,payload: AddRoleRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started creating new admin role @ {datetime.now()}")
+        role = adminQuery.getRole(db=db,roleId=payload.tag)
+        if role:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ALREADYEXIST)
+        else:
+            new = RoleModel(name=payload.name,tag=AdminRoleEnum(payload.tag),created_at=datetime.now(),updated_at=datetime.now(),)
+            created = queries.create(db=db, model=new)
+            if created:
+                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
+                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def updateSchedule(db: Session,setting: Setting,payload: AddRoleRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started creating new admin role @ {datetime.now()}")
+        role = adminQuery.getRole(db=db,roleId=payload.tag)
+        if role:
+            role.name = payload.name
+            role.tag =AdminRoleEnum(payload.tag)
+            role.updated_at=datetime.now()
+            created = queries.create(db=db, model=role)
+            if created:
+                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
+                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def deleteSchedule(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,roleId: int):
+    try:
+        logger.info(f"started deleting role {roleId} @ {datetime.now()}")
+        role = queries.deleteRole(db=db,roleId=roleId)
+        if role:
+            response.status_code = status.HTTP_200_OK
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+# trains
+async def listOfTrains(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
     try:
         logger.info(f"started querying trains")
         if admin.role.tag == AdminRoleEnum.BUSINESS:
@@ -582,7 +733,65 @@ def listOfTrains(request: Request,response: Response,setting: Setting,db: Sessio
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TrainsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-def listOfRoutes(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+async def addTrain(db: Session,setting: Setting,payload: AddRoleRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started creating new admin role @ {datetime.now()}")
+        role = adminQuery.getRole(db=db,roleId=payload.tag)
+        if role:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ALREADYEXIST)
+        else:
+            new = RoleModel(name=payload.name,tag=AdminRoleEnum(payload.tag),created_at=datetime.now(),updated_at=datetime.now(),)
+            created = queries.create(db=db, model=new)
+            if created:
+                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
+                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def updateTrain(db: Session,setting: Setting,payload: AddRoleRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started creating new admin role @ {datetime.now()}")
+        role = adminQuery.getRole(db=db,roleId=payload.tag)
+        if role:
+            role.name = payload.name
+            role.tag =AdminRoleEnum(payload.tag)
+            role.updated_at=datetime.now()
+            created = queries.create(db=db, model=role)
+            if created:
+                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
+                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def deleteTrain(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,roleId: int):
+    try:
+        logger.info(f"started deleting role {roleId} @ {datetime.now()}")
+        role = queries.deleteRole(db=db,roleId=roleId)
+        if role:
+            response.status_code = status.HTTP_200_OK
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+# routes
+async def listOfRoutes(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
     try:
         logger.info(f"started querying products")
         if admin.role.tag == AdminRoleEnum.BUSINESS:
@@ -594,7 +803,79 @@ def listOfRoutes(request: Request,response: Response,setting: Setting,db: Sessio
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return RoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-def listOfStations(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+async def addRoute(db: Session,setting: Setting,payload: AddRouteRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started creating new route @ {datetime.now()}")
+        if admin.role.tag in [AdminRoleEnum.BUSINESS,AdminRoleEnum.SUPERADMIN]:
+            existing = adminQuery.getRouteByStartStopStation(db=db,start=payload.startId, stop=payload.stopId,adminId=admin.id)
+            if existing:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ALREADYEXIST)
+            else:
+                startStation = adminQuery.getStationById(db=db,stationId=payload.startId)
+                if startStation:
+                    stopStation = adminQuery.getStationById(db=db,stationId=payload.stopId)
+                    if stopStation:
+                        new = RouteModel(routeName=payload.routeName,sourceStation_id=startStation.id,destinationStation_id=stopStation.id,mode=startStation.mode,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now(),)
+                        created = adminQuery.create(db=db, model=new)
+                        if created:
+                            email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Route Created",toAddress=admin.email,)
+                            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                        else:
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ENDSTATIONERR)
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=STARTSTATIONERR)
+        else:
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            return BaseResponse(statusCode = str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def updateRoute(db: Session,setting: Setting,payload: AddRoleRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started creating new admin role @ {datetime.now()}")
+        role = adminQuery.getRole(db=db,roleId=payload.tag)
+        if role:
+            role.name = payload.name
+            role.tag =AdminRoleEnum(payload.tag)
+            role.updated_at=datetime.now()
+            created = queries.create(db=db, model=role)
+            if created:
+                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
+                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def deleteRoute(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,roleId: int):
+    try:
+        logger.info(f"started deleting role {roleId} @ {datetime.now()}")
+        role = queries.deleteRole(db=db,roleId=roleId)
+        if role:
+            response.status_code = status.HTTP_200_OK
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+# stations
+async def listOfStations(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
     try:
         logger.info(f"started querying products")
         if admin.role.tag == AdminRoleEnum.BUSINESS:
@@ -606,7 +887,65 @@ def listOfStations(request: Request,response: Response,setting: Setting,db: Sess
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return StationsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-def listOfTickets(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
+async def addStation(db: Session,setting: Setting,payload: AddRoleRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started creating new admin role @ {datetime.now()}")
+        role = adminQuery.getRole(db=db,roleId=payload.tag)
+        if role:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ALREADYEXIST)
+        else:
+            new = RoleModel(name=payload.name,tag=AdminRoleEnum(payload.tag),created_at=datetime.now(),updated_at=datetime.now(),)
+            created = queries.create(db=db, model=new)
+            if created:
+                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
+                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def updateStation(db: Session,setting: Setting,payload: AddRoleRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started creating new admin role @ {datetime.now()}")
+        role = adminQuery.getRole(db=db,roleId=payload.tag)
+        if role:
+            role.name = payload.name
+            role.tag =AdminRoleEnum(payload.tag)
+            role.updated_at=datetime.now()
+            created = queries.create(db=db, model=role)
+            if created:
+                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
+                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def deleteStation(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,roleId: int):
+    try:
+        logger.info(f"started deleting role {roleId} @ {datetime.now()}")
+        role = queries.deleteRole(db=db,roleId=roleId)
+        if role:
+            response.status_code = status.HTTP_200_OK
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+
+async def listOfTickets(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
     try:
         logger.info(
             f"started querying tickets list from {startDate} to {endDate}"
@@ -628,7 +967,7 @@ def listOfTickets(request: Request,response: Response,setting: Setting,db: Sessi
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TicketsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 # notifications
-def listOfNotifications(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
+async def listOfNotifications(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
     try:
         logger.info(
             f"started querying tickets list from {startDate} to {endDate}"
