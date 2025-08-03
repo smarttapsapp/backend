@@ -125,7 +125,6 @@ def getParks(db: Session,startDate:str,endDate:str,adminId:int=None):
         if adminId:
             return db.query(ParkModel).filter(ParkModel.created_at.between(start,end)).order_by(desc(ParkModel.created_at)).all()
     return db.query(ParkModel).order_by(desc(ParkModel.created_at)).all()
-
 def create(db: Session, model: object):
     db.add(model)
     db.commit()
@@ -150,3 +149,32 @@ def getNotificationHistories(db: Session,startDate:str,endDate:str,adminId:int=N
         if adminId:
             return db.query(NotificationModel).filter(NotificationModel.admin_id == adminId).filter(NotificationModel.created_at.between(start,end)).order_by(desc(NotificationModel.created_at)).all()
     return db.query(NotificationModel).order_by(desc(NotificationModel.created_at)).all()
+# gl accounting
+def getGlAccounts(db: Session):
+    return db.query(GLAccountModel).order_by(desc(GLAccountModel.created_at)).all()
+def getGlAccountById(db: Session,id:int):
+    return db.query(GLAccountModel).filter(GLAccountModel.id == id).first()
+def deleteGlAccount(db: Session ,id:int):
+    return db.query(GLAccountModel).filter(GLAccountModel.id == id).delete()
+# journal entries 
+def getGlJournals(db: Session):
+    return db.query(JournalEntryModel).order_by(desc(JournalEntryModel.created_at)).all()
+def getGlJournalById(db: Session,id:int):
+    return db.query(JournalEntryModel).filter(JournalEntryModel.id == id).first()
+def deleteGlJournal(db: Session ,id:int):
+    return db.query(JournalEntryModel).filter(JournalEntryModel.id == id).delete()
+
+def getServiceCommissions(db: Session,adminId:int=None):
+    if adminId:
+        return db.query(CommissionModel).filter(CommissionModel.admin_id == adminId).order_by(desc(CommissionModel.id)).all()
+    return db.query(CommissionModel).order_by(desc(CommissionModel.id)).all()
+def deleteServiceCommission(db: Session ,id:int):
+    return db.query(CommissionModel).filter(CommissionModel.id == id).delete()
+def getServiceCommissionByProduct(db: Session,productTypeId:int,adminId:int):
+    return db.query(CommissionModel).filter(CommissionModel.admin_id==adminId).filter(CommissionModel.product_type_id==productTypeId).first()
+def getServiceProviders(db: Session):
+    return db.query(ServiceRateModel).order_by(desc(ServiceRateModel.created_at)).all()
+def deleteServiceProvider(db: Session ,providerId:int):
+    return db.query(ServiceRateModel).filter(ServiceRateModel.id == providerId).delete()
+def getServiceProviderByProduct(db: Session,productTypeId:int):
+    return db.query(ServiceRateModel).filter(ServiceRateModel.active==True).filter(ServiceRateModel.product_type_id==productTypeId).first()

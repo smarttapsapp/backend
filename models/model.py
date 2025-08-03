@@ -6,15 +6,14 @@ from sqlalchemy import (
     String,
     DateTime,
     Enum,
-    LargeBinary,Table,
+    Numeric,Table,
     Text,
-    DECIMAL,func
+    DECIMAL,func,UniqueConstraint
 )
 from sqlalchemy.orm import backref, relationship
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.dialects.mysql import LONGTEXT
 from datetime import datetime, timedelta
-import pytz
 import uuid
 from utils.constant import *
 
@@ -63,7 +62,14 @@ class AccountRatingEnum(PythonEnum):
     GOLD = "gold"
     SILVER = "silver"
     BRONZE = "bronze"
-
+class AccountType(PythonEnum):
+    asset = "asset"
+    liability = "liability"
+    revenue = "revenue"
+    expense = "expense"
+class CommissionType(PythonEnum):
+    percentage = "percentage"
+    calculated = "calculated"
 
 class POSStatusEnum(PythonEnum):
     ACTIVE = "active"
@@ -80,6 +86,7 @@ class AdminRoleEnum(PythonEnum):
     AUDIT = "audit"
     SUPPORT = "support"
     BUSINESS = "business"
+    PROVIDER = "provider"
 class AdminTypeEnum(PythonEnum):
     INTERNAL = "INTERNAL"
     EXTERNAL = "EXTERNAL"
@@ -776,4 +783,46 @@ class TicketModel(Base):
     expired_at = Column(DateTime, default=func.now())# Purchase time
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+class GLAccountModel(Base):
+    __tablename__ = "gl_accounts"
 
+    id = Column(Integer, primary_key=True)
+    code = Column(String(10), unique=True, nullable=False)
+    name = Column(String(100), nullable=False)
+    gl_type = Column(Enum(AccountType), nullable=False)
+    gl_balance = Column(String(20), nullable=False,default="0")
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(),onupdate=func.now())
+class JournalEntryModel(Base):
+    __tablename__ = "journal_entries"
+
+    id = Column(Integer, primary_key=True)
+    account_id = Column(Integer, ForeignKey("gl_accounts.id"))
+    admin_id = Column(Integer, ForeignKey("admins.id"))
+    amount = Column(String(20), nullable=False)
+    is_debit = Column(Boolean, nullable=False)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(),onupdate=func.now())
+class ServiceRateModel(Base):
+    __tablename__ = "service_rates"
+    id = Column(Integer, primary_key=True)
+    admin_id = Column(Integer, ForeignKey("admins.id"))
+    product_type_id = Column(Integer, ForeignKey("product_types.id", ondelete="CASCADE"))
+    provider_discount_rate = Column(Numeric(5, 4), nullable=False)
+    provider_discount_type = Column(Enum(CommissionType), nullable=False)
+    active = Column(Boolean, default=True)
+    updated_at = Column(DateTime, default=func.now(),onupdate=func.now())
+    created_at = Column(DateTime, default=func.now())
+class CommissionModel(Base):
+    __tablename__ = "commissions"
+
+    id = Column(Integer, primary_key=True)
+    product_type_id = Column(Integer, ForeignKey("product_types.id", ondelete="CASCADE"))
+    admin_id = Column(Integer, ForeignKey("admins.id", ondelete="CASCADE"))
+    commission_rate = Column(Numeric(5, 4), nullable=False)
+    commission_type = Column(Enum(CommissionType), nullable=False)
+    updated_at = Column(DateTime, default=func.now(),onupdate=func.now())
+    created_at = Column(DateTime, default=func.now())
+    __table_args__ = (
+        UniqueConstraint('admin_id', 'product_type_id', name='uix_admin_product_type'),
+    )
