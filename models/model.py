@@ -65,12 +65,12 @@ class AccountRatingEnum(PythonEnum):
 class AccountType(PythonEnum):
     asset = "asset"
     liability = "liability"
+    equity = "equity"
     revenue = "revenue"
     expense = "expense"
 class CommissionType(PythonEnum):
     percentage = "percentage"
     calculated = "calculated"
-
 class POSStatusEnum(PythonEnum):
     ACTIVE = "active"
     BLOCKED = "blocked"
@@ -787,10 +787,11 @@ class GLAccountModel(Base):
     __tablename__ = "gl_accounts"
 
     id = Column(Integer, primary_key=True)
-    code = Column(String(10), unique=True, nullable=False)
+    code = Column(String(20), unique=True, nullable=False)
     name = Column(String(100), nullable=False)
     gl_type = Column(Enum(AccountType), nullable=False)
     gl_balance = Column(String(20), nullable=False,default="0")
+    journal_entries = relationship('JournalEntryModel', backref='gl_account')
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(),onupdate=func.now())
 class JournalEntryModel(Base):
@@ -798,6 +799,7 @@ class JournalEntryModel(Base):
 
     id = Column(Integer, primary_key=True)
     account_id = Column(Integer, ForeignKey("gl_accounts.id"))
+    #gl_account = relationship('GLAccountModel', backref='journal_entries')
     admin_id = Column(Integer, ForeignKey("admins.id"))
     amount = Column(String(20), nullable=False)
     is_debit = Column(Boolean, nullable=False)
@@ -807,7 +809,9 @@ class ServiceRateModel(Base):
     __tablename__ = "service_rates"
     id = Column(Integer, primary_key=True)
     admin_id = Column(Integer, ForeignKey("admins.id"))
+    admin = relationship('AdminModel', backref='service_rates')
     product_type_id = Column(Integer, ForeignKey("product_types.id", ondelete="CASCADE"))
+    product_type = relationship('ProductTypeModel', backref='service_rates')
     provider_discount_rate = Column(Numeric(5, 4), nullable=False)
     provider_discount_type = Column(Enum(CommissionType), nullable=False)
     active = Column(Boolean, default=True)
@@ -818,7 +822,9 @@ class CommissionModel(Base):
 
     id = Column(Integer, primary_key=True)
     product_type_id = Column(Integer, ForeignKey("product_types.id", ondelete="CASCADE"))
+    product_type = relationship('ProductTypeModel', backref='commissions')
     admin_id = Column(Integer, ForeignKey("admins.id", ondelete="CASCADE"))
+    admin = relationship('AdminModel', backref='commissions')
     commission_rate = Column(Numeric(5, 4), nullable=False)
     commission_type = Column(Enum(CommissionType), nullable=False)
     updated_at = Column(DateTime, default=func.now(),onupdate=func.now())

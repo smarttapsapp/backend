@@ -5,7 +5,15 @@ from models.model import *
 import logging
 
 logger = logging.getLogger(__name__)
-
+def getRoleByTag(db: Session,tag:str):
+    return db.query(RoleModel).filter(RoleModel.tag == tag).first()
+def getRoleById(db: Session,roleId:int):
+    return db.query(RoleModel).filter(RoleModel.id == roleId).first()
+def deleteRole(db: Session ,roleId:int):
+    logger.info(f"started deleting role {roleId}")
+    db.query(RoleModel).filter(RoleModel.id == roleId).delete()
+    db.commit()
+    return True
 def countCustomers(db: Session):
     return db.query(CustomerModel).count()
 def countActiveCustomers(db: Session):
@@ -50,8 +58,14 @@ def getAllRole(db: Session,adminId:int=None):
     return db.query(RoleModel).order_by(desc(RoleModel.created_at)).all()
 def getRole(db: Session,roleId:int=None):
     return db.query(RoleModel).filter(RoleModel.id ==roleId).first()
+def getRole(db: Session,roleId:int=None):
+    return db.query(RoleModel).filter(RoleModel.id ==roleId).first()
+def getRoleByTag(db: Session,tag:int=None):
+    return db.query(RoleModel).filter(RoleModel.tag == tag).first()
 def getAllAdmin(db: Session,adminId:int=None):
     return db.query(AdminModel).order_by(desc(AdminModel.created_at)).all()
+def getAllAdminByRole(db: Session,roleId:int):
+    return db.query(AdminModel).filter(AdminModel.role_id == roleId).order_by(desc(AdminModel.created_at)).all()
 def getAdmin(db: Session,adminId:int=None):
     return db.query(AdminModel).filter(AdminModel.id ==adminId).first()
 # trains
@@ -163,18 +177,48 @@ def getGlJournalById(db: Session,id:int):
     return db.query(JournalEntryModel).filter(JournalEntryModel.id == id).first()
 def deleteGlJournal(db: Session ,id:int):
     return db.query(JournalEntryModel).filter(JournalEntryModel.id == id).delete()
-
+# service commission
 def getServiceCommissions(db: Session,adminId:int=None):
     if adminId:
         return db.query(CommissionModel).filter(CommissionModel.admin_id == adminId).order_by(desc(CommissionModel.id)).all()
     return db.query(CommissionModel).order_by(desc(CommissionModel.id)).all()
+def getServiceCommissionById(db: Session,id:int):
+    return db.query(CommissionModel).filter(CommissionModel.id == id).first()
 def deleteServiceCommission(db: Session ,id:int):
     return db.query(CommissionModel).filter(CommissionModel.id == id).delete()
 def getServiceCommissionByProduct(db: Session,productTypeId:int,adminId:int):
     return db.query(CommissionModel).filter(CommissionModel.admin_id==adminId).filter(CommissionModel.product_type_id==productTypeId).first()
+# service providers 
 def getServiceProviders(db: Session):
     return db.query(ServiceRateModel).order_by(desc(ServiceRateModel.created_at)).all()
+def getServiceProviderById(db: Session,id:int):
+    return db.query(ServiceRateModel).filter(ServiceRateModel.id == id).first()
 def deleteServiceProvider(db: Session ,providerId:int):
     return db.query(ServiceRateModel).filter(ServiceRateModel.id == providerId).delete()
 def getServiceProviderByProduct(db: Session,productTypeId:int):
     return db.query(ServiceRateModel).filter(ServiceRateModel.active==True).filter(ServiceRateModel.product_type_id==productTypeId).first()
+# products
+def getProducts(db: Session):
+    return db.query(ProductModel).filter(ProductModel.status == True).all()
+def getProductById(db: Session,id:int):
+    return db.query(ProductModel).filter(ProductModel.id == id).filter(ProductModel.status == True).first()
+def deleteProduct(db: Session ,id:int):
+    return db.query(ProductModel).filter(ProductModel.id == id).delete()
+# billers
+def getProductBillers(db: Session):
+    return db.query(ProductTypeModel).filter(ProductTypeModel.status == True).order_by(desc(ProductTypeModel.created_at)).all()
+def getProductBillersById(db: Session,productId:int):
+    return db.query(ProductTypeModel).filter(ProductTypeModel.product_id == productId).filter(ProductTypeModel.status == True).order_by(desc(ProductTypeModel.created_at)).all()
+def getProductBillerById(db: Session,id:int):
+    return db.query(ProductTypeModel).filter(ProductTypeModel.id == id).filter(ProductTypeModel.status == True).first()
+def deleteBiller(db: Session ,id:int):
+    return db.query(ProductTypeModel).filter(ProductTypeModel.id == id).delete()
+#packages
+def getPackages(db: Session):
+    return db.query(PackageModel).filter(PackageModel.status == True).order_by(desc(PackageModel.created_at)).all()
+def getPackageById(db: Session,id:int):
+    return db.query(PackageModel).filter(PackageModel.id == id).filter(PackageModel.status == True).first()
+def getPackagesById(db: Session,productTypeId:int):
+    return db.query(PackageModel).filter(PackageModel.product_type_id == productTypeId).filter(PackageModel.status == True).order_by(desc(PackageModel.created_at)).all()
+def deletePackage(db: Session ,id:int):
+    return db.query(PackageModel).filter(PackageModel.id == id).delete()

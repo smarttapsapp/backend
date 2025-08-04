@@ -10,9 +10,11 @@ from schemas.setting import Setting
 from utils.constant import *
 from schemas.customer import *
 from schemas.role import *
+from schemas.product import *
+from schemas.product_type import *
 from schemas.admin import *
-from schemas.station import StationsResponse
-from schemas.schedule import SchedulesResponse
+from schemas.station import *
+from schemas.schedule import *
 from schemas.route import RoutesResponse,AddRouteRequest
 from schemas.ticket import TicketsResponse
 from schemas.bus import BusesResponse,AddBusRequest
@@ -463,18 +465,33 @@ async def analytics(
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
 
 # admin service
-async def listOfAdmins(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+async def listOfAdmins(response: Response,db: Session,admin: AdminModel):
     try:
-        logger.info(f"started querying products")
-        if admin.role.tag == AdminRoleEnum.BUSINESS:
-            response.status_code = status.HTTP_401_UNAUTHORIZED
-            return AdminsResponse(statusCode= str(status.HTTP_401_UNAUTHORIZED),statusDescription=FAILED,)
-        else:
+        logger.info(f"started querying admins")
+        if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ADMIN,AdminRoleEnum.ACCOUNTANT]:
             return AdminsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getAllAdmin(db=db))
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return AdminsResponse(statusCode= str(status.HTTP_401_UNAUTHORIZED),statusDescription=FAILED,)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return AdminsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+# admin
+async def listOfAdminsByRole(response: Response,db: Session,admin: AdminModel,role:str):
+    try:
+        logger.info(f"started querying products")
+        if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ADMIN,AdminRoleEnum.ACCOUNTANT]:
+            if role:
+                existing = adminQuery.getRoleByTag(db=db,tag=AdminRoleEnum(role))
+                if existing:
+                    return AdminsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getAllAdminByRole(db=db,roleId=existing.id))
+            return AdminsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=[])
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return BaseResponse(statusCode= str(status.HTTP_401_UNAUTHORIZED),statusDescription=FAILED,)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 # roles
 async def listOfRoles(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
     try:
@@ -496,7 +513,7 @@ async def addRole(db: Session,setting: Setting,payload: AddRoleRequest, backgrou
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ALREADYEXIST)
         else:
-            new = RoleModel(name=payload.name,tag=AdminRoleEnum(payload.tag),created_at=datetime.now(),updated_at=datetime.now(),)
+            new = RoleModel(name=payload.name,tag=AdminRoleEnum(payload.tag),status=payload.status,description=payload.description,created_at=datetime.now(),updated_at=datetime.now(),)
             created = queries.create(db=db, model=new)
             if created:
                 email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
@@ -534,7 +551,7 @@ async def updateRole(db: Session,setting: Setting,payload: AddRoleRequest, backg
 async def deleteRole(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,roleId: int):
     try:
         logger.info(f"started deleting role {roleId} @ {datetime.now()}")
-        role = queries.deleteRole(db=db,roleId=roleId)
+        role = adminQuery.deleteRole(db=db,roleId=roleId)
         if role:
             response.status_code = status.HTTP_200_OK
             return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
@@ -863,7 +880,7 @@ async def updateRoute(db: Session,setting: Setting,payload: AddRoleRequest, back
 async def deleteRoute(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,roleId: int):
     try:
         logger.info(f"started deleting role {roleId} @ {datetime.now()}")
-        role = queries.deleteRole(db=db,roleId=roleId)
+        role = queries.deleteRoute(db=db,routeId=roleId)
         if role:
             response.status_code = status.HTTP_200_OK
             return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
@@ -988,3 +1005,27 @@ async def listOfNotifications(request: Request,response: Response,setting: Setti
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return NotificationsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def listOfProduct(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+    try:
+        logger.info(f"started querying products")
+        if admin.role.tag == AdminRoleEnum.BUSINESS:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
+        else:
+            return ProductsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getProducts(db=db))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def listOfBiller(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+    try:
+        logger.info(f"started querying billers")
+        if admin.role.tag == AdminRoleEnum.BUSINESS:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
+        else:
+            return ProductTypesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getProductBillers(db=db))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

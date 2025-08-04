@@ -17,7 +17,7 @@ from utils.dependencies import (
     getSystemSetting,validateAdmin,
 )
 from utils.database import get_db
-from services import adminservice
+from services import adminservice,glAccountingService
 from schemas.admin import *
 from schemas.role import *
 from schemas.station import StationsResponse
@@ -32,6 +32,11 @@ from schemas.commission import *
 from schemas.service_rate import *
 from schemas.general_ledger import *
 from schemas.journal import *
+from schemas.product import *
+from schemas.product_type import *
+from schemas.package import *
+from schemas.payment import *
+from schemas.transaction import *
 from models.model import *
 from datetime import date
 from schemas.setting import Setting
@@ -159,22 +164,17 @@ async def getAdmins(
     admin: Annotated[AdminModel, Depends(validateAdmin)],
     Setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
+    role: str = Query(None),
 ):
     try:
-        return await adminservice.listOfAdmins(
-                db=db,
-                setting=Setting,
-                request=request,
-                response=response,
-                admin=admin,
-            )
+        if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPPORT,AdminRoleEnum.ADMIN]:
+            return await adminservice.listOfAdminsByRole(response=response,db=db,admin=admin,role=role) if role else await adminservice.listOfAdmins(db=db,response=response,admin=admin,)
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return BaseResponse(statusCode=str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED,)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(
-            statusCode=str(status.HTTP_400_BAD_REQUEST),
-            statusDescription=str(ex),
-        )
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 # roles
 @router.get("/roles", 
     response_model=RolesResponse,
@@ -665,7 +665,6 @@ async def deleteSchedule(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-
 # TICKET
 @router.get("/tickets", 
     response_model=TicketsResponse,
@@ -1057,7 +1056,6 @@ async def deleteTrain(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-
 @router.get("/notifications", 
     response_model=NotificationsResponse,
     response_model_exclude_unset=True,tags=["notification"])
@@ -1124,9 +1122,7 @@ async def get_setting(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-
 # Accounting
-
 @router.get("/ledgers", 
     response_model=GLedgersResponse,
     response_model_exclude_unset=True,tags=["accounting"])
@@ -1139,7 +1135,7 @@ async def get_ledgers(
 ):
     try:
         if admin:
-            return await adminservice.listOfSchedules(
+            return await glAccountingService.listOfLedgers(
                 request=request,
                 response=response,
                 setting=setting,
@@ -1148,12 +1144,12 @@ async def get_ledgers(
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return SchedulesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+        return GLedgersResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.post("/ledger/add", 
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["accounting"])
 async def add_ledger(
-    payload:AddRoleRequest,
+    payload:AddGLRequest,
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
@@ -1162,8 +1158,8 @@ async def add_ledger(
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.addRole(
-            payload=payload,
+        return await glAccountingService.addLedger(
+                payload=payload,
                 db=db,
                 setting=setting,
                 request=request,
@@ -1235,7 +1231,6 @@ async def delete_ledger(
             statusDescription=str(ex),
         )
 # journal entries
-
 @router.get("/journals", 
     response_model=JournalEntriesResponse,
     response_model_exclude_unset=True,tags=["journal"])
@@ -1344,7 +1339,6 @@ async def delete_journal(
             statusDescription=str(ex),
         )
 # commission rate
-
 @router.get("/commissions", 
     response_model=CommissionsResponse,
     response_model_exclude_unset=True,tags=["commission"])
@@ -1357,7 +1351,7 @@ async def get_commissions(
 ):
     try:
         if admin:
-            return await adminservice.listOfSchedules(
+            return await glAccountingService.listOfCommissions(
                 request=request,
                 response=response,
                 setting=setting,
@@ -1371,7 +1365,7 @@ async def get_commissions(
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["commission"])
 async def add_commission(
-    payload:AddRoleRequest,
+    payload:AddCommissionRequest,
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
@@ -1380,7 +1374,7 @@ async def add_commission(
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.addRole(
+        return await glAccountingService.addCommission(
             payload=payload,
                 db=db,
                 setting=setting,
@@ -1452,9 +1446,7 @@ async def delete_commission(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-
 # discount rate
-
 @router.get("/discounts", 
     response_model=ProvidersResponse,
     response_model_exclude_unset=True,tags=["discount"])
@@ -1467,12 +1459,7 @@ async def get_discounts(
 ):
     try:
         if admin:
-            return await adminservice.listOfSchedules(
-                request=request,
-                response=response,
-                setting=setting,
-                db=db,
-                admin=admin,)
+            return await glAccountingService.listOfDiscounts(response=response,db=db,admin=admin,)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -1481,7 +1468,7 @@ async def get_discounts(
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["discount"])
 async def add_discount(
-    payload:AddRoleRequest,
+    payload:AddProviderRateRequest,
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
@@ -1490,7 +1477,7 @@ async def add_discount(
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.addRole(
+        return await glAccountingService.addDiscount(
             payload=payload,
                 db=db,
                 setting=setting,
@@ -1502,10 +1489,7 @@ async def add_discount(
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(
-            statusCode=str(status.HTTP_400_BAD_REQUEST),
-            statusDescription=str(ex),
-        )
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.post("/discount/{id}/edit", 
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["discount"])
@@ -1562,3 +1546,49 @@ async def delete_discount(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+# billers
+@router.get("/products", 
+    response_model=ProductsResponse,
+    response_model_exclude_unset=True,tags=["product"])
+async def get_products(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if admin:
+            return await adminservice.listOfProduct(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                admin=admin,)
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/services", 
+    response_model=ProductTypesResponse,
+    response_model_exclude_unset=True,tags=["product"])
+async def get_product_types(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if admin:
+            return await adminservice.listOfBiller(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                admin=admin,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

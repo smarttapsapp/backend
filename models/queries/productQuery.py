@@ -41,3 +41,5 @@ def deleteRecord(db:Session,id:int,userId:int):
     return db.query(BeneficiaryModel).filter(BeneficiaryModel.id == id).filter(BeneficiaryModel.user_id == userId).delete()
 def getProducts(db: Session):
     return db.query(ProductModel).all()
+def getProductBillers(db: Session):
+    return db.query(ProductTypeModel).filter(ProductTypeModel.status == True).order_by(desc(JournalEntryModel.created_at)).all()

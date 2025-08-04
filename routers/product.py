@@ -256,26 +256,3 @@ async def delete_beneficiary(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex), )
 #==============================================Admin ==============================================
-@adminRouter.get("/products", 
-    response_model=ProductsResponse,
-    response_model_exclude_unset=True,name="get products")
-async def get_products(
-    request: Request,
-    response: Response,
-    admin: Annotated[AdminModel, Depends(validateAdmin)],
-    setting: Annotated[Setting, Depends(getSystemSetting)],
-    db: Annotated[Session, Depends(get_db)],
-):
-    try:
-        if admin:
-            return productservice.listOfProduct(
-                request=request,
-                response=response,
-                setting=setting,
-                db=db,
-                admin=admin,)
-
-    except Exception as ex:
-        logger.error(ex)
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return ProductsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

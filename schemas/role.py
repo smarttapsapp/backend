@@ -16,7 +16,7 @@ class RoleRequest(RoleBase):
 
 class Role(RoleBase):
     status: Union[bool, None] = False
-    id: Optional[int]
+    id: Optional[int]=None
 
     class Config:
         from_attributes = True
@@ -28,5 +28,5 @@ class RolesResponse(BaseResponse):
 class RoleResponse(BaseResponse):
     data: Role = None
 
-class AddRoleRequest(RoleBase):
-    pass
+class AddRoleRequest(Role):
+    description: Union[str, None] = None

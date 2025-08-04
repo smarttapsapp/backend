@@ -6,6 +6,12 @@ from datetime import datetime
 from schemas.response import BaseResponse
 from schemas.role import Role
 
+class AdminMini(BaseModel):
+    firstname: str
+    lastname: str
+    class Config:
+        from_attributes = True
+        populate_by_name = True
 
 class AdminBase(BaseModel):
     firstname: str

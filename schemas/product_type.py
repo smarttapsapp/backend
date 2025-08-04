@@ -5,6 +5,14 @@ from pydantic import BaseModel
 from schemas.response import BaseResponse
 from schemas.package import Package
 
+class ProductTypeMini(BaseModel):
+    product_id:int
+    billerName:str
+    billerType: Union[str, None] = None
+    logo: Union[str, None] = None
+    class Config:
+        from_attributes = True
+        populate_by_name = True
 
 class ProductTypeBase(BaseModel):
     product_id:int

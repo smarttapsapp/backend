@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import func
 from pydantic import BaseModel,validator
 from schemas.response import BaseResponse
+#from schemas.general_ledger import GLedgerMini
 
 
 class JournalEntryBase(BaseModel):
@@ -12,6 +13,7 @@ class JournalEntryBase(BaseModel):
     is_debit: Union[bool, None] = False
 class JournalEntry(JournalEntryBase):
     id: Optional[int]
+    #gl_account: Optional[GLedgerMini]
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 
