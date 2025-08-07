@@ -21,6 +21,13 @@ from utils.constant import *
 from enum import Enum as PythonEnum
 
 Base = declarative_base()
+class WithrawalStatusEnum(PythonEnum):
+    APPROVED = "approved"
+    COMPLETED = "completed"
+    WAITING = "waiting"
+    REJECTED = "rejected"
+    BLOCKED = "blocked"
+    FAILED = "failed"
 class DebitStatusEnum(PythonEnum):
     APPROVE = "approved"
     INSUFICIENT = "insuficient Fund"
@@ -161,6 +168,7 @@ class AdminModel(Base):
     status = Column(Boolean, default=False)
     wallet = relationship("AccountModel",  uselist=False,back_populates="admin")
     role = relationship("RoleModel", back_populates="admins")
+    cashouts = relationship("CashOutModel", backref="admin")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
 class CustomerModel(Base):
@@ -237,6 +245,7 @@ class CustomerModel(Base):
     # otps
     otps = relationship("OTPModel", backref="user")
     cards = relationship("CardsModel", backref="user")
+    cashouts = relationship("CashOutModel", backref="user")
     # beneficiaries
     beneficiaries = relationship("BeneficiaryModel", backref="user")
     # notification
@@ -304,6 +313,22 @@ class AccountModel(Base):
     availableBalance= Column(String(50),default='0')
     referenceNo= Column(String(11),nullable=True)
     accountStatus= Column(String(20),default=AccountStatusEnum.ACTIVE)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now())
+class CashOutModel(Base):
+    __tablename__ = "cashouts"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("customers.id"),nullable=True)
+    admin_id = Column(Integer, ForeignKey("admins.id"),nullable=True)
+    #payment = relationship('PaymentModel', backref='cashout')
+    source= Column(String(50),default='balance')
+    amount= Column(String(20),default='0')
+    recipient= Column(String(50),nullable=False)
+    withdrawalStatus =  Column(Enum(WithrawalStatusEnum), nullable=False, default=WithrawalStatusEnum.WAITING)
+    statusCode =  Column(Enum(TransactionCodeEnum), nullable=False, default=TransactionCodeEnum.PROCESSING)
+    statusDescription =  Column(Enum(TransactionStatusEnum), nullable=False, default=TransactionStatusEnum.PROCESSING)
+    reference = Column(String(100),nullable=False,unique=True, default=lambda: str(uuid.uuid4()),)
+    reason = Column(String(220),nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
 class DeviceModel(Base):
@@ -429,6 +454,7 @@ class PaymentModel(Base):
     wallet_id = Column(Integer, ForeignKey('wallets.id'), nullable=False)
     user_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
     admin_id = Column(Integer, ForeignKey("admins.id"), nullable=True)
+    cashout_id = Column(Integer, ForeignKey("cashouts.id"),nullable=True)
     amount = Column(String(50), nullable=False)
     reference = Column(String(100),nullable=False,unique=True, default=lambda: str(uuid.uuid4()),)
     transactionreference = Column(String(100), nullable=True)
@@ -451,6 +477,8 @@ class PaymentModel(Base):
     product_id = Column(Integer, ForeignKey('products.id'))
     product_type_id = Column(Integer, ForeignKey('product_types.id'))
     productType = relationship("ProductTypeModel", backref="product_types")
+    cashout_id = Column(Integer, ForeignKey('cashouts.id'))
+    cashout = relationship("CashOutModel", backref="cashouts")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
 class BankModel(Base):
