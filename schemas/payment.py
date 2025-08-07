@@ -75,6 +75,7 @@ class AutoFundRequest(BaseModel):
     thresholdAmount:str
 class BuyTicketRequest(PINRequest):
     busId:int
+    routeId: int
     scheduleId: int
     walletAccount:str
     amount: str
@@ -91,9 +92,6 @@ class RedeemRequest(BaseModel):
     busNumber:str
     mode:str
     walletAccount:str
-    status:str
-    expireAt:str
-    amount: str
 class DebitRequest(PINRequest):
     walletAccount:str
     senderAccount:str
@@ -120,8 +118,8 @@ class BillPaymentRequest(PINRequest):
     amount: str
     @validator("amount")
     def amount_validator(cls, amount):
-        formattedAmount = util.amountToKobo(amount=amount)
-        return formattedAmount
+        #formattedAmount = util.amountToKobo(amount=amount)
+        return str(int(amount))
     customerAddress:Optional[str]
     customerName:Optional[str]
 class BillPaymentResponse(BaseResponse):

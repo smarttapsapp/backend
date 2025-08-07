@@ -8,7 +8,7 @@ from sqlalchemy import (
     Enum,
     Numeric,Table,
     Text,
-    DECIMAL,func,UniqueConstraint
+    DECIMAL,func,UniqueConstraint,Date, cast,
 )
 from sqlalchemy.orm import backref, relationship
 from sqlalchemy.ext.declarative import declarative_base
@@ -80,6 +80,7 @@ class POSStatusEnum(PythonEnum):
     PAYMENT = "payment"
     APPROVED = "approved"
 class AdminRoleEnum(PythonEnum):
+    HEADOFFICE = "headoffice"
     SUPERADMIN = "superadmin"
     ADMIN = "admin"
     ACCOUNTANT = "accountant"
@@ -111,9 +112,24 @@ class TransactionStatusEnum(PythonEnum):
     PENDING = "pending"
     PROCESSING = "processing"
     FAILED = "failed"
+class TransactionCodeEnum(PythonEnum):
+    SUCCESS = "00"
+    PENDING = "E01"
+    PROCESSING = "E02"
+    APPERROR = "E03"
+    TIMEOUT = "E05"
+    FAILED = "E100"
 class PaymentEnum(PythonEnum):
     DEBIT = "DEBIT"
     CREDIT = "CREDIT"
+class ChannelEnum(PythonEnum):
+    MOBILE = "MOBILE"
+    WEB = "WEB"
+    PAYSTACK="PAYSTACK"
+    WALLET="WALLET"
+    CARD="CARD"
+    NFC="NFC"
+    QR="QR"
 class TicketStatusEnum(PythonEnum):
     BOOKED = "booked"
     CANCELLED = "cancelled"
@@ -143,6 +159,7 @@ class AdminModel(Base):
     email = Column(String(255))
     password = Column(String(255), nullable=True)
     status = Column(Boolean, default=False)
+    wallet = relationship("AccountModel",  uselist=False,back_populates="admin")
     role = relationship("RoleModel", back_populates="admins")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
@@ -201,8 +218,8 @@ class CustomerModel(Base):
     hasAuthToken = Column(Boolean, default=False)
     hideBalance = Column(Boolean, default=False)
     autoFund = Column(Boolean, default=False)
-    autoFundThreshold = Column(String(50),default="0")
-    autoFundAmount = Column(String(50),default="0")
+    autoFundThreshold = Column(String(50),default='0')
+    autoFundAmount = Column(String(50),default='0')
     account_status = Column(
         Enum(AccountStatusEnum), nullable=False, default=AccountStatusEnum.REG
     )
@@ -263,7 +280,7 @@ class CardsModel(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("customers.id"))
     authorization_code = Column(String(100))
-    bin= Column(String(50),default="0")
+    bin= Column(String(50),default='0')
     last4= Column(String(5),nullable=True)
     exp_month= Column(String(3),nullable=True)
     exp_year= Column(String(5),nullable=True)
@@ -278,14 +295,13 @@ class CardsModel(Base):
 class AccountModel(Base):
     __tablename__ = "wallets"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("customers.id"))
+    user_id = Column(Integer, ForeignKey("customers.id"),nullable=True)
+    admin_id = Column(Integer, ForeignKey("admins.id"),nullable=True)
     user = relationship("CustomerModel", back_populates="wallet")
+    admin = relationship("AdminModel", back_populates="wallet")
     payments = relationship('PaymentModel', backref='wallet')
     walletAccount = Column(String(11))
-    availableBalance= Column(String(50),default="0")
-    #autoFundThreshold = Column(String(50),default="0")
-    #autoFundAmount = Column(String(50),default="0")
-    #autoFund = Column(Boolean, default=False)
+    availableBalance= Column(String(50),default='0')
     referenceNo= Column(String(11),nullable=True)
     accountStatus= Column(String(20),default=AccountStatusEnum.ACTIVE)
     created_at = Column(DateTime, default=func.now())
@@ -357,7 +373,7 @@ class PackageModel(Base):
     #biller = relationship("ProductTypeModel", back_populates="packages")
     billerId = Column(String(15))
     description = Column(String(150))
-    amount = Column(String(50), default="0")
+    amount = Column(String(50), default='0')
     validity = Column(String(50), nullable=True)
     packageCode = Column(String(50))
     #paymentCode = Column(String(25), default="90501")
@@ -411,28 +427,32 @@ class PaymentModel(Base):
     
     id = Column(Integer, primary_key=True)
     wallet_id = Column(Integer, ForeignKey('wallets.id'), nullable=False)
-    user_id = Column(Integer, ForeignKey("customers.id"))
+    user_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
+    admin_id = Column(Integer, ForeignKey("admins.id"), nullable=True)
     amount = Column(String(50), nullable=False)
-    payment_type = Column(Enum(PaymentEnum), nullable=False, default=PaymentEnum.DEBIT)
-    reference = Column(String(100), nullable=True)
+    reference = Column(String(100),nullable=False,unique=True, default=lambda: str(uuid.uuid4()),)
+    transactionreference = Column(String(100), nullable=True)
     access_code = Column(String(100), nullable=True)
     event = Column(String(100), nullable=True)
     paystack_id = Column(String(100), nullable=True)
     status = Column(String(25), nullable=True)
-    payment_date = Column(String(25), nullable=True)
-    channel = Column(String(25), nullable=True)
-    fee = Column(String(25), default="0")
-    statusCode = Column(String(25), default="01")
-    recipient = Column(String(50), default="01")
-    statusMessage = Column(String(255), default="01")
-    balanceBefore = Column(String(25), default="0")
-    balanceAfter = Column(String(25), default="0")
+    statusMessage = Column(String(200), nullable=True)
+    payment_date = Column(String(25), nullable=False,default=cast(func.now(), Date))
+    fee = Column(String(25), default='0')
+    recipient = Column(String(50), nullable=False)
+    providerAmount = Column(String(50), nullable=True,default='0')
+    commissionAmount = Column(String(50), nullable=True,default='0')
+    payment_type = Column(Enum(PaymentEnum), nullable=False, default=PaymentEnum.DEBIT)
+    channel =  Column(Enum(ChannelEnum), nullable=False, default=ChannelEnum.MOBILE)
+    statusCode =  Column(Enum(TransactionCodeEnum), nullable=False, default=TransactionCodeEnum.PROCESSING)
+    statusDescription =  Column(Enum(TransactionStatusEnum), nullable=False, default=TransactionStatusEnum.PROCESSING)
+    balanceBefore = Column(String(25), default='0')
+    balanceAfter = Column(String(25), default='0')
     product_id = Column(Integer, ForeignKey('products.id'))
     product_type_id = Column(Integer, ForeignKey('product_types.id'))
     productType = relationship("ProductTypeModel", backref="product_types")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
-    #paidloan = relationship('Loan', backref='payments')
 class BankModel(Base):
     __tablename__ = "banks"
     id = Column(Integer, primary_key=True, index=True)
@@ -456,12 +476,13 @@ class SettingsModel(Base):
     channel_name = Column(String(50), default="smart_tap")
     debug = Column(Boolean, default=True)
     db_url = Column(String(100), default="")
-    mail_username = Column(String(50), nullable=True)
-    mail_password = Column(String(50), nullable=True)
-    mail_from = Column(String(50), nullable=True)
+    mail_username = Column(String(100), nullable=True)
+    mail_password = Column(String(250), nullable=True)
+    mail_from = Column(String(80), nullable=True)
     mail_port = Column(String(9), nullable=True)
-    mail_server = Column(String(50), nullable=True)
-    mail_from_name = Column(String(50), nullable=True)
+    mail_server = Column(String(150), nullable=True)
+    mail_from_name = Column(String(100), nullable=True)
+    mail_token  = Column(String(250), nullable=True)
     allowed_hosts = Column(String(255), nullable=True)
     allowed_origins = Column(String(255), nullable=True)
     access_token_expire_minutes = Column(Integer, nullable=True)
@@ -486,7 +507,7 @@ class NotificationModel(Base):
     id = Column(Integer, primary_key=True, index=True)
     type = Column(String(50), default="APP")
     title = Column(String(150), nullable=False)
-    message = Column(Text, default="0")
+    message = Column(Text, default='0')
     isRead = Column(Boolean, default=False)
     user_notifications = relationship("UserNotification", back_populates="notification",cascade="all, delete",passive_deletes=True )
     #users = relationship('CustomerModel', secondary='user_notifications', back_populates='notifications')
@@ -790,7 +811,7 @@ class GLAccountModel(Base):
     code = Column(String(20), unique=True, nullable=False)
     name = Column(String(100), nullable=False)
     gl_type = Column(Enum(AccountType), nullable=False)
-    gl_balance = Column(String(20), nullable=False,default="0")
+    gl_balance = Column(String(20), nullable=False,default='0')
     journal_entries = relationship('JournalEntryModel', backref='gl_account')
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(),onupdate=func.now())
@@ -798,7 +819,7 @@ class JournalEntryModel(Base):
     __tablename__ = "journal_entries"
 
     id = Column(Integer, primary_key=True)
-    account_id = Column(Integer, ForeignKey("gl_accounts.id"))
+    code = Column(String(20), ForeignKey("gl_accounts.code"))
     #gl_account = relationship('GLAccountModel', backref='journal_entries')
     admin_id = Column(Integer, ForeignKey("admins.id"))
     amount = Column(String(20), nullable=False)
@@ -808,6 +829,8 @@ class JournalEntryModel(Base):
 class ServiceRateModel(Base):
     __tablename__ = "service_rates"
     id = Column(Integer, primary_key=True)
+    gl_to_provider = Column(String(20), ForeignKey("gl_accounts.code"))
+    provider_to_gl = Column(String(20), ForeignKey("gl_accounts.code"))
     admin_id = Column(Integer, ForeignKey("admins.id"))
     admin = relationship('AdminModel', backref='service_rates')
     product_type_id = Column(Integer, ForeignKey("product_types.id", ondelete="CASCADE"))

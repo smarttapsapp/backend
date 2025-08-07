@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session,aliased
 from sqlalchemy import desc
+from typing import List
 from sqlalchemy.sql import select,update
 from models.model import *
 from schemas.customer import Customer
@@ -22,6 +23,10 @@ def create(db: Session, model: object):
     db.commit()
     db.refresh(model)
     return model
+def save_many(db: Session, models: List[object]):
+    db.add_all(models)
+    db.commit()
+    
 def updateUserBvn(db: Session, userId: int,bvn:str):
     stmt = (update(CustomerModel)
             .where(CustomerModel.id == userId)
@@ -111,7 +116,7 @@ def getUserNotificationPreference(db: Session, userId:int):
 def queryWallet(db:Session,walletAccount:str):
     return db.query(AccountModel).filter(AccountModel.walletAccount == walletAccount).first()
 def getLastpaymentByAccount(db: Session, accountId: int):
-    return db.query(PaymentModel).filter(PaymentModel.wallet_id == accountId).order_by(desc(PaymentModel.updated_at)).first()
+    return db.query(PaymentModel).filter(PaymentModel.wallet_id == accountId).filter(PaymentModel.payment_type == PaymentEnum.DEBIT).order_by(desc(PaymentModel.updated_at)).first()
 def getstations(db: Session):
     return db.query(StationModel).all()
 def getStationById(db: Session,stationId:int):
@@ -148,14 +153,14 @@ def getPaymentHistories(db: Session,userId:int,startDate:str,endDate:str):
     if startDate and endDate:
         start = datetime.strptime(startDate, "%Y-%m-%d").date()
         end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
-        return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.statusCode=="200").filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
-    return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.statusCode=="200").order_by(desc(PaymentModel.created_at)).all()
+        return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
+    return db.query(PaymentModel).filter(PaymentModel.user_id == userId).order_by(desc(PaymentModel.created_at)).all()
 def getPaymentHistoriesByTransaction(db: Session,userId:int,startDate:str,endDate:str,transType:str):
     if startDate and endDate:
         start = datetime.strptime(startDate, "%Y-%m-%d").date()
         end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
-        return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.payment_type == transType).filter(PaymentModel.statusCode=="200").filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
-    return db.query(PaymentModel).filter(PaymentModel.payment_type == transType).filter(PaymentModel.user_id == userId).filter(PaymentModel.statusCode=="200").order_by(desc(PaymentModel.created_at)).all()
+        return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.payment_type == transType).filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
+    return db.query(PaymentModel).filter(PaymentModel.payment_type == transType).filter(PaymentModel.user_id == userId).order_by(desc(PaymentModel.created_at)).all()
 def getAllPaymentsHistories(db: Session,startDate:str,endDate:str,userId:str=None):
     if startDate and endDate:
         start = datetime.strptime(startDate, "%Y-%m-%d").date()
@@ -167,7 +172,7 @@ def paymentByTransactionNumber(db:Session,mode:PaymentEnum,transactionId:str,use
     return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.reference == transactionId).filter(PaymentModel.payment_type == mode).first()
 def ticketByTicketNumber(db:Session,mode:TicketModeEnum,ticketId:str):
     return db.query(TicketModel).filter(TicketModel.ticket_number == ticketId).filter(TicketModel.mode == mode).first()
-def getTicketHistories(db: Session,userId:int,startDate:str,endDate:str):
+def getTicketHistories(db: Session,userId:int,startDate:str=None,endDate:str=None):
     if startDate and endDate:
         start = datetime.strptime(startDate, "%Y-%m-%d").date()
         end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)

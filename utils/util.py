@@ -5,7 +5,7 @@ from random import randint
 import uuid
 import logging
 import json
-import time
+import secrets
 import base64
 import bcrypt
 from functools import lru_cache
@@ -79,6 +79,20 @@ def http(url, params={}, headers={"content-type": "application/json"},contentTyp
     )
     print(text)
     return resp
+def sendMail(setting: Setting, subject: str, toAddress: str,body=None, templatekey=None,template_data=None):
+    try:
+        headers = {'accept': "application/json",'content-type': "application/json",'authorization': f"Zoho-enczapikey {setting.mail_password}" }
+        params = {"from": {"address": setting.mail_from},"to": [{"email_address": {"address": toAddress,"name": toAddress}}],"subject": subject,"htmlbody": body}
+        url = setting.mail_server
+        if templatekey and template_data:
+            url = f"{setting.mail_server}/template"
+            params = {"from": {"address": setting.mail_from},"to": [{"email_address": {"address": toAddress,"name": toAddress}}],"subject": subject,
+        "template_key": templatekey
+        ,"merge_info": template_data}
+        res = http(url=url,method='POST',headers=headers,params=params)
+    except Exception as e:
+        logger.error(f"Error sending email at {datetime.now()} {str(e)}")
+        pass
 def mailer(body, setting: Setting, subject: str, toAddress: str, fileToSend=None):
     try:
         msg = MIMEMultipart()
@@ -87,43 +101,39 @@ def mailer(body, setting: Setting, subject: str, toAddress: str, fileToSend=None
         msg["Subject"] = subject
         msg.preamble = subject
         msg.attach(MIMEText(body, "html"))
+
         if fileToSend:
             ctype, encoding = mimetypes.guess_type(fileToSend)
             if ctype is None or encoding is not None:
                 ctype = "application/octet-stream"
             maintype, subtype = ctype.split("/", 1)
-            if maintype == "text":
-                fp = open(fileToSend)
-                # Note: we should handle calculating the charset
-                attachment = MIMEText(fp.read(), _subtype=subtype)
-                fp.close()
-            elif maintype == "image":
-                fp = open(fileToSend, "rb")
-                attachment = MIMEImage(fp.read(), _subtype=subtype)
-                fp.close()
-            elif maintype == "audio":
-                fp = open(fileToSend, "rb")
-                attachment = MIMEAudio(fp.read(), _subtype=subtype)
-                fp.close()
-            else:
-                fp = open(fileToSend, "rb")
-                attachment = MIMEBase(maintype, subtype)
-                attachment.set_payload(fp.read())
-                fp.close()
-                encoders.encode_base64(attachment)
-            attachment.add_header(
-                "Content-Disposition", "attachment", filename=fileToSend
-            )
+
+            with open(fileToSend, "rb" if maintype != "text" else "r") as fp:
+                if maintype == "text":
+                    attachment = MIMEText(fp.read(), _subtype=subtype)
+                elif maintype == "image":
+                    attachment = MIMEImage(fp.read(), _subtype=subtype)
+                elif maintype == "audio":
+                    attachment = MIMEAudio(fp.read(), _subtype=subtype)
+                else:
+                    attachment = MIMEBase(maintype, subtype)
+                    attachment.set_payload(fp.read())
+                    encoders.encode_base64(attachment)
+
+            attachment.add_header("Content-Disposition", "attachment", filename=fileToSend)
             msg.attach(attachment)
-        logger.info(f"sending mail from server {setting.mail_server}: port {setting.mail_port} : username {setting.mail_username}, password {setting.mail_password} to {toAddress} at {str(datetime.now())}")
-        server = smtplib.SMTP(f"{setting.mail_server}:{setting.mail_port}")
+
+        logger.info(f"Sending mail to {toAddress} via {setting.mail_server}:{setting.mail_port}")
+        server = smtplib.SMTP(setting.mail_server, setting.mail_port)
+        server.ehlo()
         server.starttls()
+        server.ehlo()
         server.login(setting.mail_username, setting.mail_password)
         server.sendmail(setting.mail_from, toAddress, msg.as_string())
-        # server.quit()
+        server.quit()
+
     except Exception as e:
-        logger.error(f"Error sending email at {datetime.now()} {str(e)}")
-        pass
+        logger.error(f"Error sending email: {e}")
 def send_sms_message(setting: Setting, toPhoneNumber: str, message: str,transactionId:str):
     try:
         logger.info(f"started sending SMS to {toPhoneNumber} with text {message} with transactionId {transactionId}")
@@ -182,8 +192,8 @@ def formatPhoneShort(msisdn:str)->str:
         return msisdn
 def mask_email(email):
     return re.sub(r'^[^@]+', '*' * len(re.search(r'^[^@]+', email).group()), email)
-def generateId():
-    return str(int(time.time()))
+def generateId(length: int = 12) -> str:
+    return ''.join(secrets.choice('0123456789') for _ in range(length))
 def generateOTP():
     return str(randint(100000, 999999))
 def find_item(items, key, value):

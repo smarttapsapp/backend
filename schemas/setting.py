@@ -15,6 +15,11 @@ class SettingBase(BaseModel):
     mail_port: Union[str, None] = None
     mail_server:  Union[str, None] = None
     mail_from_name:  Union[str, None] = None
+    mail_token:  Union[str, None] = None
+    gl_inflow:  Union[str, None] = None
+    gl_outflow:  Union[str, None] = None
+    gl_com:  Union[str, None] = None
+    gl_payable:  Union[str, None] = None
     paystack_url:  Union[str, None] = None
     paystack_token:  Union[str, None] = None
 

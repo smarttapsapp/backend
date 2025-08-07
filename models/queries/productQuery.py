@@ -1,6 +1,7 @@
 
 from sqlalchemy.orm import Session
 from models.model import *
+from sqlalchemy import desc
 import logging
 
 logger = logging.getLogger(__name__)
@@ -42,4 +43,4 @@ def deleteRecord(db:Session,id:int,userId:int):
 def getProducts(db: Session):
     return db.query(ProductModel).all()
 def getProductBillers(db: Session):
-    return db.query(ProductTypeModel).filter(ProductTypeModel.status == True).order_by(desc(JournalEntryModel.created_at)).all()
+    return db.query(ProductTypeModel).filter(ProductTypeModel.status == True).order_by(desc(ProductTypeModel.created_at)).all()

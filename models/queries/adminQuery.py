@@ -1,10 +1,21 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
+from typing import List
 from sqlalchemy.sql import select,update,case
 from models.model import *
 import logging
 
 logger = logging.getLogger(__name__)
+def getBillerByBillerId(db: Session, billerId: str):
+    return db.query(ProductTypeModel).filter(ProductTypeModel.billerId == billerId).first()
+def save(db: Session, account: AccountModel):
+    db.add(account)
+    db.commit()
+    db.refresh(account)
+    return account
+def save_many(db: Session, models: List[object]):
+    db.add_all(models)
+    db.commit()
 def getRoleByTag(db: Session,tag:str):
     return db.query(RoleModel).filter(RoleModel.tag == tag).first()
 def getRoleById(db: Session,roleId:int):
@@ -54,14 +65,16 @@ def debitPaymentsAnalytics(db: Session):
     return dict(row._mapping)
 def admin(db: Session,username:str):
     return db.query(AdminModel).filter(AdminModel.email ==username).first()
+def getAdminByRole(db: Session,id:int):
+    return db.query(AdminModel).filter(AdminModel.role_id ==id).first()
+def getAdminByCustomerId(db: Session,id:int):
+    return db.query(AdminModel).filter(AdminModel.customer_id ==id).first()
 def getAllRole(db: Session,adminId:int=None):
     return db.query(RoleModel).order_by(desc(RoleModel.created_at)).all()
 def getRole(db: Session,roleId:int=None):
     return db.query(RoleModel).filter(RoleModel.id ==roleId).first()
 def getRole(db: Session,roleId:int=None):
     return db.query(RoleModel).filter(RoleModel.id ==roleId).first()
-def getRoleByTag(db: Session,tag:int=None):
-    return db.query(RoleModel).filter(RoleModel.tag == tag).first()
 def getAllAdmin(db: Session,adminId:int=None):
     return db.query(AdminModel).order_by(desc(AdminModel.created_at)).all()
 def getAllAdminByRole(db: Session,roleId:int):
@@ -131,7 +144,7 @@ def getScheduleById(db: Session,scheduleId:int):
     return db.query(ScheduleModel).filter(ScheduleModel.id == scheduleId).first()
 def deleteSchedule(db: Session ,scheduleId:int):
     return db.query(ScheduleModel).filter(ScheduleModel.id == scheduleId).delete()
-
+# parks
 def getParks(db: Session,startDate:str,endDate:str,adminId:int=None):
     if startDate and endDate:
         start = datetime.strptime(startDate, "%Y-%m-%d").date()
@@ -139,6 +152,15 @@ def getParks(db: Session,startDate:str,endDate:str,adminId:int=None):
         if adminId:
             return db.query(ParkModel).filter(ParkModel.created_at.between(start,end)).order_by(desc(ParkModel.created_at)).all()
     return db.query(ParkModel).order_by(desc(ParkModel.created_at)).all()
+def getParkByIds(db:Session,ids:list[int],adminId:int=None):
+    if adminId:
+        return db.query(ParkModel).filter(ParkModel.admin_id ==adminId).filter(ParkModel.id.in_(ids)).all()
+    return db.query(ParkModel).filter(ParkModel.id.in_(ids)).all()
+def getParkById(db: Session,scheduleId:int):
+    return db.query(ParkModel).filter(ParkModel.id == scheduleId).first()
+def deletePark(db: Session ,scheduleId:int):
+    return db.query(ParkModel).filter(ParkModel.id == scheduleId).delete()
+
 def create(db: Session, model: object):
     db.add(model)
     db.commit()

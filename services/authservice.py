@@ -169,7 +169,7 @@ def resetPasswordInitiate(
                 authToken = util.create_access_token(setting=setting,credentials={"username": user.email,"password": createdOTP.otp},exp=10)
                 if authToken:
                     email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": user,"otp":createdOTP},)
-                    background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=f"Password Reset",toAddress=user.email,)
+                    background_task.add_task(util.sendMail,setting=setting, subject=f"Password Reset",toAddress=user.email, templatekey="2d6f.20c6e93ebf814272.k1.17ca5a70-7221-11f0-b2b9-525400a229b1.1987b43b197",template_data={"name":user.firstname,"OTP":createdOTP.otp})
                     return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"token":authToken[0],"expires":authToken[1] })
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST

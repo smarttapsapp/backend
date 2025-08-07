@@ -198,7 +198,7 @@ async def get_payments(
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return PaymentsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
             if transaction_type and transaction_type.lower() == "all":
-                return paymentservice.payments(
+                return await paymentservice.payments(
                 request=request,
                 response=response,
                 setting=setting,
@@ -207,7 +207,7 @@ async def get_payments(
                 startDate=startDate,
                 endDate=endDate,
                 transactionType=transaction_type)
-            return paymentservice.payments(
+            return await paymentservice.payments(
                 request=request,
                 response=response,
                 setting=setting,
@@ -235,7 +235,7 @@ async def get_single_payment(
 ):
     try:
         if user:
-            return paymentservice.getSinglePayment(
+            return await paymentservice.getSinglePayment(
                 request=request,
                 response=response,
                 setting=setting,
@@ -263,7 +263,7 @@ async def buy_ticket(
 ):
     try:
         if user:
-            return paymentservice.debitBusTicket(user=user,request=request,db=db,response=response,setting=setting,payload=payload,background_task=background_task)
+            return await paymentservice.debitBusTicket(user=user,request=request,db=db,response=response,setting=setting,payload=payload,background_task=background_task)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -303,19 +303,28 @@ async def get_tickets(
     user: Annotated[Customer, Depends(verified_user)],
     setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
-    startDate: Optional[str] = Query(str(date.today())),
-    endDate: Optional[str] = Query(str(date.today())),
+    startDate: Optional[str] = Query(None),
+    endDate: Optional[str] = Query(None),
     transaction_type: Optional[str] = Query(None),
 ):
     try:
         if user:
-            if startDate and endDate:
+            logger.info(startDate)
+            if startDate is '' or endDate is '':
+                return await paymentservice.getAllTickets(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                user=user,)
+            else:
+                logger.info(type(startDate))
                 start = datetime.strptime(startDate, "%Y-%m-%d")
                 end = datetime.strptime(endDate, "%Y-%m-%d")
                 if end < start:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
-            return paymentservice.getAllTickets(
+                return await paymentservice.getAllTickets(
                 request=request,
                 response=response,
                 setting=setting,
@@ -324,6 +333,7 @@ async def get_tickets(
                 startDate=startDate,
                 endDate=endDate,
                 transactionType=transaction_type)
+
 
     except Exception as ex:
         logger.error(ex)
@@ -344,7 +354,7 @@ async def get_ticket(
 ):
     try:
         if user:
-            return paymentservice.singleTicket(response=response,db=db,user=user,ticketId=ticketId,mode=mode)
+            return await paymentservice.singleTicket(response=response,db=db,user=user,ticketId=ticketId,mode=mode)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -368,7 +378,7 @@ async def fund_wallet_nfc(
     try:
         if user:
 
-            return paymentservice.nfcdebitService(payload=payload,request=request,response=response,setting=setting,db=db,user=user,background_task=background_task)
+            return await paymentservice.nfcdebitService(payload=payload,request=request,response=response,setting=setting,db=db,user=user,background_task=background_task)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
@@ -395,7 +405,7 @@ async def confirm_nfc_payment(
     try:
         if transactionId:
             #time.sleep(5)  # Simulate a delay for processing
-            return paymentservice.getSinglePayment(
+            return await paymentservice.getSinglePayment(
                 request=request,
                 response=response,
                 setting=setting,
@@ -425,7 +435,7 @@ async def bill_payment_name_enquiry(
 ):
     try:
         if user:
-            return paymentservice.billerEnquiry(payload=payload,request=request,response=response,setting=setting,db=db,user=user)
+            return await paymentservice.billerEnquiry(payload=payload,request=request,response=response,setting=setting,db=db,user=user)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BillNameEnquiryResponse(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
@@ -452,7 +462,7 @@ async def bill_payment(
 ):
     try:
         if user:
-            return paymentservice.payBills(payload=payload,request=request,response=response,setting=setting,db=db,user=user,background_task=background_task)
+            return await paymentservice.payBills(payload=payload,request=request,response=response,setting=setting,db=db,user=user,background_task=background_task)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT,)
     except Exception as ex:
@@ -472,7 +482,7 @@ async def wallet_enquiry(
 ):
     try:
         if user:
-            return paymentservice.walletEnquiry(
+            return await paymentservice.walletEnquiry(
                 wallet=accountNumber,
                 response=response,
                 db=db,
@@ -504,7 +514,7 @@ async def wallet_payment(
 ):
     try:
         if user:
-            return paymentservice.walletTransfer(
+            return await paymentservice.walletTransfer(
                 payload=payload,
                 request=request,
                 response=response,
@@ -535,7 +545,7 @@ async def redeem_ticket(
 ):
     try:
         if user:
-            return paymentservice.redeemTicket(user=user,db=db,request=request,response=response,setting=setting,payload=payload,background_task=background_task)
+            return await paymentservice.redeemTicket(user=user,db=db,request=request,response=response,setting=setting,payload=payload,background_task=background_task)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
