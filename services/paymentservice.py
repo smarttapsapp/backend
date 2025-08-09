@@ -623,7 +623,7 @@ async def debitWallet(
             logger.info(f"create credit record for reciever {recipient.walletAccount} with balance after {recipient.availableBalance}")
             savedRecipient = adminQuery.create(db=db,model=recipient)
             if savedRecipient:
-                background_task.add_task(notificationservice.sendNotification,notificationType="credit",setting=setting,background_task=background_task)
+                background_task.add_task(notificationservice.sendNotification,notificationType="credit",setting=setting,background_task=background_task,user=user)
                 return BaseResponse(statusCode="00",statusDescription=SUCCESS,data={"transactionId":trnxId})
             logger.info(f"unable to credit recipient at {datetime.now()}")
             response.status_code = status.HTTP_400_BAD_REQUEST

@@ -81,6 +81,11 @@ class NextOfKinRequest(BaseModel):
     address: str
     phone: str
     relationship: str
+class UnlockRequest(BaseModel):
+    bvn:str
+    pin:str
+    action:str
+    username: str
 class CustomersResponse(BaseResponse):
     data: Union[List[Customer],None] = None
 class CustomerResponse(BaseResponse):

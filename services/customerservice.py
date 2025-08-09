@@ -10,6 +10,8 @@ from utils import util
 from schemas.setting import Setting
 from utils.constant import *
 from schemas.customer import *
+from schemas.support_ticket import *
+from schemas.support_comment import *
 import shutil
 from fastapi import (
     status,
@@ -536,6 +538,85 @@ async def uploadProfileImage(response: Response,db:Session,user:CustomerModel,se
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription="Invalid Image",)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def listOfSupportTickets(request: Request,response: Response,setting: Setting,db: Session,user: CustomerModel,startDate: str,endDate: str):
+    try:
+        logger.info(
+            f"started querying support tickets list"
+        )
+        return SupportTicketsResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=queries.supportTickets(db=db,userId=user.id)
+            )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return SupportTicketsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def openSupportTicket(response: Response,db:Session,user:CustomerModel,setting:Setting,request:Request,background_task:BackgroundTasks,payload:SupportTicketRequest,attachment: UploadFile,
+):
+    try: #
+        logger.info(
+            f"started uploading profile image for {user.firstname} at {datetime.now()}"
+        )
+        support = SupportTicketModel(
+                user_id = user.id ,
+                subject =payload.subject,
+                description = payload.description,
+                priority = PriorityEnum(payload.priority),
+                status =OTPStatusEnum(payload.status),
+                created_at = datetime.now(),
+                updated_at = datetime.now()
+            )
+        logger.info(attachment.content_type)
+        if attachment.content_type.startswith("image/"):
+            UPLOAD_DIR = Path("templates/tickets")
+            UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+            file_ext = attachment.filename.split(".")[-1]
+            unique_name = f"{uuid.uuid4().hex}.{file_ext}"
+            file_path = UPLOAD_DIR / unique_name
+            with file_path.open("wb") as buffer:
+                shutil.copyfileobj(attachment.file, buffer)
+            image_url = f"tickets/{unique_name}"
+            support.attachment = image_url
+        saved = queries.create(db=db,model=support)
+        if saved:
+            return  BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription = SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription="Support ticket failed",)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def addSupportTicketComment(response: Response,db:Session,user:CustomerModel,setting:Setting,request:Request,background_task:BackgroundTasks,payload:SupportTicketCommentRequest,attachment: UploadFile,
+):
+    try: #
+        logger.info(
+            f"started commenting on ticket {payload.ticket_id} for {user.firstname} at {datetime.now()}"
+        )
+        img = None
+        logger.info(attachment.content_type)
+        if attachment.content_type.startswith("image/"):
+            UPLOAD_DIR = Path("templates/tickets")
+            UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+            file_ext = attachment.filename.split(".")[-1]
+            unique_name = f"{uuid.uuid4().hex}.{file_ext}"
+            file_path = UPLOAD_DIR / unique_name
+            with file_path.open("wb") as buffer:
+                shutil.copyfileobj(attachment.file, buffer)
+            image_url = f"tickets/{unique_name}"
+            img = image_url
+        comment = TicketCommentModel(ticket_id = payload.ticket_id,user_id = user.id,comment = payload.comment,created_at = payload.created_at,attachment=img)
+        saved = queries.create(db=db,model=comment)
+        if saved:
+            return  BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription = SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription="Support ticket failed",)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST

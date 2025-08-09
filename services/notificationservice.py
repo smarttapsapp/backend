@@ -127,7 +127,7 @@ def notifyUser(
             logger.info(f"Notification sent successfully to {customer.firstname}")
     else:
         logger.info(f"User with ID {userId} not found")
-async def sendNotification(setting: Setting,notificationType:str,background_task:BackgroundTasks):
+async def sendNotification(setting: Setting,notificationType:str,background_task:BackgroundTasks,user:CustomerModel):
     try:
         logger.info(f"started sending notification at {datetime.now()}")
     except Exception as ex:

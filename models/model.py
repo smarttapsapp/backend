@@ -13,7 +13,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import backref, relationship
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.dialects.mysql import LONGTEXT
-from datetime import datetime, timedelta
+from datetime import timedelta
 import uuid
 from utils.constant import *
 
@@ -21,6 +21,13 @@ from utils.constant import *
 from enum import Enum as PythonEnum
 
 Base = declarative_base()
+class PriorityEnum(PythonEnum):
+    CRITICAL = "CRITICAL"
+    URGENT = "URGENT"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    INFO = "INFO"
 class WithrawalStatusEnum(PythonEnum):
     APPROVED = "approved"
     COMPLETED = "completed"
@@ -573,43 +580,12 @@ class SupportTicketModel(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('customers.id'), nullable=False)  # Creator of the ticket
     admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True)  # Assigned support agent
-    category_id = Column(Integer, ForeignKey('ticket_categories.id'), nullable=False)
-    status_id = Column(Integer, ForeignKey('ticket_statuses.id'), nullable=False)
-    priority_id = Column(Integer, ForeignKey('ticket_priorities.id'), nullable=False)
     subject = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    #agent=relationship("AdminModel", back_populates="tickets")
-    #creator=relationship("Customer", back_populates="tickets")
-    category = relationship('TicketCategoryModel', backref='support_tickets')
-    status = relationship('TicketStatusModel', backref='support_tickets')
-    priority = relationship('TicketPriorityModel', backref='support_tickets')
+    priority = Column(Enum(PriorityEnum), default=PriorityEnum.INFO) 
+    status = Column(Enum(OTPStatusEnum), default=OTPStatusEnum.OPEN) 
+    attachment = Column(Text, nullable=True)
     comments = relationship('TicketCommentModel', backref='support_ticket', cascade='all, delete-orphan')
-    attachments = relationship('TicketAttachmentModel', backref='support_ticket', cascade='all, delete-orphan')
-class TicketCategoryModel(Base):
-    __tablename__ = 'ticket_categories'
-    
-    id = Column(Integer, primary_key=True)
-    name = Column(String(50), unique=True, nullable=False)
-    description = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-class TicketStatusModel(Base):
-    __tablename__ = 'ticket_statuses'
-    
-    id = Column(Integer, primary_key=True)
-    name = Column(String(50), unique=True, nullable=False)
-    description = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-class TicketPriorityModel(Base):
-    __tablename__ = 'ticket_priorities'
-    
-    id = Column(Integer, primary_key=True)
-    name = Column(String(50), unique=True, nullable=False)
-    level = Column(Integer, nullable=False)  # e.g., 1 for Low, 2 for Medium, etc.
-    description = Column(Text, nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 class TicketCommentModel(Base):
@@ -620,6 +596,8 @@ class TicketCommentModel(Base):
     user_id = Column(Integer, ForeignKey('customers.id'), nullable=False)  # Comment author
     admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True)
     comment = Column(Text, nullable=False)
+    attachment = Column(Text, nullable=True)
+    #attachments = relationship('TicketAttachmentModel', backref='ticket_comments', cascade='all, delete-orphan')
     created_at = Column(DateTime, default=func.now())
     user = relationship('CustomerModel', backref='comments')
     agent = relationship('AdminModel', backref='comments')
@@ -627,7 +605,7 @@ class TicketAttachmentModel(Base):
     __tablename__ = 'ticket_attachments'
     
     id = Column(Integer, primary_key=True)
-    ticket_id = Column(Integer, ForeignKey('support_tickets.id'), nullable=False)
+    comment_id = Column(Integer, ForeignKey('ticket_comments.id'), nullable=False)
     file_path = Column(String(255), nullable=False)
     uploaded_by = Column(Integer, ForeignKey('customers.id'), nullable=False)
     uploaded_at = Column(DateTime, default=func.now())

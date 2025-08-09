@@ -8,6 +8,8 @@ from fastapi import (
     BackgroundTasks,File
 )
 from schemas.customer import *
+from schemas.support_ticket import *
+from schemas.support_comment import SupportTicketCommentRequest
 from schemas.setting import Setting
 from models.model import CustomerModel
 from models.model import AdminModel
@@ -353,7 +355,7 @@ async def get_customer_analytics(
 async def upload_customer_profile_image(
     request: Request,
     response: Response,
-    user: Annotated[Customer, Depends(validateCustomer)],
+    user: Annotated[CustomerModel, Depends(validateCustomer)],
     Setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
@@ -361,6 +363,83 @@ async def upload_customer_profile_image(
 ):
     try:
         return await customerservice.uploadProfileImage(response=response,db=db,user=user,setting=Setting,request=request,background_task=background_task,img=img)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=SYSTEMBUSY,
+        )
+@router.get("/tickets", 
+    response_model=SupportTicketsResponse,
+    response_model_exclude_unset=True,tags=['customer'])
+async def get_customer_support_tickets(
+    request: Request,
+    response: Response,
+    user: Annotated[CustomerModel, Depends(validateCustomer)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    startDate: str = Query(default=util.get_first_day_of_month()),
+    endDate: Optional[str] = Query(str(date.today())),
+):
+    try:
+        return await customerservice.listOfSupportTickets(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                user=user,
+                startDate=startDate,
+                endDate=endDate)
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return SupportTicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.post("/ticket/open",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,)
+async def open_support_ticket(
+    request: Request,
+    response: Response,
+    user: Annotated[CustomerModel, Depends(validateCustomer)],
+    Setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+    attachment: UploadFile = File(...),
+    subject: str = Form(...),
+    description: str = Form(...),
+    priority: str = Form(...),
+):
+    try:
+        payload = SupportTicketRequest(subject=subject,description=description,priority=priority,status=OTPStatusEnum.OPEN)
+        return await customerservice.openSupportTicket(response=response,db=db,user=user,setting=Setting,request=request,background_task=background_task,payload=payload,attachment=attachment)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=SYSTEMBUSY,
+        )
+@router.post("/ticket/comment",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,)
+async def support_ticket_comment(
+    request: Request,
+    response: Response,
+    user: Annotated[CustomerModel, Depends(validateCustomer)],
+    Setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+    attachment: UploadFile = File(...),
+    ticketId: str = Form(...),
+    comment: str = Form(...),
+):
+    try:
+        payload = SupportTicketCommentRequest(
+            comment=comment,ticket_id=ticketId,created_at=datetime.now(),updated_at=datetime.now()
+        )
+        return await customerservice.addSupportTicketComment(response=response,db=db,user=user,setting=Setting,request=request,background_task=background_task,payload=payload,attachment=attachment)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST

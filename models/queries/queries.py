@@ -68,6 +68,11 @@ def updateUserNextOfKin(db: Session, userId: int,name:str,phone:str,address:str,
     return  res 
 def get_latest_otp_by_servicename(userId:int,servicename: str, db: Session):
     return db.query(OTPModel).filter(OTPModel.user_id==userId,OTPModel.status == "OPEN",OTPModel.servicename == servicename).order_by(desc(OTPModel.id)).first()
+def supportTickets(db: Session,userId:int):
+    return db.query(SupportTicketModel).filter(SupportTicketModel.user_id==userId).order_by(desc(SupportTicketModel.created_at)).all()
+def deleteSupportTickets(db: Session ,userId:int,id:int):
+    return db.query(SupportTicketModel).filter(SupportTicketModel.user_id==userId).filter(SupportTicketModel.id == id).delete()
+
 def notifications(db: Session,userId:int):
     if userId:
         return db.query(NotificationModel).join(UserNotification).join(CustomerModel).filter(CustomerModel.id==userId).all()

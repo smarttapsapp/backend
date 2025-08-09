@@ -8,6 +8,8 @@ from utils import util
 from schemas.setting import Setting
 from utils.constant import *
 from schemas.customer import *
+from services import notificationservice
+from schemas.device import Device
 from fastapi import (
     status,
     Response,
@@ -168,7 +170,6 @@ def resetPasswordInitiate(
             if createdOTP:
                 authToken = util.create_access_token(setting=setting,credentials={"username": user.email,"password": createdOTP.otp},exp=10)
                 if authToken:
-                    email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": user,"otp":createdOTP},)
                     background_task.add_task(util.sendMail,setting=setting, subject=f"Password Reset",toAddress=user.email, templatekey="2d6f.20c6e93ebf814272.k1.17ca5a70-7221-11f0-b2b9-525400a229b1.1987b43b197",template_data={"name":user.firstname,"OTP":createdOTP.otp})
                     return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"token":authToken[0],"expires":authToken[1] })
                 else:
@@ -215,20 +216,126 @@ def resetPasswordFinal(request:Request,db:Session,response:Response,user:Custome
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-def login(request:Request,db: Session,response: Response,setting: Setting, payload: LoginRequest,background_task: BackgroundTasks,):
+def login(request:Request,db: Session,response: Response,setting: Setting, payload: LoginRequest,device:Device,background_task: BackgroundTasks,):
     user = authQuery.userByEmailOrPhone( db=db,email=payload.username,phonenumber=util.formatPhoneWithDialingCode(payload.username))
     if user:
-        if util.verify_password(payload.password, user.password) is True:
-            if user.account_status == AccountStatusEnum.ACTIVE:
-                authToken = util.create_access_token(setting=setting,credentials={"username": user.email,"password": payload.password,},exp=600)
-                logger.info(authToken)
-                return BaseResponse(statusCode= str(status.HTTP_200_OK),statusDescription= SUCCESS,data={"token":authToken[0],"expires":authToken[1]})
+        if user.device and user.device.imeiNo == device.imeiNo:
+            if util.verify_password(payload.password, user.password) is True:
+                if user.account_status == AccountStatusEnum.ACTIVE:
+                    authToken = util.create_access_token(setting=setting,credentials={"username": user.email,"password": payload.password,},exp=600)
+                    logger.info(authToken)
+                    return BaseResponse(statusCode= str(status.HTTP_200_OK),statusDescription= SUCCESS,data={"token":authToken[0],"expires":authToken[1]})
+                else:
+                    response.status_code= status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=f"Your account is {user.account_status}")
             else:
-                response.status_code= status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=f"Your account is {user.account_status}")
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT)
         else:
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT)
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            return BaseResponse(statusCode=str(status.HTTP_401_UNAUTHORIZED),statusDescription=DEVICEMISMATCH)
     else:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT)
+async def deviceUnlockInitiate(
+        payload:UnlockRequest,
+        device:Device,
+        request: Request,
+        response: Response,
+        setting: Setting,
+        db: Session,
+        background_task: BackgroundTasks,
+):
+    try:
+        logger.info(f"started device unlock @ {datetime.now()}................")
+        account = authQuery.userByEmailOrPhone(db=db,email=payload.username,phonenumber=payload.username)
+        if account:
+            logger.info(f"Verify user with transaction PIN @  {datetime.now()}.....................")
+            if util.verify_password(payload.pin,account.pin):
+                logger.info(f"Account is fine go and check bvn/nin @  {datetime.now()}.....................")
+                if payload.action.lower() == "bvn":
+                    if payload.bvn == account.bvn :# and account.bvn_verified
+                        otp = util.generateOTP()
+                        password = f"{otp}|{device.imeiNo}|{device.modelName}|{device.manufacturer}"
+                        newOtp = OTPModel(otp=otp,user_id=account.id,status=OTPStatusEnum.OPEN,servicename="unlockInitiate",created_at=datetime.now(),expired_at=datetime.now()+timedelta(minutes=5),updated_at=datetime.now(),)
+                        createdOTP = authQuery.create_otp(db=db,otp=newOtp)
+                        background_task.add_task(notificationservice.sendNotification,notificationType="unlockInitiate",setting=setting,background_task=background_task,user=account)
+                        authToken = util.create_access_token(setting=setting,credentials={"username":account.phonenumber,"password": password,},exp=15,)
+                        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"token":authToken[0],"expire":authToken[1],"message":f"Please enter the OTP sent to {account.phonenumber[0:4]}xxxxxx{account.phonenumber[-2:]} to unlock your device"},)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+                elif payload.action.lower() == "nin":
+                    if payload.bvn == account.nin :# and account.bvn_verified
+                        otp = util.generateOTP()
+                        newOtp = OTPModel(otp=otp,user_id=account.id,status=OTPStatusEnum.OPEN,servicename="unlockInitiate",created_at=datetime.now(),expired_at=datetime.now()+timedelta(minutes=5),updated_at=datetime.now(),)
+                        createdOTP = authQuery.create_otp(db=db,otp=newOtp)
+                        background_task.add_task(notificationservice.sendNotification,notificationType="unlockInitiate",setting=setting,background_task=background_task,user=account)
+                        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"token":authToken[0],"expire":int(authToken[1]),"message":f"Please enter the OTP sent to {account.phonenumber[0:4]}xxxxxx{account.phonenumber[-2:]} to unlock your device"},)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+            else:
+                logger.info(f"sending invalid transaction PIN to unlock device @ {datetime.now()}.....................")
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDPIN)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription= SYSTEMBUSY)
+async def deviceUnlockFinal(request: Request,device:Device,db:Session,response:Response,token:str,setting: Setting, background_task: BackgroundTasks,payload:OTPRequest):
+    try:
+        logger.info(f"Started verifying device unlock @ {datetime.now()} ..........")
+        data = util.jwt.decode(token, setting.secret_key, algorithms=[setting.algorithm])
+        logger.info(f"checking token {data} for device unlock @ {datetime.now()}.........")
+        if data:
+            user =authQuery.userByEmailOrPhone(db=db,email=data["username"],phonenumber=data["username"])
+            if user:
+                logger.info(f"Started verifying device verification details........{data['password']} and {payload.otp}")
+                auth = str(data["password"]).split("|")
+                if auth[0] == payload.otp and auth[1] == device.imeiNo and auth[2] == device.modelName and auth[3] == device.manufacturer:
+                    otp = authQuery.get_otp_by_code(db=db,code=payload.otp,userId=user.id)
+                    if otp and otp.expired_at > datetime.now():
+                        logger.info(f"device unlock with valid OTP @ {datetime.now()}........")
+                        user.device = DeviceModel(
+                            imeiNo = device.imeiNo,
+                            modelName = device.modelName,
+                            manufacturer = device.manufacturer,
+                            deviceName = device.deviceName,
+                            apiLevel = device.apiLevel,
+                            isPhysicalDevice = device.isPhysicalDevice,
+                            platformVersion = device.platformVersion,
+                        )
+                        user.updated_at = datetime.now()
+                        otp.status = OTPStatusEnum.CLOSED
+                        otp.updated_at = datetime.now()
+                        user.otps.append(otp)
+                        updatedUser = authQuery.create_account(db=db,user=user)
+                        response.status_code = status.HTTP_200_OK
+                        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription="Device unlock Successful",)
+                    else:
+                        logger.info(f"otp already expired for device @ {datetime.now()}........")
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=OTPEXPIRE)
+                else:
+                    logger.info(f"suspected fraud to unlock user device @ {datetime.now()}........")
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+            else:
+                logger.info("device unlock from suspicious user........")
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Unauthoried",)
+        else:
+            logger.info(f"device unlock without valid token")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNABLE)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)

@@ -25,7 +25,6 @@ def transactions(request: Request,response: Response,setting: Setting,db: Sessio
         logger.info(
             f"started querying transactions from {startDate} to {endDate} for {transactionType}"
         )
-        sleep(5)
         if transactionType:
             return Transactions(
                 statusCode= str(status.HTTP_200_OK),

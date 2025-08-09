@@ -43,6 +43,19 @@ def getSystemSetting(db: Session = Depends(get_db)):
         return Setting.model_validate(settings)
     logger.info("Unable to get system setting. please check database settings for more info")
     exit(code=99)
+async def validateDevice(
+    device: Annotated[str, Header()],
+) -> Device:
+    try:
+        logger.info(device)
+        parsed = json.loads(device)
+        validated_device = Device(**parsed)
+        if not validated_device.isPhysicalDevice:
+            raise device_exception
+        return validated_device
+    except Exception as ex:
+        logger.info(ex)
+        raise device_exception
 async def validateRegistration(
     token: str = Depends(util.oauth2_scheme),
     setting: Setting = Depends(getSystemSetting),
@@ -68,75 +81,56 @@ async def validateRegistration(
         return user
     except JWTError:
         raise credentials_exception
+
 async def verified_user(
-    #device: Annotated[Device, Depends(validateDevice)],
+    device: Annotated[Device, Depends(validateDevice)],
     token: str = Depends(util.oauth2_scheme),
     setting: Setting = Depends(getSystemSetting),
     db: Session = Depends(get_db),
 ):
-    credentials_exception = util.UnicornException(
-        status=status.HTTP_401_UNAUTHORIZED,
-        error={"statusCode": "401", "statusDescription": "Your session has expired!"},
-    )
     try:
-        payload = jwt.decode(
-            token, setting.secret_key, algorithms=[setting.algorithm]
-        )
+        payload = jwt.decode(token, setting.secret_key, algorithms=[setting.algorithm])
         logger.info(payload)
-        user = authQuery.userByEmailOrPhone(
-            db=db,
-            email=payload["username"],
-            phonenumber=payload["username"],
-        )
-        logger.info(user)
+        user = authQuery.userByEmailOrPhone(db=db,email=payload["username"],phonenumber=payload["username"],)
+        logger.info(user.account_status)
         if user is None:
-            raise credentials_exception
+            raise util.UnicornException(status=status.HTTP_401_UNAUTHORIZED,error={"statusCode":str(status.HTTP_404_NOT_FOUND), "statusDescription": UNKNOWNUSER},)
+        if user.device and user.device.imeiNo != device.imeiNo:
+            raise util.UnicornException(status=status.HTTP_401_UNAUTHORIZED,error={"statusCode": str(status.HTTP_401_UNAUTHORIZED),"statusDescription": DEVICEMISMATCH,},)
+        if user.account_status != AccountStatusEnum.REG and user.account_status != AccountStatusEnum.ACTIVE:
+            raise util.UnicornException(status=status.HTTP_401_UNAUTHORIZED,error={"statusCode": str(status.HTTP_401_UNAUTHORIZED),"statusDescription": "Inactive account",},)
         return user
     except JWTError:
-        raise credentials_exception
+        raise util.UnicornException(status=status.HTTP_401_UNAUTHORIZED,error={"statusCode": "401", "statusDescription": "Your session has expired!"},)
 async def validateTransactionPIN(
     payload:PINRequest,
-    #device: Annotated[Device, Depends(validateDevice)],
+    device: Annotated[Device, Depends(validateDevice)],
     token: str = Depends(util.oauth2_scheme),
     setting: Setting = Depends(getSystemSetting),
     db: Session = Depends(get_db),
 ):
-    credentials_exception = util.UnicornException(
-        status=status.HTTP_401_UNAUTHORIZED,
-        error={"statusCode": "401", "statusDescription": "Your session has expired!"},
-    )
     try:
+        auth = jwt.decode(token, setting.secret_key, algorithms=[setting.algorithm])
         logger.info(payload)
-        decodedToken = jwt.decode(token, setting.secret_key, algorithms=[setting.algorithm])
-        user = authQuery.userByEmailOrPhone(
-            db=db,
-            email=decodedToken["username"],
-            phonenumber=decodedToken["username"],
-        )
+        user = authQuery.userByEmailOrPhone(db=db,email=auth["username"],phonenumber=auth["username"],)
         if user is None:
-            raise credentials_exception
-        #validatedUser = Customer.model_validate(user)
-        if user.account_status == AccountStatusEnum.ACTIVE:
-            logger.info(payload.pin)
-            if util.verify_password(payload.pin, user.pin) is True:
-                return user
-            raise util.UnicornException(
-                status=status.HTTP_403_FORBIDDEN,
-                error={
-                    "statusCode": str(status.HTTP_403_FORBIDDEN),
-                    "statusDescription":INVALIDPIN,
-                },
-            )
-        else:
-            raise util.UnicornException(
-                status=status.HTTP_403_FORBIDDEN,
-                error={
-                    "statusCode": str(status.HTTP_403_FORBIDDEN),
-                    "statusDescription": f"Your account is {user.account_status}",
-                },
-            )
+            raise util.UnicornException(status=status.HTTP_404_NOT_FOUND,error={"statusCode":str(status.HTTP_404_NOT_FOUND), "statusDescription": UNKNOWNUSER},)
+        if user.device.imeiNo != device.imeiNo:
+            raise util.UnicornException(status=status.HTTP_401_UNAUTHORIZED,error={"statusCode": str(status.HTTP_401_UNAUTHORIZED),"statusDescription": DEVICEMISMATCH,},)
+        print(user.account_status)
+        if user.account_status != AccountStatusEnum.ACTIVE:
+            raise util.UnicornException(status=status.HTTP_401_UNAUTHORIZED,error={"statusCode": str(status.HTTP_401_UNAUTHORIZED),"statusDescription": "Inactive account",},)
+        if not util.verify_password(payload.pin, user.pin):
+            raise util.UnicornException(status=status.HTTP_401_UNAUTHORIZED,error={"statusCode": str(status.HTTP_401_UNAUTHORIZED),"statusDescription": INVALIDPIN,},)
+        #selectedWallet = next((acct for acct in user.wallets if acct.nuban == payload.senderAccount), None)
+        #if selectedWallet is None:
+        #    raise util.UnicornException(status=status.HTTP_404_NOT_FOUND,error={"statusCode":str(status.HTTP_404_NOT_FOUND), "statusDescription": INVALIDACCOUNT},)
+        #if int(payload.amount) > int(user.wallet.availableBalance):
+        #    raise util.UnicornException(status=status.HTTP_400_BAD_REQUEST,error={"statusCode": str(status.HTTP_400_BAD_REQUEST),"statusDescription": INSUFFICIENTFUND,},)
+        return user
     except JWTError:
-        raise credentials_exception
+        raise util.UnicornException(status=status.HTTP_401_UNAUTHORIZED,error={"statusCode": "401", "statusDescription": "Your session has expired!"},)
+    
 
 async def validateCustomer(
     request: Request,
@@ -175,20 +169,7 @@ async def get_device_header(device: Annotated[str, Header()]):
                 "statusDescription": "invalid header parameter",
             },
         )
-async def validateDevice(
-    device: Annotated[str, Header()],
-):
-    try:
-        logger.info(device)
-        validatedDevice = Device.model_validate(json.loads(device))
-        if validatedDevice:
-            if validatedDevice.isPhysicalDevice is True:
-                return validatedDevice
-            raise device_exception
-        raise device_exception
-    except Exception as ex:
-        logger.info(ex)
-        raise device_exception
+
 async def validateAdmin(
         request:Request,
     setting: Setting = Depends(getSystemSetting),

@@ -14,11 +14,11 @@ from typing import Annotated
 from schemas.device import Device
 from utils.dependencies import (
     getSystemSetting,
-    validateRegistration,
+    validateRegistration,validateDevice
 )
 from utils.database import get_db
 from services import authservice
-from models.model import AccountStatusEnum,CustomerModel
+from models.model import *
 from schemas.customer import *
 from schemas.setting import Setting
 import logging
@@ -204,6 +204,7 @@ async def login(
     payload: LoginRequest,
     request: Request,
     response: Response,
+    device: Annotated[Device, Depends(validateDevice)],
     setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
@@ -215,6 +216,7 @@ async def login(
             response=response,
             setting=setting,
             payload=payload,
+            device=device,
             background_task=background_task,
         )
     except Exception as ex:
@@ -224,4 +226,68 @@ async def login(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=SYSTEMBUSY,
         )
+@router.post(
+    "/unlock-device",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,
+    name="to unlock user account during device change",
+    tags=["auth"],
+)
+async def unlockDevice(
+    payload: UnlockRequest,
+    request: Request,
+    response: Response,
+    device: Annotated[Device, Depends(validateDevice)],
+    settings: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await authservice.deviceUnlockInitiate(
+                payload=payload,
+                request=request,
+                response=response,
+                setting=settings,
+                device=device,
+                db=db,
+                background_task=background_task,
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.put(
+    "/unlock-device/final",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,
+    tags=["auth"],
+)
+async def unlockDeviceFinal(
+    payload: OTPRequest,
+    request: Request,
+    response: Response,
+    background_task: BackgroundTasks,
+    settings: Annotated[Setting, Depends(getSystemSetting)],
+    device: Annotated[Device, Depends(validateDevice)],
+    db: Annotated[Session, Depends(get_db)],
+    token:  Annotated[str, Depends(util.oauth2_scheme)]
+):
+    try:
+        if token:
+            return await authservice.deviceUnlockFinal(
+                payload=payload,
+                request=request,
+                device=device,
+                response=response,
+                setting=settings,
+                token=token,
+                db=db,
+                background_task=background_task)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 

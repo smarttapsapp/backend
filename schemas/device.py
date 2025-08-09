@@ -6,17 +6,20 @@ from schemas.response import BaseResponse
 
 
 class DeviceBase(BaseModel):
-    title: Union[str, None] = None
-    type: Union[str, None] = None
-    message: Union[str, None] = None
+    platformVersion: Union[str, None] = None
+    imeiNo: Union[str, None] = None
+    modelName: Union[str, None] = None
+    manufacturer: Union[str, None] = None
+    isPhysicalDevice: Union[bool, None] = False
+    deviceName: Union[str, None] = None
+    apiLevel: Union[str, None] = None
 
 
 class DeviceRequest(DeviceBase):
-    user: Union[List[str], None] = None
+    pass
 
 class Device(DeviceBase):
-    isRead: Union[bool, None] = False
-    id: Optional[int]
+    id: Optional[int]=None
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 
@@ -28,4 +31,4 @@ class DevicesResponse(BaseResponse):
     data: Union[List[Device],None] = None
     
 class DeviceResponse(BaseResponse):
-    data: Device = None
+    data: Optional[Device] = None
