@@ -632,7 +632,7 @@ def listOfCustomer(request: Request,response: Response,setting: Setting,db: Sess
             return CustomersResponse(
                 statusCode= str(status.HTTP_200_OK),
                 statusDescription=SUCCESS,
-                data=queries.getPaymentHistories(db=db,userId=admin.id,startDate=startDate,endDate=endDate)
+                data=customerQuery.listAllCustomers(db=db,userId=admin.id,startDate=startDate,endDate=endDate)
             )
         else:
             return CustomersResponse(

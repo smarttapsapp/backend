@@ -81,7 +81,6 @@ async def validateRegistration(
         return user
     except JWTError:
         raise credentials_exception
-
 async def verified_user(
     device: Annotated[Device, Depends(validateDevice)],
     token: str = Depends(util.oauth2_scheme),
@@ -131,7 +130,6 @@ async def validateTransactionPIN(
     except JWTError:
         raise util.UnicornException(status=status.HTTP_401_UNAUTHORIZED,error={"statusCode": "401", "statusDescription": "Your session has expired!"},)
     
-
 async def validateCustomer(
     request: Request,
     token: str = Depends(util.oauth2_scheme),
@@ -169,7 +167,6 @@ async def get_device_header(device: Annotated[str, Header()]):
                 "statusDescription": "invalid header parameter",
             },
         )
-
 async def validateAdmin(
         request:Request,
     setting: Setting = Depends(getSystemSetting),

@@ -3,8 +3,8 @@ from sqlalchemy import desc
 from typing import List
 from sqlalchemy.sql import select,update
 from models.model import *
+from datetime import datetime, timedelta
 from schemas.customer import Customer
-from schemas.account import Account
 import logging
 
 logger = logging.getLogger(__name__)
