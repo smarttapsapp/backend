@@ -535,6 +535,12 @@ class SettingsModel(Base):
     focus_code = Column(String(8), default="0093")
     paystack_url = Column(String(250), nullable=True)
     paystack_token = Column(String(250), nullable=True)
+    gl_cust = Column(String(25), nullable=True)
+    cust_gl = Column(String(25), nullable=True)
+    gl_inflow= Column(String(25), nullable=True)
+    gl_outflow= Column(String(25), nullable=True)
+    gl_com= Column(String(25), nullable=True)
+    gl_payable= Column(String(25), nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
 class NotificationModel(Base):

@@ -47,6 +47,10 @@ def get_all_biller(db: Session):
 def get_single_biller_by_id(db: Session, id: int):
     return db.query(ProductTypeModel).filter(ProductTypeModel.id == id).first()
 
+def getHeadoffice(db: Session, glcode: str):
+    return db.query(GLAccountModel).filter(GLAccountModel.code == glcode).first()
+def getHeadofficeAccount(db:Session):
+    return db.query(AdminModel).filter(AdminModel.role == AdminRoleEnum.HEADOFFICE).first()
 
 def get_single_biller_by_billerId(db: Session, billerId: str):
     return db.query(ProductTypeModel).filter(ProductTypeModel.billerId == billerId).first()

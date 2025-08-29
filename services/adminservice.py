@@ -833,15 +833,28 @@ async def addRoute(db: Session,setting: Setting,payload: AddRouteRequest, backgr
                 if startStation:
                     stopStation = adminQuery.getStationById(db=db,stationId=payload.stopId)
                     if stopStation:
-                        new = RouteModel(routeName=payload.routeName,sourceStation_id=startStation.id,destinationStation_id=stopStation.id,mode=startStation.mode,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now(),)
-                        created = adminQuery.create(db=db, model=new)
-                        if created:
-                            email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
-                            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Route Created",toAddress=admin.email,)
-                            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                        busess = adminQuery.getBusesByIds(db=db,ids=payload.buses)
+                        logger.info(busess)
+                        if busess:
+                            previous = adminQuery.getRouteById(db=db,routeId=payload.id)
+                            if previous and previous.admin_id == admin.id:
+                                previous.buses = busess
+                                previous.destinationStation_id=stopStation.id
+                                previous.sourceStation_id=startStation.id
+                                previous.updated_at = datetime.now()
+                            else:
+                                previous = RouteModel(routeName=payload.routeName,sourceStation_id=startStation.id,destinationStation_id=stopStation.id,mode=startStation.mode,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now(),buses=busess)
+                            created = adminQuery.create(db=db, model=previous)
+                            if created:
+                                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Route Created",toAddress=admin.email,)
+                                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                            else:
+                                response.status_code = status.HTTP_400_BAD_REQUEST
+                                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
                         else:
                             response.status_code = status.HTTP_400_BAD_REQUEST
-                            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+                            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOROUTE)
                     else:
                         response.status_code = status.HTTP_400_BAD_REQUEST
                         return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ENDSTATIONERR)

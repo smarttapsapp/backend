@@ -102,6 +102,10 @@ def getBuses(db: Session,adminId:int=None):
     return db.query(BusModel).order_by(desc(BusModel.created_at)).all()
 def getBus(db: Session,busNumber:str):
     return db.query(BusModel).filter(BusModel.bus_number ==busNumber).first()
+def getBusesByIds(db:Session,ids:list[int],adminId:int=None):
+    if adminId:
+        return db.query(BusModel).filter(BusModel.admin_id == adminId).filter(BusModel.id.in_(ids)).all()
+    return db.query(BusModel).filter(BusModel.id.in_(ids)).all()
 def deleteBus(db: Session,id:int):
     return db.query(BusModel).filter(BusModel.id ==id).delete()
 def countBuses(db: Session):

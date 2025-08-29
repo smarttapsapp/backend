@@ -32,8 +32,10 @@ class RoutesResponse(BaseResponse):
     data: Union[List[Route],None] = None
 
 class AddRouteRequest(RouteBase):
+    id: Optional[int]=None
     startId:int
     stopId:int
+    buses:List[int]
 
 class RouteResponse(BaseResponse):
     data: Route = None
