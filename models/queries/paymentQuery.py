@@ -1,6 +1,7 @@
 
 from sqlalchemy.orm import Session
 from models.model import *
+from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ def get_single_biller_by_id(db: Session, id: int):
 def getHeadoffice(db: Session, glcode: str):
     return db.query(GLAccountModel).filter(GLAccountModel.code == glcode).first()
 def getHeadofficeAccount(db:Session):
-    return db.query(AdminModel).filter(AdminModel.role == AdminRoleEnum.HEADOFFICE).first()
+    return db.query(AdminModel).filter(AdminModel.role.has(RoleModel.tag == AdminRoleEnum.HEADOFFICE)).first() #db.query(AdminModel).filter(AdminModel.role == AdminRoleEnum.HEADOFFICE).first()
 
 def get_single_biller_by_billerId(db: Session, billerId: str):
     return db.query(ProductTypeModel).filter(ProductTypeModel.billerId == billerId).first()
