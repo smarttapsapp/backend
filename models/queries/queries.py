@@ -124,6 +124,10 @@ def getLastpaymentByAccount(db: Session, accountId: int):
     return db.query(PaymentModel).filter(PaymentModel.wallet_id == accountId).filter(PaymentModel.payment_type == PaymentEnum.DEBIT).order_by(desc(PaymentModel.updated_at)).first()
 def getstations(db: Session):
     return db.query(StationModel).all()
+def getstations(db: Session,mode:MovableEnum,adminId:int=None):
+    if adminId:
+        return db.query(StationModel).filter(StationModel.admin_id == adminId).filter(StationModel.mode == mode.value).all()
+    return db.query(StationModel).filter(StationModel.mode == mode.value).all()
 def getStationById(db: Session,stationId:int):
     return db.query(StationModel).filter(StationModel.id == stationId).first()
 def deleteStation(db: Session ,stationId:int):

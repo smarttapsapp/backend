@@ -33,6 +33,7 @@ class RoutesResponse(BaseResponse):
 
 class AddRouteRequest(RouteBase):
     id: Optional[int]=None
+    admin_id: int
     startId:int
     stopId:int
     buses:List[int]

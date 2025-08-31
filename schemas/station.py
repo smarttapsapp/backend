@@ -8,13 +8,14 @@ from schemas.bus import Bus
 class StationBase(BaseModel):
     stationName: Union[str, None] = None
     location: Union[str, None] = None
+    admin_id: int
+    mode: Union[str, None] = None
 
 class StationRequest(StationBase):
     user: Union[List[str], None] = None
 
 class Station(StationBase):
     id: Optional[int]
-    mode: Union[str, None] = None
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 
@@ -27,3 +28,6 @@ class StationsResponse(BaseResponse):
     
 class StationResponse(BaseResponse):
     data: Station = None
+
+class AddStationRequest(StationBase):
+    id: Optional[int]=None

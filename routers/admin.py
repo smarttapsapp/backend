@@ -20,7 +20,7 @@ from utils.database import get_db
 from services import adminservice,glAccountingService
 from schemas.admin import *
 from schemas.role import *
-from schemas.station import StationsResponse
+from schemas.station import *
 from schemas.route import RoutesResponse,AddRouteRequest
 from schemas.train import TrainsResponse
 from schemas.bus import BusesResponse,AddBusRequest
@@ -341,10 +341,10 @@ async def getDashboardProductRequest(
             statusDescription=str(ex),
         )
 # station
-@router.get("/stations", 
+@router.get("/bus/stations", 
     response_model=StationsResponse,
     response_model_exclude_unset=True,tags=["station"])
-async def get_stations(
+async def get_bus_stations(
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
@@ -358,7 +358,30 @@ async def get_stations(
                 response=response,
                 setting=setting,
                 db=db,
-                admin=admin,)
+                admin=admin,mode=MovableEnum('bus'))
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return StationsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/train/stations", 
+    response_model=StationsResponse,
+    response_model_exclude_unset=True,tags=["station"])
+async def get_train_stations(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if admin:
+            return await adminservice.listOfStations(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                admin=admin,mode=MovableEnum('train'))
 
     except Exception as ex:
         logger.error(ex)
@@ -368,7 +391,7 @@ async def get_stations(
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["station"])
 async def addStation(
-    payload:AddRoleRequest,
+    payload:AddStationRequest,
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
@@ -377,7 +400,7 @@ async def addStation(
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.addRole(
+        return await adminservice.addStation(
             payload=payload,
                 db=db,
                 setting=setting,

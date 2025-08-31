@@ -905,21 +905,25 @@ async def deleteRoute(db: Session, background_task: BackgroundTasks, request: Re
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
 # stations
-async def listOfStations(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+async def listOfStations(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,mode:MovableEnum):
     try:
         logger.info(f"started querying products")
-        if admin.role.tag == AdminRoleEnum.BUSINESS:
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return StationsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
+        if admin.role.tag in[AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER]:
+            return StationsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getstations(db=db,mode=mode,adminId=admin.id))
         else:
-            return StationsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getstations(db=db))
+            return StationsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getstations(db=db,mode=mode))
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return StationsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-async def addStation(db: Session,setting: Setting,payload: AddRoleRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+async def addStation(db: Session,setting: Setting,payload: AddStationRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
     try:
-        logger.info(f"started creating new admin role @ {datetime.now()}")
+        logger.info(f"started creating/updating new station @ {datetime.now()}")
+        if admin.role.tag in[AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER]:
+            if payload.id:
+                existing = queries.getStationById(db=db,stationId=payload.id)
+                if existing:
+                    existing.stationName
         role = adminQuery.getRole(db=db,roleId=payload.tag)
         if role:
             response.status_code = status.HTTP_400_BAD_REQUEST

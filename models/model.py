@@ -102,6 +102,8 @@ class AdminRoleEnum(PythonEnum):
     SUPPORT = "support"
     BUSINESS = "business"
     PROVIDER = "provider"
+    BUSPROVIDER = "busprovider"
+    TRAINPROVIDER = "trainprovider"
 class AdminTypeEnum(PythonEnum):
     INTERNAL = "INTERNAL"
     EXTERNAL = "EXTERNAL"
@@ -700,6 +702,7 @@ class StationModel(Base):
     __tablename__ = 'stations'
     
     id = Column(Integer, primary_key=True)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
     stationName = Column(String(50), nullable=False, unique=True)
     location = Column(String(50), nullable=False)
     description = Column(String(255), nullable=True)
