@@ -132,8 +132,10 @@ def getStationById(db: Session,stationId:int):
     return db.query(StationModel).filter(StationModel.id == stationId).first()
 def deleteStation(db: Session ,stationId:int):
     return db.query(StationModel).filter(StationModel.id == stationId).delete()
-def getRoutes(db: Session):
-    return db.query(RouteModel).all()
+def getRoutes(db: Session,adminId:int=None):
+    if adminId:
+        return db.query(RouteModel).filter(RouteModel.admin_id ==adminId).order_by(desc(RouteModel.created_at)).all()
+    return db.query(RouteModel).order_by(desc(RouteModel.created_at)).all()
 def getRouteById(db: Session,routeId:int):
     return db.query(RouteModel).filter(RouteModel.id == routeId).first()
 def deleteRoute(db: Session ,routeId:int):
@@ -170,13 +172,22 @@ def getPaymentHistoriesByTransaction(db: Session,userId:int,startDate:str,endDat
         end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
         return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.payment_type == transType).filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
     return db.query(PaymentModel).filter(PaymentModel.payment_type == transType).filter(PaymentModel.user_id == userId).order_by(desc(PaymentModel.created_at)).all()
-def getAllPaymentsHistories(db: Session,startDate:str,endDate:str,userId:str=None):
+def getAllPaymentsHistories(db: Session,startDate:str,endDate:str,adminId:str=None):
+    logger.info(f'started querying payment for {startDate} {endDate} {adminId}')
     if startDate and endDate:
         start = datetime.strptime(startDate, "%Y-%m-%d").date()
         end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
-        if userId:
-            return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
+        if adminId:
+            return db.query(PaymentModel).filter(PaymentModel.admin_id == adminId).filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
         return db.query(PaymentModel).filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()    
+def getListOfcashout(db: Session,startDate:str,endDate:str,adminId:str=None):
+    logger.info(f'started querying payment for {startDate} {endDate} {adminId}')
+    if startDate and endDate:
+        start = datetime.strptime(startDate, "%Y-%m-%d").date()
+        end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
+        if adminId:
+            return db.query(CashOutModel).filter(CashOutModel.admin_id == adminId).filter(CashOutModel.created_at.between(start,end)).order_by(desc(CashOutModel.created_at)).all()
+        return db.query(CashOutModel).filter(CashOutModel.created_at.between(start,end)).order_by(desc(CashOutModel.created_at)).all()    
 def paymentByTransactionNumber(db:Session,mode:PaymentEnum,transactionId:str,userId=int):
     return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.reference == transactionId).filter(PaymentModel.payment_type == mode).first()
 def ticketByTicketNumber(db:Session,mode:TicketModeEnum,ticketId:str):

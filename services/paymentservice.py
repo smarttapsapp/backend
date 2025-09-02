@@ -12,6 +12,7 @@ from services import glAccountingService
 from utils.constant import *
 from schemas.customer import *
 from schemas.payment import *
+from schemas.cashout import *
 from services import notificationservice,glAccountingService
 from schemas.ticket import TicketResponse,TicketsResponse
 from schemas.admin import Admin
@@ -965,19 +966,41 @@ def adminPayments(request: Request,response: Response,setting: Setting,db: Sessi
         logger.info(
             f"started querying payments from {startDate} to {endDate}"
         )
-        if admin.role.tag == AdminRoleEnum.BUSINESS:
-            return PaymentsResponse(
-                statusCode= str(status.HTTP_200_OK),
-                statusDescription=SUCCESS,
-                data=queries.getPaymentHistories(db=db,userId=admin.id,startDate=startDate,endDate=endDate)
-            )
-        else:
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
             return PaymentsResponse(
                 statusCode= str(status.HTTP_200_OK),
                 statusDescription=SUCCESS,
                 data=queries.getAllPaymentsHistories(db=db,startDate=startDate,endDate=endDate)
             )
+        else:
+            return PaymentsResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=queries.getAllPaymentsHistories(db=db,adminId=admin.id,startDate=startDate,endDate=endDate)
+            )
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return PaymentsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+
+def listOfCashout(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
+    try:
+        logger.info(
+            f"started querying payments from {startDate} to {endDate}"
+        )
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
+            return CashoutsResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=queries.getListOfcashout(db=db,startDate=startDate,endDate=endDate)
+            )
+        else:
+            return CashoutsResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=queries.getListOfcashout(db=db,adminId=admin.id,startDate=startDate,endDate=endDate)
+            )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return CashoutsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

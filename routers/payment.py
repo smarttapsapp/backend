@@ -17,6 +17,7 @@ from services import productservice,paymentservice
 from utils.database import get_db
 from datetime import date
 from schemas.payment import *
+from schemas.cashout import *
 from models.model import *
 from schemas.ticket import TicketResponse,TicketsResponse
 from schemas.customer import Customer,CreatePINRequest
@@ -669,3 +670,36 @@ async def get_Admin_payments(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return PaymentsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@adminRouter.get("/cashouts", 
+    response_model=CashoutsResponse,
+    response_model_exclude_unset=True)
+async def get_cashouts(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    startDate: str = Query(default=util.get_first_day_of_month()),
+    endDate: Optional[str] = Query(str(date.today())),
+):
+    try:
+        if admin:
+            if startDate and endDate:
+                start = datetime.strptime(startDate, "%Y-%m-%d")
+                end = datetime.strptime(endDate, "%Y-%m-%d")
+                if end < start:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return PaymentsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
+            return paymentservice.listOfCashout(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                admin=admin,
+                startDate=startDate,
+                endDate=endDate)
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return CashoutsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

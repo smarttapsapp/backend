@@ -811,11 +811,10 @@ async def deleteTrain(db: Session, background_task: BackgroundTasks, request: Re
 async def listOfRoutes(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
     try:
         logger.info(f"started querying products")
-        if admin.role.tag == AdminRoleEnum.BUSINESS:
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return RoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
-        else:
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
             return RoutesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getRoutes(db=db))
+        else:
+            return RoutesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getRoutes(db=db,adminId=admin.id))
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -984,17 +983,17 @@ async def listOfTickets(request: Request,response: Response,setting: Setting,db:
         logger.info(
             f"started querying tickets list from {startDate} to {endDate}"
         )
-        if admin.role.tag == AdminRoleEnum.BUSINESS:
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
             return TicketsResponse(
                 statusCode= str(status.HTTP_200_OK),
                 statusDescription=SUCCESS,
-                data=adminQuery.getTicketHistories(db=db,adminId=admin.id,startDate=startDate,endDate=endDate)
+                data=adminQuery.getTicketHistories(db=db,startDate=startDate,endDate=endDate)
             )
         else:
             return TicketsResponse(
                 statusCode= str(status.HTTP_200_OK),
                 statusDescription=SUCCESS,
-                data=adminQuery.getTicketHistories(db=db,startDate=startDate,endDate=endDate)
+                data=adminQuery.getTicketHistories(db=db,adminId=admin.id,startDate=startDate,endDate=endDate)
             )
     except Exception as ex:
         logger.info(ex)
@@ -1006,17 +1005,17 @@ async def listOfNotifications(request: Request,response: Response,setting: Setti
         logger.info(
             f"started querying tickets list from {startDate} to {endDate}"
         )
-        if admin.role.tag == AdminRoleEnum.BUSINESS:
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
             return NotificationsResponse(
                 statusCode= str(status.HTTP_200_OK),
                 statusDescription=SUCCESS,
-                data=adminQuery.getNotificationHistories(db=db,adminId=admin.id,startDate=startDate,endDate=endDate)
+                data=adminQuery.getNotificationHistories(db=db,startDate=startDate,endDate=endDate)
             )
         else:
             return NotificationsResponse(
                 statusCode= str(status.HTTP_200_OK),
                 statusDescription=SUCCESS,
-                data=adminQuery.getNotificationHistories(db=db,startDate=startDate,endDate=endDate)
+                data=adminQuery.getNotificationHistories(db=db,adminId=admin.id,startDate=startDate,endDate=endDate)
             )
     except Exception as ex:
         logger.info(ex)

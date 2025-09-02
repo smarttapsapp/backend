@@ -76,8 +76,6 @@ def createNotification(
                     statusCode=str(status.HTTP_503_SERVICE_UNAVAILABLE),
                     statusDescription=SYSTEMBUSY,
                 )
-    
-
 def notifyUser(
         db: Session,
     title: str,
