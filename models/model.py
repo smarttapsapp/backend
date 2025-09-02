@@ -178,6 +178,8 @@ class AdminModel(Base):
     wallet = relationship("AccountModel",  uselist=False,back_populates="admin")
     role = relationship("RoleModel", back_populates="admins")
     cashouts = relationship("CashOutModel", backref="admin")
+    user_notifications = relationship("UserNotification", back_populates="admin")
+    preference = relationship('UserNotificationPreference', back_populates='admin')
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
 class CustomerModel(Base):
@@ -562,22 +564,26 @@ class UserNotificationPreference(Base):
     
     id = Column(Integer, primary_key=True)
     customer_id = Column(Integer, ForeignKey('customers.id'), nullable=False)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
     #notification_type_id = Column(Integer, ForeignKey('notification_types.id'), nullable=False)
     receive_via_email = Column(Boolean, default=True)
     receive_via_sms = Column(Boolean, default=False)
     receive_in_app = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
     user = relationship('CustomerModel', back_populates='preference')
+    admin = relationship('AdminModel', back_populates='preference')
     #notification_type = relationship('NotificationType')
 class UserNotification(Base):
     __tablename__ = 'user_notifications'
     
     id = Column(Integer, primary_key=True)
-    customer_id = Column(Integer, ForeignKey('customers.id'), nullable=False)
+    customer_id = Column(Integer, ForeignKey('customers.id'), nullable=True)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
     notification_id = Column(Integer, ForeignKey('notifications.id', ondelete="CASCADE"), nullable=False,)
     is_read = Column(Boolean, default=False)
     created_at = Column(DateTime, default=func.now())
     customer = relationship("CustomerModel", back_populates="user_notifications")
+    admin = relationship("AdminModel", back_populates="user_notifications")
     notification = relationship("NotificationModel", back_populates="user_notifications")
 
     #customer = relationship("CustomerModel", back_populates="user_notifications")
