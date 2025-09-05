@@ -4,6 +4,7 @@ from sqlalchemy import func
 from pydantic import BaseModel,validator
 from schemas.response import BaseResponse
 from schemas.park import Park
+from schemas.admin import Provider
 from schemas.schedule import Schedule
 
 
@@ -29,6 +30,7 @@ class Bus(BusBase):
     airCondition: Union[bool, None] = False
     id: Optional[int]=None
     park: Optional[Park]=None
+    provider: Optional[Provider]=None
     schedules: Optional[List[Schedule]] = []
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()

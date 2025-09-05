@@ -35,6 +35,13 @@ class Admin(AdminBase):
         from_attributes = True
         populate_by_name = True
 
+class Provider(AdminBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
 class AdminProfile(AdminBase):
     status: bool
     id: int
@@ -72,3 +79,5 @@ class AdminsResponse(BaseResponse):
     data: Union[List[Admin],None] = None
 class AdminResponse(BaseResponse):
     data: Admin = None
+class ProvidersResponse(BaseResponse):
+    data: Union[List[Provider],None] = None

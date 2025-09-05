@@ -79,6 +79,7 @@ class BuyTicketRequest(PINRequest):
     scheduleId: int
     walletAccount:str
     amount: str
+    boardingDate:str
 class BuyTrainTicketRequest(PINRequest):
     trainId:int
     scheduleId: int
@@ -87,6 +88,7 @@ class BuyTrainTicketRequest(PINRequest):
     adult:int
     minor:int
     tripDate:datetime
+    routeId:int
 class RedeemRequest(BaseModel):
     ticketId:str
     busNumber:str

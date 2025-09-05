@@ -248,7 +248,7 @@ async def deviceUnlockInitiate(
 ):
     try:
         logger.info(f"started device unlock @ {datetime.now()}................")
-        account = authQuery.userByEmailOrPhone(db=db,email=payload.username,phonenumber=payload.username)
+        account = authQuery.userByEmailOrPhone(db=db,email=payload.username,phonenumber=util.formatPhoneWithDialingCode(payload.username))
         if account:
             logger.info(f"Verify user with transaction PIN @  {datetime.now()}.....................")
             if util.verify_password(payload.pin,account.pin):
@@ -271,6 +271,7 @@ async def deviceUnlockInitiate(
                         newOtp = OTPModel(otp=otp,user_id=account.id,status=OTPStatusEnum.OPEN,servicename="unlockInitiate",created_at=datetime.now(),expired_at=datetime.now()+timedelta(minutes=5),updated_at=datetime.now(),)
                         createdOTP = authQuery.create_otp(db=db,otp=newOtp)
                         background_task.add_task(notificationservice.sendNotification,notificationType="unlockInitiate",setting=setting,background_task=background_task,user=account)
+                        authToken = util.create_access_token(setting=setting,credentials={"username":account.phonenumber,"password": password,},exp=15,)
                         return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"token":authToken[0],"expire":int(authToken[1]),"message":f"Please enter the OTP sent to {account.phonenumber[0:4]}xxxxxx{account.phonenumber[-2:]} to unlock your device"},)
                     else:
                         response.status_code = status.HTTP_400_BAD_REQUEST

@@ -122,6 +122,14 @@ def queryWallet(db:Session,walletAccount:str):
     return db.query(AccountModel).filter(AccountModel.walletAccount == walletAccount).first()
 def getLastpaymentByAccount(db: Session, accountId: int):
     return db.query(PaymentModel).filter(PaymentModel.wallet_id == accountId).filter(PaymentModel.payment_type == PaymentEnum.DEBIT).order_by(desc(PaymentModel.updated_at)).first()
+def getBusProvider(db: Session):
+    return db.query(AdminModel).join(AdminModel.role).filter(RoleModel.tag == AdminRoleEnum.BUSPROVIDER).order_by(desc(AdminModel.created_at)).all()
+def query_bus_routes_by_provider(db: Session,adminId:int):
+    return db.query(RouteModel).filter(RouteModel.admin_id==adminId).filter(RouteModel.mode==MovableEnum.BUS.value).order_by(desc(RouteModel.created_at)).all()
+def getTrainProvider(db: Session):
+    return db.query(AdminModel).join(AdminModel.role).filter(RoleModel.tag == AdminRoleEnum.TRAINPROVIDER).order_by(desc(AdminModel.created_at)).all()
+def query_train_routes_by_provider(db: Session,adminId:int):
+    return db.query(RouteModel).filter(RouteModel.admin_id==adminId).filter(RouteModel.mode==MovableEnum.TRAIN.value).order_by(desc(RouteModel.created_at)).all()
 def getstations(db: Session):
     return db.query(StationModel).all()
 def getstations(db: Session,mode:MovableEnum,adminId:int=None):

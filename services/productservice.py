@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from schemas.setting import Setting
 from schemas.park import ParksResponse
 from schemas.product import ProductsResponse
-from schemas.bus import BusesResponse
+from schemas.admin import ProvidersResponse
 from schemas.station import StationsResponse
 from schemas.route import RoutesResponse,RouteResponse
 from fastapi import Response,Request,status
@@ -133,6 +133,38 @@ def deleteBeneficiary(db: Session,beneficiaryId:str,user:Customer):
     if deleted:
         return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS)
     return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+async def getBusprovider(response: Response,setting: Setting,db: Session,user: Customer):
+    try:
+        logger.info(f"Started getting all bus provider at {datetime.now()}")
+        return ProvidersResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getBusProvider(db=db))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return ProvidersResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def getBusproviderRoutes(response: Response,db: Session,adminId:int):
+    try:
+        logger.info(f"Started getting all bus provider at {datetime.now()}")
+        return RoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.query_bus_routes_by_provider(db=db,adminId=adminId))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return RoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def getTrainprovider(response: Response,setting: Setting,db: Session,user: Customer):
+    try:
+        logger.info(f"Started getting all bus provider at {datetime.now()}")
+        return ProvidersResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getTrainProvider(db=db))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return ProvidersResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def getTrainproviderRoutes(response: Response,db: Session,adminId:int):
+    try:
+        logger.info(f"Started getting all train provider at {datetime.now()}")
+        return RoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.query_train_routes_by_provider(db=db,adminId=adminId))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return RoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 # admin service
 def listOfProduct(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
     try:

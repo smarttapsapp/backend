@@ -22,6 +22,7 @@ from schemas.setting import Setting
 from schemas.product import ProductsResponse
 from schemas.station import StationsResponse
 from schemas.bus import BusesResponse
+from schemas.admin import ProvidersResponse
 from schemas.route import RouteResponse
 from schemas.beneficiary import *
 from models.model import CustomerModel,AdminModel
@@ -92,7 +93,7 @@ async def get_available_routes(
         return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,data=[])
 @router.get("/bus_search",
     response_model=RoutesResponse,
-    response_model_exclude_unset=True,)
+    response_model_exclude_unset=True,tags=['bus'])
 async def get_Bus_Routes(
     request: Request,
     response: Response,
@@ -113,6 +114,46 @@ async def get_Bus_Routes(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/bus_provider/{providerId}",
+    response_model=RoutesResponse,
+    response_model_exclude_unset=True,tags=['bus'])
+async def get_Bus_ProviderRoutes(
+    providerId: int,
+    response: Response,
+    user: Annotated[Customer, Depends(verified_user)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if user:
+            return await productservice.getBusproviderRoutes(response=response,adminId=providerId,db=db)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/bus_provider",
+    response_model=ProvidersResponse,
+    response_model_exclude_unset=True,tags=['bus'])
+async def get_Bus_Providers(
+    request: Request,
+    response: Response,
+    user: Annotated[Customer, Depends(verified_user)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if user:
+            return await productservice.getBusprovider(response=response,setting=setting,db=db,user=user)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return ProvidersResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return ProvidersResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.get("/stations/{mode}",
     response_model=StationsResponse,
     response_model_exclude_unset=True,)
@@ -136,7 +177,7 @@ async def get_Train_Stations(
         return StationsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,data=[])
 @router.get("/train_search",
     response_model=RoutesResponse,
-    response_model_exclude_unset=True,)
+    response_model_exclude_unset=True,tags=['train'])
 async def get_Trains_Routes(
     request: Request,
     response: Response,
@@ -163,6 +204,46 @@ async def get_Trains_Routes(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/train_provider/{providerId}",
+    response_model=RoutesResponse,
+    response_model_exclude_unset=True,tags=['train'])
+async def get_Train_ProviderRoutes(
+    providerId: int,
+    response: Response,
+    user: Annotated[Customer, Depends(verified_user)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if user:
+            return await productservice.getTrainproviderRoutes(response=response,adminId=providerId,db=db)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/train_provider",
+    response_model=ProvidersResponse,
+    response_model_exclude_unset=True,tags=['train'])
+async def get_Bus_Providers(
+    request: Request,
+    response: Response,
+    user: Annotated[Customer, Depends(verified_user)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if user:
+            return await productservice.getTrainprovider(response=response,setting=setting,db=db,user=user)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return ProvidersResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return ProvidersResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.get("/schedule/{mode}/{routeId}",
     response_model=RouteResponse,
     response_model_exclude_unset=True,)
