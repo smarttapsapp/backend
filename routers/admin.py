@@ -457,7 +457,7 @@ async def deleteStation(
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.deleteRole(
+        return await adminservice.deleteStation(
             roleId=id,
                 db=db,
                 request=request,
@@ -565,8 +565,8 @@ async def deleteRoute(
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.deleteRole(
-            roleId=id,
+        return await adminservice.deleteRoute(
+            routeId=id,
                 db=db,
                 request=request,
                 response=response,
@@ -945,8 +945,8 @@ async def deleteBus(
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.deleteRole(
-            roleId=id,
+        return await adminservice.deleteBus(
+            busId=id,
                 db=db,
                 request=request,
                 response=response,

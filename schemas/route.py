@@ -36,7 +36,7 @@ class AddRouteRequest(RouteBase):
     admin_id: int
     startId:int
     stopId:int
-    buses:List[int]
+    buses:Union[List[int],None]=None
 
 class RouteResponse(BaseResponse):
     data: Route = None

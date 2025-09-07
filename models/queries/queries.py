@@ -139,7 +139,11 @@ def getstations(db: Session,mode:MovableEnum,adminId:int=None):
 def getStationById(db: Session,stationId:int):
     return db.query(StationModel).filter(StationModel.id == stationId).first()
 def deleteStation(db: Session ,stationId:int):
-    return db.query(StationModel).filter(StationModel.id == stationId).delete()
+    deleted = db.query(StationModel).filter(StationModel.id == stationId).delete()
+    if deleted:
+        db.commit()
+        return True
+    return False
 def getRoutes(db: Session,adminId:int=None):
     if adminId:
         return db.query(RouteModel).filter(RouteModel.admin_id ==adminId).order_by(desc(RouteModel.created_at)).all()
@@ -147,7 +151,11 @@ def getRoutes(db: Session,adminId:int=None):
 def getRouteById(db: Session,routeId:int):
     return db.query(RouteModel).filter(RouteModel.id == routeId).first()
 def deleteRoute(db: Session ,routeId:int):
-    return db.query(RouteModel).filter(RouteModel.id == routeId).delete()
+    deleted = db.query(RouteModel).filter(RouteModel.id == routeId).delete()
+    if deleted:
+        db.commit()
+        return True
+    return False
 def query_stations(db: Session,mode:str):
     return db.query(StationModel).filter(StationModel.mode == mode).all()
 def queryRouteByIdAndMode(db: Session,routeId:int,mode:str):
@@ -168,6 +176,12 @@ def query_routes_by_stations(db: Session,departure:str,arrival:str,mode:str):
     )
 def busById(db: Session,busId:int):
     return db.query(BusModel).filter(BusModel.id == busId).first()
+def deleteBus(db: Session ,busId:int):
+    deleted = db.query(BusModel).filter(BusModel.id == busId).delete()
+    if deleted:
+        db.commit()
+        return True
+    return False
 def getPaymentHistories(db: Session,userId:int,startDate:str,endDate:str):
     if startDate and endDate:
         start = datetime.strptime(startDate, "%Y-%m-%d").date()

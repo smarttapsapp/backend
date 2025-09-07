@@ -726,13 +726,13 @@ class StationModel(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 bus_route = Table('bus_route',
     Base.metadata,
-    Column('bus_id', Integer, ForeignKey('buses.id'), primary_key=True),
-    Column('route_id', Integer, ForeignKey('routes.id'), primary_key=True)
+    Column('bus_id', Integer, ForeignKey('buses.id' ,ondelete="CASCADE"), primary_key=True),
+    Column('route_id', Integer, ForeignKey('routes.id',ondelete="CASCADE"), primary_key=True)
 )
 train_route = Table('train_route',
     Base.metadata,
-    Column('train_id', Integer, ForeignKey('trains.id'), primary_key=True),
-    Column('route_id', Integer, ForeignKey('routes.id'), primary_key=True)
+    Column('train_id', Integer, ForeignKey('trains.id',ondelete="CASCADE"), primary_key=True),
+    Column('route_id', Integer, ForeignKey('routes.id',ondelete="CASCADE"), primary_key=True)
 )
 class BusModel(Base):
     __tablename__ = 'buses'
@@ -750,7 +750,7 @@ class BusModel(Base):
     base_price = Column(String(25), nullable=True)
     availabilityStatus = Column(Boolean, default=False)
     busImage = Column(String(255), nullable=True)
-    routes = relationship('RouteModel',secondary=bus_route,back_populates='buses')
+    routes = relationship('RouteModel',secondary=bus_route,back_populates='buses',cascade="all")
     park = relationship("ParkModel", backref="buses")
     provider = relationship("AdminModel", back_populates="buses")
     schedules =  relationship("ScheduleModel", secondary="bus_schedule", back_populates="buses")
@@ -767,8 +767,8 @@ class RouteModel(Base):
     destinationStation_id = Column(Integer, ForeignKey("stations.id"))
     sourceStation = relationship("StationModel", foreign_keys=[sourceStation_id], back_populates="depature")
     destinationStation = relationship("StationModel", foreign_keys=[destinationStation_id], back_populates="arrival")
-    trains = relationship('TrainModel',secondary=train_route,back_populates='routes')
-    buses = relationship('BusModel',secondary=bus_route,back_populates='routes')
+    trains = relationship('TrainModel',secondary=train_route,back_populates='routes',cascade="all")
+    buses = relationship('BusModel',secondary=bus_route,back_populates='routes',cascade="all")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 class TrainModel(Base):
@@ -780,7 +780,7 @@ class TrainModel(Base):
     admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
     image = Column(String(255), nullable=True)
     provider = relationship("AdminModel", back_populates="trains")
-    routes = relationship('RouteModel',secondary=train_route,back_populates='trains')
+    routes = relationship('RouteModel',secondary=train_route,back_populates='trains',cascade="all")
     schedules =  relationship("ScheduleModel", secondary="train_schedule", back_populates="trains")
     description = Column(String(255), nullable=True)
     seats = relationship("SeatModel", backref="train")
