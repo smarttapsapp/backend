@@ -26,6 +26,10 @@ class Seat(SeatBase):
 
 class SeatsResponse(BaseResponse):
     data: Union[List[Seat],None] = None
-    
+
+class AddSeatRequest(SeatBase):
+    id: Optional[int]=None
+    admin_id: int
+
 class SeatResponse(BaseResponse):
     data: Seat = None

@@ -149,6 +149,16 @@ def getScheduleById(db: Session,scheduleId:int):
     return db.query(ScheduleModel).filter(ScheduleModel.id == scheduleId).first()
 def deleteSchedule(db: Session ,scheduleId:int):
     return db.query(ScheduleModel).filter(ScheduleModel.id == scheduleId).delete()
+# seat
+def getSeats(db: Session,adminId:int=None):
+    if adminId:
+        return db.query(SeatModel).filter(SeatModel.admin_id ==adminId).order_by(desc(SeatModel.created_at)).all()
+    return db.query(SeatModel).all()
+def getSeatById(db: Session,seatId:int):
+    return db.query(SeatModel).filter(SeatModel.id == seatId).first()
+def deleteSeat(db: Session ,seatId:int):
+    return db.query(SeatModel).filter(SeatModel.id == seatId).delete()
+
 # parks
 def getParks(db: Session,startDate:str,endDate:str,adminId:int=None):
     if startDate and endDate:

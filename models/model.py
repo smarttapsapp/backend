@@ -675,13 +675,20 @@ class ScheduleSeatModel(Base):
     id = Column(Integer, primary_key=True)
     seat_id = Column(Integer, ForeignKey('seats.id'), nullable=False)
     schedule_id = Column(Integer, ForeignKey('schedules.id'), nullable=False)
+class TrainSeatModel(Base):
+    __tablename__ = 'seat_train'
+    id = Column(Integer, primary_key=True)
+    seat_id = Column(Integer, ForeignKey('seats.id'), nullable=False)
+    train_id = Column(Integer, ForeignKey('trains.id'), nullable=False)
 class SeatModel(Base):
     __tablename__ = 'seats'
     
     id = Column(Integer, primary_key=True)
-    train_id  = Column(Integer, ForeignKey("trains.id"))
-    schedule_id  = Column(Integer, ForeignKey("schedules.id"))
-    schedules =  relationship("ScheduleModel", secondary="seat_schedule", back_populates="seats")
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
+    #train_id  = Column(Integer, ForeignKey("trains.id"))
+    trains =  relationship("TrainModel", secondary="seat_train", back_populates="seats",cascade="all")
+    #schedule_id  = Column(Integer, ForeignKey("schedules.id"))
+    #schedules =  relationship("ScheduleModel", secondary="seat_schedule", back_populates="seats")
     seatNumber = Column(String(50), nullable=False)
     price = Column(String(25), nullable=True)
     classType = Column(Enum(TrainClassEnum), default=TrainClassEnum.ADULT)
@@ -782,8 +789,8 @@ class TrainModel(Base):
     provider = relationship("AdminModel", back_populates="trains")
     routes = relationship('RouteModel',secondary=train_route,back_populates='trains',cascade="all")
     schedules =  relationship("ScheduleModel", secondary="train_schedule", back_populates="trains")
+    seats = relationship('SeatModel',secondary="seat_train",back_populates='trains',cascade="all")
     description = Column(String(255), nullable=True)
-    seats = relationship("SeatModel", backref="train")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 class ScheduleModel(Base):
@@ -796,7 +803,7 @@ class ScheduleModel(Base):
     route_id = Column(Integer, ForeignKey('routes.id'), nullable=False)
     departureTime = Column(String(50), nullable=False)
     arrivalTime = Column(String(255), nullable=True)
-    seats =  relationship("SeatModel", secondary="seat_schedule", back_populates="schedules")
+    #seats =  relationship("SeatModel", secondary="seat_schedule", back_populates="schedules")
     daysOfOperation = Column(String(255), nullable=True)
     timeOfOperation = Column(Enum(TimeOfOperationEnum), default=TimeOfOperationEnum.MORNING)
     mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS)  # schedule mode
