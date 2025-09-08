@@ -6,14 +6,10 @@ from schemas.response import BaseResponse
 
 
 class SeatBase(BaseModel):
+    classType:str
+    price:str
     seatNumber: Union[str, None] = None
-    classType: Union[str, None] = None
     availabilityStatus: Union[str, None] = None
-    price: Union[str, None] = None
-
-
-class SeatRequest(SeatBase):
-    user: Union[List[str], None] = None
 
 class Seat(SeatBase):
     id: Optional[int]

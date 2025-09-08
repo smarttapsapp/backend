@@ -20,7 +20,7 @@ from schemas.route import RoutesResponse,AddRouteRequest
 from schemas.ticket import TicketsResponse
 from schemas.bus import BusesResponse,AddBusRequest
 from schemas.park import ParksResponse
-from schemas.train import TrainsResponse
+from schemas.train import *
 from schemas.notification import NotificationsResponse
 from fastapi import (
     status,
@@ -633,7 +633,7 @@ async def addBus(db: Session,setting: Setting,payload: AddBusRequest, background
     except Exception as ex:
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)   
 async def updateBus(db: Session,setting: Setting,payload: AddBusRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
     try:
         logger.info(f"started creating new admin role @ {datetime.now()}")
@@ -746,7 +746,7 @@ async def listOfSeats(request: Request,response: Response,setting: Setting,db: S
         if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
             return SeatsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getSeats(db=db))
         else:
-            return SeatsResponse(statusCode= str(status.HTTP_401_UNAUTHORIZED),statusDescription=SUCCESS,data=adminQuery.getSeats(db=db,adminId=admin.id))
+            return SeatsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getSeats(db=db,adminId=admin.id))
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -754,20 +754,26 @@ async def listOfSeats(request: Request,response: Response,setting: Setting,db: S
 async def addSeat(db: Session,setting: Setting,payload: AddSeatRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
     try:
         logger.info(f"started creating new seat at {datetime.now()}")
-        seat = adminQuery.getSeatById(db=db,seatId=payload.id)
-        if seat:
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ALREADYEXIST)
+        existing = adminQuery.getSeatById(db=db,seatId=payload.id)
+        if existing:
+            existing.price = payload.price
+            existing.classType = TrainClassEnum[payload.classType]
         else:
-            new = SeatModel(name=payload.name,tag=AdminRoleEnum(payload.tag),created_at=datetime.now(),updated_at=datetime.now(),)
-            created = queries.create(db=db, model=new)
-            if created:
-                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
-                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
-                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
-            else:
-                response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+            existing = SeatModel(
+                admin_id = admin.id,
+                seatNumber = 10,
+                price = payload.price,
+                classType = TrainClassEnum[payload.classType],
+                availabilityStatus = "available",
+                created_at=datetime.now(),updated_at=datetime.now(),)
+        created = queries.create(db=db, model=existing)
+        if created:
+            email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
     except Exception as ex:
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -799,23 +805,47 @@ async def listOfTrains(request: Request,response: Response,setting: Setting,db: 
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TrainsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-async def addTrain(db: Session,setting: Setting,payload: AddRoleRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+async def addTrain(db: Session,setting: Setting,payload: AddTrainRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
     try:
         logger.info(f"started creating new admin role @ {datetime.now()}")
-        role = adminQuery.getRole(db=db,roleId=payload.tag)
-        if role:
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ALREADYEXIST)
-        else:
-            new = RoleModel(name=payload.name,tag=AdminRoleEnum(payload.tag),created_at=datetime.now(),updated_at=datetime.now(),)
-            created = queries.create(db=db, model=new)
-            if created:
-                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
-                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
-                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+        if admin.role.tag in[AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
+            adminId = admin.id if admin.role.tag in [AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER] else payload.admin_id
+            routes = adminQuery.getRoutesByIds(db=db,ids=payload.routes,adminId=adminId)
+            if routes:
+                schedules =  adminQuery.getSchedulesByIds(db=db,ids=payload.schedules,adminId=None)
+                if schedules:
+                    seatsClass = adminQuery.getSeatsByIds(db=db,ids=payload.seats,adminId=adminId)
+                    if seatsClass:
+                        previous = adminQuery.getTrain(db=db,trainNumber=payload.trainNumber)
+                        if previous and previous.admin_id == adminId:
+                            previous.trainName = payload.trainName
+                            previous.seats = seatsClass
+                            previous.description = payload.description
+                            previous.schedules = schedules
+                            previous.routes = routes
+                            previous.updated_at = datetime.now()
+                        else:
+                            previous = TrainModel(admin_id=admin.id,trainNumber=payload.trainNumber,trainName=payload.trainName,description=payload.description,created_at=datetime.now(),updated_at=datetime.now(),schedules=schedules,routes=routes,seats=seatsClass)
+                        created = queries.create(db=db, model=previous)
+                        if created:
+                            email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
+                            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                        else:
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOSEAT)
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOSCHEDULE)
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOROUTE)
+        else:
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            return BaseResponse(statusCode = str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED)
     except Exception as ex:
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -968,7 +998,7 @@ async def listOfStations(request: Request,response: Response,setting: Setting,db
 async def addStation(db: Session,setting: Setting,payload: AddStationRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
     try:
         logger.info(f"started creating/updating new station @ {datetime.now()}")
-        if admin.role.tag in[AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
+        if admin.role.tag in [AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
             if admin:
                 if payload.id:
                     existing = queries.getStationById(db=db,stationId=payload.id)

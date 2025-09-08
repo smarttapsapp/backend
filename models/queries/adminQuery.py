@@ -87,8 +87,8 @@ def getTrains(db: Session,adminId:int=None):
     if adminId:
         return db.query(TrainModel).filter(TrainModel.admin_id ==adminId).order_by(desc(TrainModel.created_at)).all()
     return db.query(TrainModel).order_by(desc(TrainModel.created_at)).all()
-def getTrain(db: Session,busNumber:str):
-    return db.query(TrainModel).filter(TrainModel.trainNumber==busNumber).first()
+def getTrain(db: Session,trainNumber:str):
+    return db.query(TrainModel).filter(TrainModel.trainNumber==trainNumber).first()
 def deleteTrain(db: Session,id:int):
     return db.query(TrainModel).filter(TrainModel.id ==id).delete()
 def countTrains(db: Session):
@@ -154,6 +154,10 @@ def getSeats(db: Session,adminId:int=None):
     if adminId:
         return db.query(SeatModel).filter(SeatModel.admin_id ==adminId).order_by(desc(SeatModel.created_at)).all()
     return db.query(SeatModel).all()
+def getSeatsByIds(db:Session,ids:list[int],adminId:int=None):
+    if adminId:
+        return db.query(SeatModel).filter(SeatModel.admin_id ==adminId).filter(SeatModel.id.in_(ids)).all()
+    return db.query(SeatModel).filter(SeatModel.id.in_(ids)).all()
 def getSeatById(db: Session,seatId:int):
     return db.query(SeatModel).filter(SeatModel.id == seatId).first()
 def deleteSeat(db: Session ,seatId:int):

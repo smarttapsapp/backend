@@ -6,12 +6,15 @@ from schemas.response import BaseResponse
 from schemas.seat import Seat
 from schemas.admin import Provider
 from schemas.schedule import Schedule
+#from schemas.route import Route
 
 
 class TrainBase(BaseModel):
     trainName: Union[str, None] = None
     trainNumber: Union[str, None] = None
     image: Union[str, None] = None
+    description: Union[str, None] = None
+    admin_id: Optional[int]
 
 
 class TrainRequest(TrainBase):
@@ -21,6 +24,7 @@ class Train(TrainBase):
     provider: Optional[Provider]=None
     schedules: Union[List[Schedule],None] = None
     seats: Union[List[Seat],None] = None
+    #routes:Union[List[Route],None] = None
     id: Optional[int]
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
@@ -28,6 +32,12 @@ class Train(TrainBase):
     class Config:
         from_attributes = True
         populate_by_name = True
+
+class AddTrainRequest(TrainBase):
+    id: Optional[int] = None
+    schedules:List[int]
+    routes:List[int]
+    seats:List[int]
 
 class TrainsResponse(BaseResponse):
     data: Union[List[Train],None] = None

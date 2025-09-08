@@ -22,7 +22,7 @@ from schemas.admin import *
 from schemas.role import *
 from schemas.station import *
 from schemas.route import RoutesResponse,AddRouteRequest
-from schemas.train import TrainsResponse
+from schemas.train import *
 from schemas.bus import BusesResponse,AddBusRequest
 from schemas.park import ParksResponse
 from schemas.ticket import TicketsResponse
@@ -716,7 +716,7 @@ async def get_seats(
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["seat"])
 async def addSeat(
-    payload:AddRoleRequest,
+    payload:AddSeatRequest,
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
@@ -1079,7 +1079,7 @@ async def get_trains(
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["train"])
 async def addTrain(
-    payload:AddRoleRequest,
+    payload:AddTrainRequest,
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
@@ -1088,10 +1088,10 @@ async def addTrain(
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.addRole(
-            payload=payload,
+        return await adminservice.addTrain(
                 db=db,
                 setting=setting,
+            payload=payload,
                 request=request,
                 response=response,
                 admin=admin,
