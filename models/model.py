@@ -800,7 +800,7 @@ class ScheduleModel(Base):
     admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
     train_id = Column(Integer, ForeignKey("trains.id"), nullable=True)
     bus_id = Column(Integer, ForeignKey('buses.id'), nullable=True)
-    route_id = Column(Integer, ForeignKey('routes.id'), nullable=False)
+    #route_id = Column(Integer, ForeignKey('routes.id'), nullable=False)
     departureTime = Column(String(50), nullable=False)
     arrivalTime = Column(String(255), nullable=True)
     #seats =  relationship("SeatModel", secondary="seat_schedule", back_populates="schedules")

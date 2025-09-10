@@ -148,7 +148,11 @@ def getSchedulesByIds(db:Session,ids:list[int],adminId:int=None):
 def getScheduleById(db: Session,scheduleId:int):
     return db.query(ScheduleModel).filter(ScheduleModel.id == scheduleId).first()
 def deleteSchedule(db: Session ,scheduleId:int):
-    return db.query(ScheduleModel).filter(ScheduleModel.id == scheduleId).delete()
+    deleted = db.query(ScheduleModel).filter(ScheduleModel.id == scheduleId).delete()
+    if deleted:
+        db.commit()
+        return True
+    return False
 # seat
 def getSeats(db: Session,adminId:int=None):
     if adminId:

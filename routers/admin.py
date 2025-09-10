@@ -27,7 +27,7 @@ from schemas.bus import BusesResponse,AddBusRequest
 from schemas.park import ParksResponse
 from schemas.ticket import TicketsResponse
 from schemas.notification import NotificationsResponse
-from schemas.schedule import SchedulesResponse
+from schemas.schedule import *
 from schemas.commission import *
 from schemas.service_rate import *
 from schemas.general_ledger import *
@@ -608,7 +608,7 @@ async def get_schedules(
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["schedule"])
 async def addSchedule(
-    payload:AddRoleRequest,
+    payload:AddScheduleRequest,
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
@@ -617,7 +617,7 @@ async def addSchedule(
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.addRole(
+        return await adminservice.addSchedule(
             payload=payload,
                 db=db,
                 setting=setting,
@@ -674,8 +674,8 @@ async def deleteSchedule(
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.deleteRole(
-            roleId=id,
+        return await adminservice.deleteSchedule(
+            scheduleId=id,
                 db=db,
                 request=request,
                 response=response,

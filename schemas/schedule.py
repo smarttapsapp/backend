@@ -7,6 +7,7 @@ from schemas.seat import Seat
 
 
 class ScheduleBase(BaseModel):
+    timeOfOperation: Union[str, None] = None
     departureTime: Union[str, None] = None
     arrivalTime: Union[str, None] = None
 
@@ -16,7 +17,6 @@ class ScheduleRequest(ScheduleBase):
 
 class Schedule(ScheduleBase):    
     seats: Union[List[Seat],None] = None
-    timeOfOperation: Union[str, None] = None
     daysOfOperation: Union[str, None] = None
     id: Optional[int]
     created_at: Union[datetime, None] = func.now()
@@ -26,6 +26,10 @@ class Schedule(ScheduleBase):
         from_attributes = True
         populate_by_name = True
 
+class AddScheduleRequest(ScheduleBase):
+    id: Optional[int]=None
+    admin_id: int
+    mode:str
 class SchedulesResponse(BaseResponse):
     data: Union[List[Schedule],None] = None
     
