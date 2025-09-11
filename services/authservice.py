@@ -260,29 +260,15 @@ async def deviceUnlockInitiate(
             logger.info(f"Verify user with transaction PIN @  {datetime.now()}.....................")
             if util.verify_password(payload.pin,account.pin):
                 logger.info(f"Account is fine go and check bvn/nin @  {datetime.now()}.....................")
-                if payload.action.lower() == "bvn":
-                    if payload.bvn == account.bvn :# and account.bvn_verified
-                        otp = util.generateOTP()
-                        password = f"{otp}|{device.imeiNo}|{device.modelName}|{device.manufacturer}"
-                        newOtp = OTPModel(otp=otp,user_id=account.id,status=OTPStatusEnum.OPEN,servicename="unlockInitiate",created_at=datetime.now(),expired_at=datetime.now()+timedelta(minutes=5),updated_at=datetime.now(),)
-                        createdOTP = authQuery.create_otp(db=db,otp=newOtp)
-                        background_task.add_task(notificationservice.sendNotification,notificationType="unlockInitiate",setting=setting,background_task=background_task,user=account)
-                        authToken = util.create_access_token(setting=setting,credentials={"username":account.phonenumber,"password": password,},exp=15,)
-                        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"token":authToken[0],"expire":authToken[1],"message":f"Please enter the OTP sent to {account.phonenumber[0:4]}xxxxxx{account.phonenumber[-2:]} to unlock your device"},)
-                    else:
-                        response.status_code = status.HTTP_400_BAD_REQUEST
-                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
-                elif payload.action.lower() == "nin":
-                    if payload.bvn == account.nin :# and account.bvn_verified
-                        otp = util.generateOTP()
-                        newOtp = OTPModel(otp=otp,user_id=account.id,status=OTPStatusEnum.OPEN,servicename="unlockInitiate",created_at=datetime.now(),expired_at=datetime.now()+timedelta(minutes=5),updated_at=datetime.now(),)
-                        createdOTP = authQuery.create_otp(db=db,otp=newOtp)
-                        background_task.add_task(notificationservice.sendNotification,notificationType="unlockInitiate",setting=setting,background_task=background_task,user=account)
-                        authToken = util.create_access_token(setting=setting,credentials={"username":account.phonenumber,"password": password,},exp=15,)
-                        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"token":authToken[0],"expire":int(authToken[1]),"message":f"Please enter the OTP sent to {account.phonenumber[0:4]}xxxxxx{account.phonenumber[-2:]} to unlock your device"},)
-                    else:
-                        response.status_code = status.HTTP_400_BAD_REQUEST
-                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+                if payload.action.lower() == "unlock":
+                    otp = util.generateOTP()
+                    password = f"{otp}|{device.imeiNo}|{device.modelName}|{device.manufacturer}"
+                    newOtp = OTPModel(otp=otp,user_id=account.id,status=OTPStatusEnum.OPEN,servicename="unlockInitiate",created_at=datetime.now(),expired_at=datetime.now()+timedelta(minutes=5),updated_at=datetime.now(),)
+                    createdOTP = authQuery.create_otp(db=db,otp=newOtp)
+                    message =f"""<p>Dear {account.firstname} {account.lastname},<br />Kindly enter OTP {createdOTP.otp} to complete your activation or verification process<br /></p>"""
+                    background_task.add_task(notificationservice.sendNotification,request=request,notificationType="unlockInitiate",setting=setting,email=account.email,message=message,template="otp")
+                    authToken = util.create_access_token(setting=setting,credentials={"username":account.phonenumber,"password": password,},exp=15,)
+                    return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"token":authToken[0],"expire":authToken[1],"message":f"Please enter the OTP sent to {account.phonenumber[0:4]}xxxxxx{account.phonenumber[-2:]} to unlock your device"},)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)

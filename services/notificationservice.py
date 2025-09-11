@@ -125,8 +125,15 @@ def notifyUser(
             logger.info(f"Notification sent successfully to {customer.firstname}")
     else:
         logger.info(f"User with ID {userId} not found")
-async def sendNotification(setting: Setting,notificationType:str,background_task:BackgroundTasks,user:CustomerModel):
+async def sendNotification(request:Request,setting: Setting,notificationType:str,email:str,message:str,template:str):
     try:
+        logger.info(f"Started sending notification to {email} {datetime.now()}")
+        if notificationType =="unlockInitiate":
+            if template == "otp":
+                email_body = util.templates.TemplateResponse("otp_message.html",{"request": request,"message":message},)
+                subject = "Unlock Device"
+                    
+        util.mailer(body=str(email_body.body, "utf-8"),setting=setting,subject=subject,toAddress=email,)
         logger.info(f"started sending notification at {datetime.now()}")
     except Exception as ex:
         logger.info(f"Error {ex} occurred while processing your debit transaction at {datetime.now()}")

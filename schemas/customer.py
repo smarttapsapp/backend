@@ -82,7 +82,6 @@ class NextOfKinRequest(BaseModel):
     phone: str
     relationship: str
 class UnlockRequest(BaseModel):
-    bvn:str
     pin:str
     action:str
     username: str
