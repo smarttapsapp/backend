@@ -8,6 +8,8 @@ from schemas.customer import Customer
 import logging
 
 logger = logging.getLogger(__name__)
+def getAdminById(db: Session, adminId: int):
+    return db.query(AdminModel).filter(AdminModel.id == adminId).first()
 def getBillByVas(db: Session,vasType:str):
     return db.query(ProductModel).filter(ProductModel.vasType == vasType).first()
 def customer(db: Session, userId: int):
@@ -255,3 +257,9 @@ def getHeadoffice(db: Session, glcode: str):
     return db.query(GLAccountModel).filter(GLAccountModel.code == glcode).first()
 def getHeadofficeAccount(db:Session):
     return db.query(AdminModel).filter(AdminModel.role.has(RoleModel.tag == AdminRoleEnum.HEADOFFICE)).first() #db.query(AdminModel).filter(AdminModel.role == AdminRoleEnum.HEADOFFICE).first()
+def getMerchantByCustomerId(db: Session, customerId: int):
+    return db.query(AdminModel).filter(AdminModel.customer_id == customerId).first()
+def getAdminCommission(db: Session, adminId: int):
+    return db.query(CommissionModel).filter(CommissionModel.admin_id == adminId).first()
+def getAdminDiscount(db: Session, adminId: int):
+    return db.query(ServiceRateModel).filter(ServiceRateModel.admin_id == adminId).first()
