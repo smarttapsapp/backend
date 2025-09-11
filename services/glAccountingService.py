@@ -17,7 +17,7 @@ from schemas.route import RoutesResponse,AddRouteRequest
 from schemas.ticket import TicketsResponse
 from schemas.bus import BusesResponse,AddBusRequest
 from schemas.park import ParksResponse
-from schemas.payment import BillPaymentResponse,BuyTicketRequest
+from schemas.payment import BillPaymentResponse,BuyTicketRequest,BuyTrainTicketRequest
 from schemas.train import TrainsResponse
 from schemas.notification import NotificationsResponse
 from services import notificationservice
@@ -137,6 +137,122 @@ async def debitBusTransaction(response:Response,setting: Setting,db: Session,bil
             headoffice = adminQuery.getAdminByRole(db=db,id=role.id)
             if headoffice:
                 logger.info(f"headoffice is configured at {datetime.now()}")
+                if not merchant:
+                    merchant = headoffice
+                serviceProvider = adminQuery.getServiceProviderByProduct(db=db,productTypeId=biller.id)
+                if serviceProvider:
+                    logger.info(f"{serviceProvider.admin.lastname}  is configured configured at {datetime.now()}")
+                    provider_cost = int(payload.amount) - int(serviceProvider.provider_discount_rate) if serviceProvider.provider_discount_type == CommissionType.percentage else int(payload.amount) * (1 - serviceProvider.provider_discount_rate)
+                    netIncome = int(payload.amount) - provider_cost
+                    merchantCommission = adminQuery.getServiceCommissionByProduct(db=db,productTypeId=biller.id,adminId=merchant.id) if merchant else None
+                    logger.info(f"started checking available merchant at {datetime.now()}")
+                    commissionAmount = 0
+                    if merchantCommission:
+                        logger.info(f"merchant is configured at {datetime.now()}")
+                        commissionAmount = netIncome - int(merchantCommission.commission_rate) if merchantCommission.commission_type == CommissionType.calculated else (netIncome *  merchantCommission.commission_rate)
+                    trnxId = f"{str(biller.billerId[:2]).upper()}-{util.generateId()}"
+                    # debit customer
+                    customerAccount.availableBalance = int(customerAccount.availableBalance) - int(payload.amount)
+                    customerAccount.updated_at = datetime.now()
+                    logger.info(f"started saving debit for customer at {datetime.now()}")
+                    customerAccount.payments.append(PaymentModel(wallet_id = customerAccount.id,user_id =customerAccount.user_id, amount = int(payload.amount),
+                                     payment_type =PaymentEnum.DEBIT,reference =trnxId,
+                                     event = "charge.success",
+                                     status = "success",channel =ChannelEnum.MOBILE,providerAmount = provider_cost,statusCode = TransactionCodeEnum.PROCESSING,
+                                     statusDescription = TransactionStatusEnum.PROCESSING,commissionAmount = commissionAmount,
+                                     product_type_id = biller.id,product_id=biller.product_id,recipient=customerAccount.walletAccount,
+                                     statusMessage = remark,balanceBefore = customerAccount.availableBalance,
+                                     balanceAfter = customerAccount.availableBalance,created_at =datetime.now(),updated_at = datetime.now())),
+                    savedCustomerAccount = adminQuery.save(db=db,account=customerAccount)
+                    if savedCustomerAccount:
+                        background_task.add_task(notificationservice.sendNotification,notificationType="debit",setting=setting,background_task=background_task)
+                        serviceProvider.admin.wallet.availableBalance = int(serviceProvider.admin.wallet.availableBalance) + int(provider_cost)
+                        serviceProvider.admin.wallet.updated_at = datetime.now()
+                        serviceProvider.admin.wallet.payments.append(PaymentModel(wallet_id = serviceProvider.admin.wallet.id,admin_id = serviceProvider.admin_id, amount = int(provider_cost),
+                                     payment_type =PaymentEnum.CREDIT,reference =f"{str(biller.billerId[:2]).upper()}-{util.generateId()}",
+                                     transactionreference=trnxId,event = "charge.success",status = "success",channel =ChannelEnum.MOBILE,
+                                     statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,product_type_id = biller.id,product_id=biller.product_id,
+                                     recipient=serviceProvider.admin.wallet.walletAccount,statusMessage = remark,balanceBefore = serviceProvider.admin.wallet.availableBalance,
+                                     balanceAfter = serviceProvider.admin.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now()),)
+                        savedServiceProvider = adminQuery.create(db=db,model=serviceProvider)
+                        if savedServiceProvider:
+                            background_task.add_task(notificationservice.sendNotification,notificationType="credit",setting=setting,background_task=background_task)
+                            merchant.wallet.availableBalance = int(merchant.wallet.availableBalance) + int(commissionAmount)
+                            merchant.wallet.updated_at = datetime.now()
+                            merchant.wallet.payments.append(PaymentModel(wallet_id=merchant.wallet.id,admin_id=merchant.id,amount = int(commissionAmount),
+                                     payment_type =PaymentEnum.CREDIT,reference =f"{str(biller.billerId[:2]).upper()}-{util.generateId()}",
+                                     transactionreference=trnxId,event = "charge.success",status = "success",channel =ChannelEnum.MOBILE,
+                                     fee = provider_cost,statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,product_type_id = biller.id,product_id=biller.product_id,
+                                     recipient=merchant.wallet.walletAccount,statusMessage = remark,balanceBefore =merchant.wallet.availableBalance,
+                                     balanceAfter =merchant.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now()))
+                            savedMerchant = adminQuery.create(db=db,model=merchant)
+                            if savedMerchant:
+                                background_task.add_task(notificationservice.sendNotification,notificationType="credit",setting=setting,background_task=background_task)
+                                headoffice.wallet.availableBalance = int(headoffice.wallet.availableBalance) + int(netIncome)
+                                headoffice.wallet.updated_at = datetime.now()
+                                headoffice.wallet.payments.append(PaymentModel(wallet_id = headoffice.wallet.id,admin_id =headoffice.id,amount = int(netIncome),
+                                     payment_type =PaymentEnum.CREDIT,reference =f"{str(biller.billerId[:2]).upper()}-{util.generateId()}",
+                                     event = "charge.success",payment_date = datetime.now().date(),status = "success",channel = ChannelEnum.MOBILE,
+                                     fee = provider_cost,statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,product_type_id = biller.id,product_id=biller.product_id,
+                                     recipient=headoffice.wallet.walletAccount,statusMessage = remark,balanceBefore = headoffice.wallet.availableBalance,
+                                     balanceAfter =headoffice.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now()))
+                                savedHeadoffice = adminQuery.create(db=db,model=headoffice)
+                                if savedHeadoffice:
+                                    background_task.add_task(notificationservice.sendNotification,notificationType="credit",setting=setting,background_task=background_task)
+                                    ticketId =  f"BUS-{util.generateId()}"
+                                    logger.info(f"create ticket record for bus with balance after {customerAccount.availableBalance} ticket reference is {ticketId}")
+                                    ticket = TicketModel(
+                                        bus_id = bus.id,
+                                        admin_id=bus.admin_id,
+                                        customer_id = customerAccount.user_id,
+                                        route_id = payload.routeId,
+                                        schedule_id = payload.scheduleId,
+                                        qr_code = f"{ticketId}|{bus.bus_number}|{TicketModeEnum.BUS.value}|{customerAccount.walletAccount}",
+                                        mode = TicketModeEnum.BUS,
+                                        price = int(payload.amount),
+                                        ticket_number = ticketId,
+                                        booked_at =datetime.now(),
+                                        expired_at =datetime.now()+timedelta(days=2),
+                                        created_at =datetime.now(),
+                                        updated_at = datetime.now()
+                                    )
+                                    createTicketRecord = adminQuery.create(db=db,model=ticket)
+                                    return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":createTicketRecord.ticket_number})
+                                logger.info(f"Unable to credit system wallet at {datetime.now()}")
+                                response.status_code = status.HTTP_400_BAD_REQUEST
+                                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+                            logger.info(f"Unable to credit merchant commission wallet at {datetime.now()}")
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+                        logger.info(f"Unable to credit provider wallet at {datetime.now()}")
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+                    logger.info(f"Unable to debit customer at {datetime.now()}")
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=DEBITFAILED)
+                logger.info(f"Service provider has not been configured at {datetime.now()}")
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDBILLER)
+            logger.info(f"Please configure headoffice to start transactions at {datetime.now()}")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SERVICEERROR)
+        logger.info(f"headoffice role has not been configured at {datetime.now()}")
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SERVICEERR)
+    except Exception as ex:
+        logger.info(f"Error {ex} occurred while processing your debit transaction at {datetime.now()}")
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+
+async def debitTrainTransaction(response:Response,setting: Setting,db: Session,biller:ProductTypeModel,customer:CustomerModel,payload:BuyTrainTicketRequest,train:TrainModel,seat:SeatModel,schedule:ScheduleModel,route:RouteModel,background_task:BackgroundTasks):
+    try:
+        logger.info(f"started gl debit transaction for biller {biller.id} at {datetime.now()}")
+        headoffice = queries.getHeadofficeAccount(db=db)
+        logger.info(f"headoffice is configured at {datetime.now()}")
+        if headoffice:
+            outFlowGlAccount = queries.getHeadoffice(db=db,glcode=setting.gl_outflow)
+            if outFlowGlAccount:
+                logger.info(f"Outflow GLaccount is configured at {datetime.now()}")
                 if not merchant:
                     merchant = headoffice
                 serviceProvider = adminQuery.getServiceProviderByProduct(db=db,productTypeId=biller.id)

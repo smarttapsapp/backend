@@ -679,6 +679,65 @@ async def debitBusTicket(db:Session,request:Request,response:Response,setting:Se
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex),)
+async def debitTrainTicket(db:Session,request:Request,response:Response,setting:Setting,payload:BuyTrainTicketRequest,user:CustomerModel,background_task:BackgroundTasks):
+    try:
+        logger.info(f"Started debit process for train ticket payment {payload.trainId} for amount {payload.amount} for {user.firstname}")
+        if user.wallet.walletAccount == payload.walletAccount:
+            product = queries.getBillerByBillerId(db=db,billerId="train")
+            if product:
+                train = queries.trainById(db=db,trainId=payload.trainId)
+                if train:
+                    seat = queries.seatById(db=db,seatId=payload.seatId)
+                    if seat:
+                        route = queries.getRouteById(db=db,routeId=payload.routeId)
+                        if route:
+                            schedule = queries.getScheduleById(db=db,scheduleId=payload.scheduleId)
+                            if schedule:
+                                totalAdult = payload.adult * int(seat.price)
+                                totalMinor = payload.minor * int(seat.price)
+                                allTotal = totalAdult + totalMinor
+                                totalAmount = allTotal
+                                if payload.trip == 1:
+                                    totalAmount = allTotal * 2
+                                if totalAmount == payload.amount:
+                                    if int(user.wallet.availableBalance) > int(payload.amount):
+                                        logger.info(f"balance is sufficient {user.wallet.availableBalance}")
+                                        return await glAccountingService.debitTrainTransaction(response=response,setting=setting,db=db,biller=product,customer=user,payload=payload,train=train,seat=seat,schedule=schedule,background_task=background_task)
+                                    else:
+                                        logger.info(f"{INSUFFICIENTFUND} with user {user.firstname}")
+                                        response.status_code = status.HTTP_400_BAD_REQUEST
+                                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INSUFFICIENTFUND)
+                                else:
+                                    logger.info(f"Calculated Amount {payload.amount} is not equal for {user.firstname}")
+                                    response.status_code = status.HTTP_400_BAD_REQUEST
+                                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Price error")
+                            else:
+                                logger.info(f"schedule {payload.scheduleId} is not available for {user.firstname}")
+                                response.status_code = status.HTTP_400_BAD_REQUEST
+                                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="schedule not available")
+                        else:
+                            logger.info(f"Route {payload.routeId} is not available for {user.firstname}")
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Route not available")
+                    else:
+                        logger.info(f"Seat {payload.seatId} is not available for {user.firstname}")
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Seat not available")
+                else:
+                    logger.info(f"Invalid bus selected {payload.trainId} for {user.firstname}")
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Train not found")
+            else: 
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Train ticket error")
+        else:
+            logger.info(f"Invalid account selected {payload.walletAccount} for {user.firstname}")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex),)
 async def redeemTicket(user:Customer,db:Session,request:Request,response:Response,payload:RedeemRequest,setting:Setting,background_task:BackgroundTasks):
     try:
         product = adminQuery.getBillerByBillerId(db=db,billerId=payload.mode)

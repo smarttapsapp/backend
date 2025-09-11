@@ -26,7 +26,6 @@ def create(db: Session, model: object):
 def save_many(db: Session, models: List[object]):
     db.add_all(models)
     db.commit()
-    
 def updateUserBvn(db: Session, userId: int,bvn:str):
     stmt = (update(CustomerModel)
             .where(CustomerModel.id == userId)
@@ -72,7 +71,6 @@ def supportTickets(db: Session,userId:int):
     return db.query(SupportTicketModel).filter(SupportTicketModel.user_id==userId).order_by(desc(SupportTicketModel.created_at)).all()
 def deleteSupportTickets(db: Session ,userId:int,id:int):
     return db.query(SupportTicketModel).filter(SupportTicketModel.user_id==userId).filter(SupportTicketModel.id == id).delete()
-
 def notifications(db: Session,userId:int):
     if userId:
         return db.query(NotificationModel).join(UserNotification).join(CustomerModel).filter(CustomerModel.id==userId).all()
@@ -243,3 +241,17 @@ def getProductTypeBYname(db: Session,name:str):
 def getDailyCashoutTransactionsByUser(db: Session,productId:int,userId:int):
     logger.info(f"Started getting daily cashout total for user {userId} @ {str(datetime.now())}")
     return db.query(func.sum(CashOutModel.amount)).filter(CashOutModel.user_id == userId).scalar()
+def getBillerByBillerId(db: Session, billerId: str):
+    return db.query(ProductTypeModel).filter(ProductTypeModel.billerId == billerId).first()
+def trainById(db: Session,trainId:int):
+    return db.query(TrainModel).filter(TrainModel.id == trainId).first()
+def seatById(db: Session,seatId:int):
+    return db.query(SeatModel).filter(SeatModel.id == seatId).first()
+def getRouteById(db: Session,routeId:int):
+    return db.query(RouteModel).filter(RouteModel.id == routeId).first()
+def getScheduleById(db: Session,scheduleId:int):
+    return db.query(ScheduleModel).filter(ScheduleModel.id == scheduleId).first()
+def getHeadoffice(db: Session, glcode: str):
+    return db.query(GLAccountModel).filter(GLAccountModel.code == glcode).first()
+def getHeadofficeAccount(db:Session):
+    return db.query(AdminModel).filter(AdminModel.role.has(RoleModel.tag == AdminRoleEnum.HEADOFFICE)).first() #db.query(AdminModel).filter(AdminModel.role == AdminRoleEnum.HEADOFFICE).first()
