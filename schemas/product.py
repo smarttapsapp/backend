@@ -12,13 +12,13 @@ class ProductBase(BaseModel):
     vasType: Union[str, None] = None
     icon: Union[str, None] = None
     customerField: Union[str, None] = None
+    status: Union[bool, None] = False
 
 class ProductRequest(ProductBase):
     user: Union[List[str], None] = None
 
 class Product(ProductBase):
     enabledInline: Union[bool, None] = False
-    status: Union[bool, None] = False
     id: Optional[int]
     billers: Union[List[ProductType],None] = None
     created_at: Union[datetime, None] = func.now()
@@ -28,6 +28,9 @@ class Product(ProductBase):
         from_attributes = True
         populate_by_name = True
 
+class AddProductRequest(ProductBase):
+    id: Optional[int]=None
+ 
 class ProductsResponse(BaseResponse):
     data: Union[List[Product],None] = None
     

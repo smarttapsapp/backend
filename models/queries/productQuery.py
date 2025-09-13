@@ -42,5 +42,37 @@ def deleteRecord(db:Session,id:int,userId:int):
     return db.query(BeneficiaryModel).filter(BeneficiaryModel.id == id).filter(BeneficiaryModel.user_id == userId).delete()
 def getProducts(db: Session):
     return db.query(ProductModel).all()
+def getProductById(db: Session,productId:int):
+    return db.query(ProductModel).filter(ProductModel.id == productId).first()
+def deleteProduct(db: Session ,productId:int):
+    deleted = db.query(ProductModel).filter(ProductModel.id == productId).delete()
+    if deleted:
+        db.commit()
+        return True
+    return False
 def getProductBillers(db: Session):
     return db.query(ProductTypeModel).filter(ProductTypeModel.status == True).order_by(desc(ProductTypeModel.created_at)).all()
+def getBillers(db: Session):
+    return db.query(ProductTypeModel).order_by(desc(ProductTypeModel.created_at)).all()
+def getProductTypeById(db: Session,billerId:int):
+    return db.query(ProductTypeModel).filter(ProductTypeModel.id == billerId).first()
+def getBillersByProductId(db: Session,productId:int):
+    return db.query(ProductTypeModel).filter(ProductTypeModel.product_id == productId).order_by(desc(ProductTypeModel.created_at)).all()
+def deleteBiller(db: Session ,billerId:int):
+    deleted = db.query(ProductTypeModel).filter(ProductTypeModel.id == billerId).delete()
+    if deleted:
+        db.commit()
+        return True
+    return False
+def getPackages(db: Session):
+    return db.query(PackageModel).order_by(desc(PackageModel.created_at)).all()
+def getPackageById(db: Session,packageId:int):
+    return db.query(PackageModel).filter(PackageModel.id == packageId).first()
+def getPackagesByBillerId(db: Session,billerId:int):
+    return db.query(PackageModel).filter(PackageModel.product_type_id == billerId).order_by(desc(PackageModel.created_at)).all()
+def deletePackage(db: Session ,packageId:int):
+    deleted = db.query(PackageModel).filter(PackageModel.id == packageId).delete()
+    if deleted:
+        db.commit()
+        return True
+    return False

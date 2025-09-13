@@ -17,7 +17,7 @@ from utils.dependencies import (
     getSystemSetting,validateAdmin,
 )
 from utils.database import get_db
-from services import adminservice,glAccountingService
+from services import adminservice,glAccountingService,productservice
 from schemas.admin import *
 from schemas.role import *
 from schemas.station import *
@@ -1650,12 +1650,155 @@ async def delete_discount(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-# billers
+# products
 @router.get("/products", 
     response_model=ProductsResponse,
     response_model_exclude_unset=True,tags=["product"])
 async def get_products(
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        return await productservice.listOfProduct(response=response,db=db,admin=admin,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.post("/product/add", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["seat"])
+async def addProduct(
+    payload:AddProductRequest,
     request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await productservice.addProduct(
+                db=db,
+                setting=setting,
+                payload=payload,
+                background_task=background_task,
+                request=request,
+                response=response,
+                admin=admin
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.delete("/product/{id}/delete", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["seat"])
+async def deleteProduct(
+    id:int,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await productservice.deleteProduct(
+                db=db,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task,
+                productId=id,
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+# biller
+@router.get("/billers/{productId}", 
+    response_model=ProductTypesResponse,
+    response_model_exclude_unset=True,tags=["biller"])
+async def get_billers(
+    productId:int,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        return await productservice.listOfBillers(response=response,db=db,admin=admin,productId=productId)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.post("/biller/add", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["biller"])
+async def add_biller(
+    payload:AddProductTypeRequest,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await productservice.addBiller(
+            payload=payload,
+                db=db,
+                setting=setting,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.delete("/biller/{id}/delete", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["biller"])
+async def delete_biller(
+    id:int,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await productservice.deleteBiller(
+            billerId=id,
+                db=db,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+# billers
+@router.get("/packages/{billerId}", 
+    response_model=PackagesResponse,
+    response_model_exclude_unset=True,tags=["package"])
+async def get_packages(
+    billerId: int,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
     setting: Annotated[Setting, Depends(getSystemSetting)],
@@ -1663,8 +1806,8 @@ async def get_products(
 ):
     try:
         if admin:
-            return await adminservice.listOfProduct(
-                request=request,
+            return await productservice.listOfPackages(
+                billerId=billerId,
                 response=response,
                 setting=setting,
                 db=db,
@@ -1674,6 +1817,59 @@ async def get_products(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.post("/package/add", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["package"])
+async def add_package(
+    payload:AddPackageRequest,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await productservice.addPackage(
+            payload=payload,
+                db=db,
+                setting=setting,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.delete("/package/{id}/delete", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["package"])
+async def delete_package(
+    id:int,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        return await productservice.deletePackage(
+            packageId=id,
+                db=db,
+                response=response,
+                admin=admin,
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+
 @router.get("/services", 
     response_model=ProductTypesResponse,
     response_model_exclude_unset=True,tags=["product"])

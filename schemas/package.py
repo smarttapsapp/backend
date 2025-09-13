@@ -17,10 +17,6 @@ class PackageBase(BaseModel):
     currencyCode: Union[str, None] = None
     currencySymbol: Union[str, None] = None
 
-
-class PackageRequest(PackageBase):
-    user: Union[List[str], None] = None
-
 class Package(PackageBase):
     id: Optional[int]
     created_at: Union[datetime, None] = func.now()
@@ -29,6 +25,10 @@ class Package(PackageBase):
     class Config:
         from_attributes = True
         populate_by_name = True
+
+class AddPackageRequest(PackageBase):
+    validity: Union[int, None] = None
+    id: Optional[int]=None
 
 class PackagesResponse(BaseResponse):
     data: Union[List[Package],None] = None

@@ -702,7 +702,7 @@ async def debitTrainTicket(db:Session,request:Request,response:Response,setting:
                                 if totalAmount == payload.amount:
                                     if int(user.wallet.availableBalance) > int(payload.amount):
                                         logger.info(f"balance is sufficient {user.wallet.availableBalance}")
-                                        return await glAccountingService.debitTrainTransaction(response=response,setting=setting,db=db,biller=product,customer=user,payload=payload,train=train,seat=seat,schedule=schedule,background_task=background_task)
+                                        return await glAccountingService.debitTrainTransaction(response=response,setting=setting,db=db,biller=product,customer=user,payload=payload,train=train,seat=seat,schedule=schedule,route=route,background_task=background_task)
                                     else:
                                         logger.info(f"{INSUFFICIENTFUND} with user {user.firstname}")
                                         response.status_code = status.HTTP_400_BAD_REQUEST

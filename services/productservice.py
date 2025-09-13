@@ -1,40 +1,39 @@
 
 import logging
-import schemas.station
 from utils import util
 from models.model import *
 from utils.constant import *
 from schemas.customer import *
 from sqlalchemy.orm import Session
 from schemas.setting import Setting
-from schemas.park import ParksResponse
-from schemas.product import ProductsResponse
+from schemas.product import *
+from schemas.package import *
+from schemas.product_type import *
 from schemas.admin import ProvidersResponse
 from schemas.station import StationsResponse
 from schemas.route import RoutesResponse,RouteResponse
 from fastapi import Response,Request,status
 from models.queries import productQuery,queries
 from schemas.beneficiary import *
-
+from fastapi import (
+    status,
+    Response,
+    Request,
+    BackgroundTasks,
+)
 logger = logging.getLogger(__name__)
 
 
 def getAllBill(db: Session):
-    bills = productQuery.get_all_bill(db=db)
-    logger.info(bills)
-    return bills
+    return productQuery.get_all_bill(db=db)
 def getSingleBill(db: Session, id: int):
     bill = productQuery.get_single_bill_by_id(db=db, id=id)
     logger.info(bill)
     return bill
 def getAllBillers(db: Session):
-    bills = productQuery.get_all_biller(db=db)
-    logger.info(bills)
-    return bills
+    return productQuery.get_all_biller(db=db)
 def getSingleBiller(db: Session, id: int):
-    bill = productQuery.get_single_biller_by_id(db=db, id=id)
-    logger.info(bill)
-    return bill
+    return productQuery.get_single_biller_by_id(db=db, id=id)
 async def searchMovablesRoutes(request: Request,response: Response,setting: Setting,db: Session,user: Customer,departure: str,arrival: str,mode: str):
     try:
         logger.info(f"Started searching for {mode} route by {user.firstname}") 
@@ -165,8 +164,8 @@ async def getTrainproviderRoutes(response: Response,db: Session,adminId:int):
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return RoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-# admin service
-def listOfProduct(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+# admin products
+async def listOfProduct(response: Response,db: Session,admin: AdminModel):
     try:
         logger.info(f"started querying products")
         if admin.role.tag == AdminRoleEnum.BUSINESS:
@@ -178,7 +177,7 @@ def listOfProduct(request: Request,response: Response,setting: Setting,db: Sessi
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return ProductsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-def listOfProductBiller(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+async def listOfProductBiller(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
     try:
         logger.info(f"started querying products")
         if admin.role.tag == AdminRoleEnum.BUSINESS:
@@ -190,3 +189,196 @@ def listOfProductBiller(request: Request,response: Response,setting: Setting,db:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return ProductsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def addProduct(db: Session,setting: Setting,payload: AddProductRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started product at {datetime.now()}")
+        existing = productQuery.getProductById(db=db,productId=payload.id)
+        if existing:
+            subject = "Product Update"
+            existing.name = payload.name
+            existing.vasType = payload.vasType
+            existing.status = payload.status
+            existing.customerField = payload.customerField
+            existing.description = payload.description
+            existing.updated_at=datetime.now()
+        else:
+            subject = "New Product"
+            existing = ProductModel(
+                name =payload.name,
+                vasType = payload.vasType,
+                status = payload.status,
+                customerField = payload.customerField,
+                description = payload.description,
+                created_at=datetime.now(),updated_at=datetime.now(),)
+        created = queries.create(db=db, model=existing)
+        if created:
+            email_body = util.templates.TemplateResponse("product.html",{"request": request, "product": created,},)
+            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=subject,toAddress=admin.email,)
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def deleteProduct(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,productId: int):
+    try:
+        logger.info(f"started deleting product {productId} at {datetime.now()}")
+        deleted = productQuery.deleteProduct(db=db,productId=productId)
+        if deleted:
+            response.status_code = status.HTTP_200_OK
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+# billers
+async def listOfBillers(response: Response,db: Session,admin: AdminModel,productId:int):
+    try:
+        logger.info(f"started querying biller by product ID")
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN]:
+            return ProductTypesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=productQuery.getBillersByProductId(db=db,productId=productId))
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return ProductTypesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return ProductTypesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def addBiller(db: Session,setting: Setting,payload: AddProductTypeRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started product at {datetime.now()}")
+        existing = productQuery.getProductTypeById(db=db,billerId=payload.id)
+        if existing:
+            subject = "Biller Update"
+            existing.billerId = payload.billerId
+            existing.billerName = payload.billerName
+            existing.billerType = payload.billerType
+            existing.customerField = payload.customerField
+            existing.hasAddons = payload.hasAddons
+            existing.hasLookup = payload.hasLookup
+            existing.hasPackages = payload.hasPackages
+            existing.status=payload.status
+            existing.maxAmountLimit=payload.maxAmountLimit
+            existing.minAmountLimit=payload.minAmountLimit
+            existing.updated_at=datetime.now()
+        else:
+            subject = "New Biller"
+            existing = ProductTypeModel(
+                product_id=payload.product_id,
+                billerId =payload.billerId,
+                billerName = payload.billerName,
+                status = payload.status,
+                customerField = payload.customerField,
+                hasAddons = payload.hasAddons,
+                hasLookup = payload.hasLookup,
+                hasPackages = payload.hasPackages,
+                maxAmountLimit = payload.maxAmountLimit,
+                minAmountLimit = payload.minAmountLimit,
+                created_at=datetime.now(),updated_at=datetime.now(),)
+        created = productQuery.create(db=db, model=existing)
+        if created:
+            email_body = util.templates.TemplateResponse("product.html",{"request": request, "product": created,},)
+            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=subject,toAddress=admin.email,)
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def deleteBiller(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,billerId: int):
+    try:
+        logger.info(f"started deleting product {billerId} at {datetime.now()}")
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN]:
+            deleted = productQuery.deleteBiller(db=db,billerId=billerId)
+            if deleted:
+                response.status_code = status.HTTP_200_OK
+                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+# packages
+async def listOfPackages(response: Response,db: Session,admin: AdminModel,billerId: int):
+    try:
+        logger.info(f"started querying biller by product ID")
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN]:
+            return PackagesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=productQuery.getPackagesByBillerId(db=db,billerId=billerId))
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return ProductsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return ProductsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def addPackage(db: Session,setting: Setting,payload: AddPackageRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started package at {datetime.now()}")
+        existing = productQuery.getPackageById(db=db,packageId=payload.id)
+        if existing:
+            subject = "Package Update"
+            existing.billerId = payload.billerId
+            existing.packageCode = payload.packageCode
+            existing.amount = payload.amount
+            existing.currencyCode = payload.currencyCode
+            existing.hasValidity = payload.hasValidity
+            existing.description = payload.description
+            existing.validity = payload.validity
+            existing.product_type_id =payload.product_type_id,
+            existing.status=payload.status
+            existing.updated_at=datetime.now()
+        else:
+            subject = "New Package"
+            existing = PackageModel(
+                billerId =payload.billerId,
+                product_type_id =payload.product_type_id,
+                packageCode = payload.packageCode,
+                status = payload.status,
+                amount = payload.amount,
+                currencyCode = payload.currencyCode,
+                hasValidity = payload.hasValidity,
+                description = payload.description,
+                validity = payload.validity,
+                created_at=datetime.now(),updated_at=datetime.now(),)
+        created = productQuery.create(db=db, model=existing)
+        if created:
+            email_body = util.templates.TemplateResponse("product.html",{"request": request, "product": created,},)
+            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=subject,toAddress=admin.email,)
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def deletePackage(db: Session,response: Response,admin:AdminModel,packageId: int):
+    try:
+        logger.info(f"started deleting package {packageId} at {datetime.now()}")
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN]:
+            deleted = productQuery.deletePackage(db=db,packageId=packageId)
+            if deleted:
+                response.status_code = status.HTTP_200_OK
+                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    

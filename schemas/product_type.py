@@ -24,13 +24,9 @@ class ProductTypeBase(BaseModel):
     hasPackages: Union[bool, None] = False
     hasLookup: Union[bool, None] = False
     hasAddons: Union[bool, None] = False
+    status: Union[bool, None] = False
     maxAmountLimit: Union[int, None] = None
     minAmountLimit: Union[int, None] = None
-
-
-class ProductTypeRequest(ProductTypeBase):
-    user: Union[List[str], None] = None
-
 class ProductType(ProductTypeBase):
     network: Union[str, None] = None
     id: Optional[int]
@@ -42,6 +38,9 @@ class ProductType(ProductTypeBase):
         from_attributes = True
         populate_by_name = True
 
+class AddProductTypeRequest(ProductTypeBase):
+    id: Optional[int]=None
+    
 class ProductTypesResponse(BaseResponse):
     data: Union[List[ProductType],None] = None
     
