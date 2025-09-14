@@ -13,10 +13,11 @@ class CommissionBase(BaseModel):
 
 class Commission(CommissionBase):
     id: Optional[int]=None
-    product_type_id: Optional[int]=None
+    product_type_id: int
     product_type: Optional[ProductTypeMini]=None
-    admin_id: Optional[int]=None
+    admin_id: int
     admin: Optional[AdminMini]=None
+    glcode: str
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 

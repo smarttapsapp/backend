@@ -48,7 +48,7 @@ async def createAccount(
                 response.status_code = status.HTTP_302_FOUND
                 return BaseResponse(statusCode=str(status.HTTP_302_FOUND),statusDescription=ALREADYEXIST,)
             else:
-                return createUserAccount(db=db,setting=setting,payload=payload,background_task=background_task,request=request,response=response)
+                return await createUserAccount(db=db,setting=setting,payload=payload,background_task=background_task,request=request,response=response)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -116,7 +116,7 @@ async def verifyAccountOpening(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription= SYSTEMBUSY)
-def createUserAccount(db: Session,setting: Setting,payload: CreateAdminRequest, background_task: BackgroundTasks, request: Request,response: Response):
+async def createUserAccount(db: Session,setting: Setting,payload: CreateAdminRequest, background_task: BackgroundTasks, request: Request,response: Response):
     try:
         logger.info("started creating new admin account")
         role = adminQuery.getRole(db=db,roleId=payload.tag)
@@ -133,6 +133,7 @@ def createUserAccount(db: Session,setting: Setting,payload: CreateAdminRequest, 
                     status=True,
                     created_at=datetime.now(),
                     updated_at=datetime.now(),
+                    wallet=AccountModel(walletAccount=util.formatPhoneShort(payload.phonenumber),availableBalance=0,created_at=datetime.now(),updated_at=datetime.now())
                 )
             createdAccount = adminQuery.create(db=db, model=newAdmin)
             if createdAccount:

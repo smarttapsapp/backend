@@ -128,7 +128,7 @@ async def debitTransaction(response:Response,setting: Setting,db: Session,biller
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
 
-async def debitBusTransaction(response:Response,setting: Setting,db: Session,biller:ProductTypeModel,customerAccount:AccountModel,payload:BuyTicketRequest,background_task:BackgroundTasks,bus:BusModel,remark:str=None,merchant:AdminModel=None):
+async def debitBusTransaction(request: Request,response:Response,setting: Setting,db: Session,biller:ProductTypeModel,customerAccount:AccountModel,payload:BuyTicketRequest,background_task:BackgroundTasks,bus:BusModel,remark:str=None,merchant:AdminModel=None):
     try:
         logger.info(f"started gl debit transaction for biller {biller.id} at {datetime.now()}")
         role = adminQuery.getRoleByTag(db=db,tag=AdminRoleEnum.HEADOFFICE)
@@ -244,10 +244,10 @@ async def debitBusTransaction(response:Response,setting: Setting,db: Session,bil
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
 
-async def debitTrainTransaction(response:Response,setting:Setting,db:Session,biller:ProductTypeModel,customer:CustomerModel,payload:BuyTrainTicketRequest,train:TrainModel,seat:SeatModel,schedule:ScheduleModel,route:RouteModel,background_task:BackgroundTasks):
+async def debitTrainTransaction(request: Request,response:Response,setting:Setting,db:Session,biller:ProductTypeModel,customer:CustomerModel,payload:BuyTrainTicketRequest,train:TrainModel,seat:SeatModel,schedule:ScheduleModel,route:RouteModel,background_task:BackgroundTasks):
     try:
         logger.info(f"started gl debit transaction for biller {biller.id} at {datetime.now()}")
-        remark = f"{str(biller.billerId[:2]).upper()}/{train.trainNumber[:2]}/{seat.classType}"
+        remark = f"{str(biller.billerId[:2]).upper()}/{train.trainNumber[:2]}/{seat.classType.value}"
         headoffice = queries.getHeadofficeAccount(db=db)
         logger.info(f"headoffice is configured at {datetime.now()}")
         if headoffice:
@@ -275,7 +275,7 @@ async def debitTrainTransaction(response:Response,setting:Setting,db:Session,bil
                         PaymentModel(wallet_id = customer.wallet.id,user_id =customer.id, amount = int(payload.amount),
                                         payment_type =PaymentEnum.DEBIT,reference =trnxId,event = "charge.success",status = "success",
                                         channel = ChannelEnum.MOBILE,providerAmount = provider_cost,statusCode = TransactionCodeEnum.PROCESSING,
-                                    statusDescription = TransactionStatusEnum.PROCESSING,commissionAmount = commissionAmount,
+                                    statusDescription = TransactionStatusEnum.SUCCESS,commissionAmount = commissionAmount,
                                     product_type_id = biller.id,product_id=biller.product_id,recipient=customer.wallet.walletAccount,
                                     statusMessage =remark,balanceBefore = customer.wallet.availableBalance,code=setting.gl_outflow,
                                     balanceAfter = customer.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now()))
