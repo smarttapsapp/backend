@@ -29,6 +29,7 @@ class AdminCreate(AdminBase):
 class Admin(AdminBase):
     status: bool
     role: Role
+    billerId: Optional[str]=None
     id: int
 
     class Config:

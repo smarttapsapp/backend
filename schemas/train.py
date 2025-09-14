@@ -26,6 +26,7 @@ class Train(TrainBase):
     seats: Union[List[Seat],None] = None
     #routes:Union[List[Route],None] = None
     id: Optional[int]
+    billerId: Optional[str]=None
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 

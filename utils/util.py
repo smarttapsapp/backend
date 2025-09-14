@@ -196,6 +196,8 @@ def generateId(length: int = 12) -> str:
     return ''.join(secrets.choice('0123456789') for _ in range(length))
 def generateOTP():
     return str(randint(100000, 999999))
+def generateBillerId():
+    return str(randint(1000, 9999))
 def find_item(items, key, value):
     return next((x for x in items if x.billerId == value), None)
 def generateUniqueId():

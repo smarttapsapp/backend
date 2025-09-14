@@ -274,7 +274,7 @@ async def debitTrainTransaction(request: Request,response:Response,setting:Setti
                     customer.wallet.payments.append(
                         PaymentModel(wallet_id = customer.wallet.id,user_id =customer.id, amount = int(payload.amount),
                                         payment_type =PaymentEnum.DEBIT,reference =trnxId,event = "charge.success",status = "success",
-                                        channel = ChannelEnum.MOBILE,providerAmount = provider_cost,statusCode = TransactionCodeEnum.PROCESSING,
+                                        channel = ChannelEnum.MOBILE,providerAmount = provider_cost,statusCode = TransactionCodeEnum.SUCCESS,
                                     statusDescription = TransactionStatusEnum.SUCCESS,commissionAmount = commissionAmount,
                                     product_type_id = biller.id,product_id=biller.product_id,recipient=customer.wallet.walletAccount,
                                     statusMessage =remark,balanceBefore = customer.wallet.availableBalance,code=setting.gl_outflow,
@@ -308,7 +308,7 @@ async def debitTrainTransaction(request: Request,response:Response,setting:Setti
                                 headoffice.wallet.updated_at = datetime.now()
                                 headoffice.wallet.payments.append(PaymentModel(wallet_id = headoffice.wallet.id,admin_id =headoffice.id,amount = int(netIncome),
                                     payment_type =PaymentEnum.CREDIT,reference =f"INC-{util.generateId()}",event = "charge.success",
-                                    payment_date = datetime.now().date(),status = "success",channel = ChannelEnum.MOBILE,code=setting.gl_inflow,
+                                    payment_date = datetime.now().date(),status = "success",channel = ChannelEnum.MOBILE,code=setting.gl_inflow,transactionreference=trnxId,
                                     fee = provider_cost,statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,product_type_id = biller.id,product_id=biller.product_id,
                                     recipient=headoffice.wallet.walletAccount,statusMessage = remark,balanceBefore = headoffice.wallet.availableBalance,
                                     balanceAfter =headoffice.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now()))

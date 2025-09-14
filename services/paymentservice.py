@@ -653,7 +653,7 @@ async def debitBusTicket(db:Session,request:Request,response:Response,setting:Se
             bus = queries.busById(db=db,busId=payload.busId)
             if bus:
                 if bus.availabilityStatus:
-                    product = adminQuery.getBillerByBillerId(db=db,billerId=bus.bus_number)
+                    product = adminQuery.getBillerByBillerId(db=db,billerId=bus.billerId)
                     if product:
                         if int(user.wallet.availableBalance) > int(payload.amount):
                             logger.info(f"balance is sufficient {user.wallet.availableBalance}")
@@ -689,7 +689,7 @@ async def debitTrainTicket(db:Session,request:Request,response:Response,setting:
         if user.wallet.walletAccount == payload.walletAccount:
             train = queries.trainById(db=db,trainId=payload.trainId)
             if train:
-                product = queries.getBillerByBillerId(db=db,billerId=train.trainNumber)
+                product = queries.getBillerByBillerId(db=db,billerId=train.billerId)
                 if product:
                     seat = queries.seatById(db=db,seatId=payload.seatId)
                     if seat:

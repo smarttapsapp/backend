@@ -131,6 +131,7 @@ async def createUserAccount(db: Session,setting: Setting,payload: CreateAdminReq
                     password=util.get_password_hash(password),
                     role_id=role.id,
                     status=True,
+                    billerId = util.generateBillerId(),
                     created_at=datetime.now(),
                     updated_at=datetime.now(),
                     wallet=AccountModel(walletAccount=util.formatPhoneShort(payload.phonenumber),availableBalance=0,created_at=datetime.now(),updated_at=datetime.now())
@@ -613,7 +614,10 @@ async def addBus(db: Session,setting: Setting,payload: AddBusRequest, background
                 schedules =  adminQuery.getSchedulesByIds(db=db,ids=payload.busschedules,adminId=None)
                 if schedules:
                     previous = adminQuery.getBus(db=db,busNumber=payload.bus_number)
-                    if previous and previous.admin_id == admin.id:
+                    logger.info(previous.name)
+                    logger.info(previous.admin_id)
+                    logger.info(admin.id)
+                    if previous:
                         previous.airCondition = payload.airCondition
                         previous.tv = payload.tv
                         previous.base_price = payload.base_price
@@ -621,11 +625,12 @@ async def addBus(db: Session,setting: Setting,payload: AddBusRequest, background
                         previous.name = payload.name
                         previous.seatCount = payload.seatCount
                         previous.description = payload.description
+                        previous.billerId = admin.billerId
                         previous.schedules = schedules
                         previous.routes = routes
                         previous.updated_at = datetime.now()
                     else:
-                        previous = BusModel(admin_id=admin.id,seatCount=payload.seatCount,name=payload.name,bus_number=payload.bus_number,description=payload.description,tv=payload.tv,camera=payload.camera,airCondition=payload.airCondition,base_price=payload.base_price,created_at=datetime.now(),updated_at=datetime.now(),schedules=schedules,routes=routes)
+                        previous = BusModel(admin_id=admin.id,seatCount=payload.seatCount,name=payload.name,bus_number=payload.bus_number,description=payload.description,tv=payload.tv,camera=payload.camera,airCondition=payload.airCondition,base_price=payload.base_price,created_at=datetime.now(),updated_at=datetime.now(),billerId=admin.billerId,schedules=schedules,routes=routes)
                     created = queries.create(db=db, model=previous)
                     if created:
                         email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
@@ -840,12 +845,13 @@ async def addTrain(db: Session,setting: Setting,payload: AddTrainRequest, backgr
                         if previous and previous.admin_id == adminId:
                             previous.trainName = payload.trainName
                             previous.seats = seatsClass
+                            previous.billerId = admin.billerId
                             previous.description = payload.description
                             previous.schedules = schedules
                             previous.routes = routes
                             previous.updated_at = datetime.now()
                         else:
-                            previous = TrainModel(admin_id=admin.id,trainNumber=payload.trainNumber,trainName=payload.trainName,description=payload.description,created_at=datetime.now(),updated_at=datetime.now(),schedules=schedules,routes=routes,seats=seatsClass)
+                            previous = TrainModel(admin_id=admin.id,trainNumber=payload.trainNumber,trainName=payload.trainName,description=payload.description,created_at=datetime.now(),updated_at=datetime.now(),billerId=admin.billerId,schedules=schedules,routes=routes,seats=seatsClass)
                         created = queries.create(db=db, model=previous)
                         if created:
                             email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)

@@ -29,6 +29,7 @@ class Bus(BusBase):
     camera: Union[bool, None] = False
     airCondition: Union[bool, None] = False
     id: Optional[int]=None
+    billerId: Optional[str]=None
     park: Optional[Park]=None
     provider: Optional[Provider]=None
     schedules: Optional[List[Schedule]] = []
