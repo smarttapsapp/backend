@@ -473,7 +473,18 @@ async def listOfAdmins(response: Response,db: Session,admin: AdminModel):
         if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ADMIN,AdminRoleEnum.ACCOUNTANT]:
             return AdminsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getAllAdmin(db=db))
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        return AdminsResponse(statusCode= str(status.HTTP_401_UNAUTHORIZED),statusDescription=FAILED,)
+        return AdminsResponse(statusCode= str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED,)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return AdminsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def listOfProviders(response: Response,db: Session,admin: AdminModel):
+    try:
+        logger.info(f"started querying providers")
+        if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ADMIN,AdminRoleEnum.ACCOUNTANT]:
+            return AdminsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getAdminProvider(db=db))
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return AdminsResponse(statusCode= str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED,)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -481,12 +492,13 @@ async def listOfAdmins(response: Response,db: Session,admin: AdminModel):
 # admin
 async def listOfAdminsByRole(response: Response,db: Session,admin: AdminModel,role:str):
     try:
-        logger.info(f"started querying products")
+        logger.info(f"started querying {role}")
         if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ADMIN,AdminRoleEnum.ACCOUNTANT]:
             if role:
                 existing = adminQuery.getRoleByTag(db=db,tag=AdminRoleEnum(role))
                 if existing:
                     return AdminsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getAllAdminByRole(db=db,roleId=existing.id))
+                return AdminsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getAdminProvider(db=db))
             return AdminsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=[])
         response.status_code = status.HTTP_401_UNAUTHORIZED
         return BaseResponse(statusCode= str(status.HTTP_401_UNAUTHORIZED),statusDescription=FAILED,)

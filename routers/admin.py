@@ -1635,9 +1635,9 @@ async def delete_discount(
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.deleteRole(
-            roleId=id,
-                db=db,
+        return await glAccountingService.deleteDiscount(
+            id=id,
+            db=db,
                 request=request,
                 response=response,
                 admin=admin,
@@ -1892,3 +1892,17 @@ async def get_product_types(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/providers", 
+    response_model=AdminsResponse,
+    response_model_exclude_unset=True,tags=["product"])
+async def get_providers(
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        return await adminservice.listOfProviders(response=response,db=db,admin=admin)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return AdminsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

@@ -869,7 +869,7 @@ class ServiceRateModel(Base):
     admin = relationship('AdminModel', backref='service_rates')
     product_type_id = Column(Integer, ForeignKey("product_types.id", ondelete="CASCADE"))
     product_type = relationship('ProductTypeModel', backref='service_rates')
-    provider_discount_rate = Column(Numeric(5, 4), nullable=False)
+    provider_discount_rate = Column(Numeric(5, 2), nullable=False)
     provider_discount_type = Column(Enum(CommissionType), nullable=False)
     active = Column(Boolean, default=True)
     updated_at = Column(DateTime, default=func.now(),onupdate=func.now())

@@ -70,6 +70,8 @@ def getAdminByRole(db: Session,id:int):
     return db.query(AdminModel).filter(AdminModel.role_id ==id).first()
 def getAdminByCustomerId(db: Session,id:int):
     return db.query(AdminModel).filter(AdminModel.customer_id ==id).first()
+def getAdminProvider(db:Session):
+    return db.query(AdminModel).join(RoleModel).filter(RoleModel.tag.in_([AdminRoleEnum.PROVIDER,AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER])).order_by(desc(AdminModel.created_at)).all()
 def getAllRole(db: Session,adminId:int=None):
     return db.query(RoleModel).order_by(desc(RoleModel.created_at)).all()
 def getRole(db: Session,roleId:int=None):
@@ -238,10 +240,20 @@ def getServiceProviders(db: Session):
     return db.query(ServiceRateModel).order_by(desc(ServiceRateModel.created_at)).all()
 def getServiceProviderById(db: Session,id:int):
     return db.query(ServiceRateModel).filter(ServiceRateModel.id == id).first()
-def deleteServiceProvider(db: Session ,providerId:int):
-    return db.query(ServiceRateModel).filter(ServiceRateModel.id == providerId).delete()
+def deleteServiceDiscount(db: Session ,discountId:int):
+    deleted = db.query(ServiceRateModel).filter(ServiceRateModel.id == discountId).delete()
+    if deleted:
+        db.commit()
+        return True
+    return False
 def getServiceProviderByProduct(db: Session,productTypeId:int):
     return db.query(ServiceRateModel).filter(ServiceRateModel.active==True).filter(ServiceRateModel.product_type_id==productTypeId).first()
+def disableServiceProviderByProduct(db: Session,productId:int,active:bool,model:ServiceRateModel):
+    if model and model.id:
+        db.query(ServiceRateModel).filter(ServiceRateModel.product_type_id == productId,ServiceRateModel.id != model.id).update({"active": active})
+    db.commit()
+    db.refresh(model)
+    return model
 # products
 def getProducts(db: Session):
     return db.query(ProductModel).filter(ProductModel.status == True).all()

@@ -592,42 +592,42 @@ async def listOfDiscounts(response: Response,db: Session,admin: AdminModel):
         return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 async def addDiscount(db: Session,setting: Setting,payload: AddProviderRateRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
     try:
-        logger.info(f"started creating new ledger @ {datetime.now()}")
-        if payload.id:
-            logger.info(f"started updating ledger {payload.id} @ {datetime.now()}")
+        logger.info(f"started creating new ledger at {datetime.now()}")
+        if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ACCOUNTANT]:            
             existing = adminQuery.getServiceProviderById(db=db,id=payload.id)
             if existing:
+                subject = "Update on Service Provider Discount"
+                logger.info(f"started updating ledger {payload.id} at {datetime.now()}")
                 existing.provider_discount_rate = payload.provider_discount_rate
                 existing.provider_discount_type = payload.provider_discount_type
                 existing.active = payload.active
                 existing.updated_at = datetime.now()
-                created = adminQuery.create(db=db,model=existing)
-                if created:
-                    email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
-                    background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="Service Discount Update",toAddress=admin.email,)
-                    return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
-                else:
-                    response.status_code = status.HTTP_400_BAD_REQUEST
-                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
-        else:
-            new = ServiceRateModel(admin_id=payload.admin_id,product_type_id=payload.product_type_id,provider_discount_type=payload.provider_discount_type,provider_discount_rate=payload.provider_discount_rate,active=payload.active,created_at=datetime.now(),updated_at=datetime.now(),)
-            created = queries.create(db=db,model=new)
+                created = adminQuery.disableServiceProviderByProduct(db=db,productId=existing.product_type_id,active=not payload.active,model=existing)
+            else:
+                subject = "New Service Provider Discount"
+                logger.info(f"started creating new service provider discount @ {datetime.now()}")
+                existing = ServiceRateModel(admin_id=payload.admin_id,product_type_id=payload.product_type_id,provider_discount_type=payload.provider_discount_type,provider_discount_rate=payload.provider_discount_rate,active=payload.active,gl_to_provider=payload.gl_to_provider,created_at=datetime.now(),updated_at=datetime.now(),)
+                newlycreated = queries.create(db=db,model=existing)
+                created = adminQuery.disableServiceProviderByProduct(db=db,productId=existing.product_type_id,active=not payload.active,model=newlycreated)
             if created:
-                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
-                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Service Discount",toAddress=admin.email,)
+                email_body = util.templates.TemplateResponse("service_discount.html",{"request": request, "user": admin,},)
+                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=subject,toAddress=admin.email,)
                 return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
                 return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+        else:
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            return BaseResponse(statusCode = str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED)
     except Exception as ex:
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
-async def deleteDiscount(db: Session,response: Response,admin:AdminModel,id: int):
+async def deleteDiscount(db: Session,response: Response, background_task: BackgroundTasks, request: Request,admin:AdminModel,id: int):
     try:
         logger.info(f"started deleting Discount {id} @ {datetime.now()}")
         if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ACCOUNTANT]:
-            existing = adminQuery.deleteServiceProvider(db=db,id=id)
+            existing = adminQuery.deleteServiceDiscount(db=db,discountId=id)
             if existing:
                 response.status_code = status.HTTP_200_OK
                 return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
