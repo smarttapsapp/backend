@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field,validator,EmailStr
 from typing import Optional, Union, List
 from schemas.otp import OTP
-from schemas.device import Device
+from schemas.account import Account
 from datetime import datetime
 from schemas.response import BaseResponse
 from schemas.role import Role
@@ -47,6 +47,7 @@ class AdminProfile(AdminBase):
     status: bool
     id: int
     tag: str
+    wallet: Optional[Account]=None 
     @classmethod
     def from_orm(cls, obj):
         return cls(
@@ -57,6 +58,7 @@ class AdminProfile(AdminBase):
             status=obj.status,
             email=obj.email,
             tag=obj.role.tag,
+            wallet=obj.wallet
         )
     class Config:
         from_attributes = True
