@@ -614,10 +614,10 @@ async def addBus(db: Session,setting: Setting,payload: AddBusRequest, background
                 schedules =  adminQuery.getSchedulesByIds(db=db,ids=payload.busschedules,adminId=None)
                 if schedules:
                     previous = adminQuery.getBus(db=db,busNumber=payload.bus_number)
-                    logger.info(previous.name)
-                    logger.info(previous.admin_id)
-                    logger.info(admin.id)
                     if previous:
+                        logger.info(previous.name)
+                        logger.info(previous.admin_id)
+                        logger.info(admin.id)
                         previous.airCondition = payload.airCondition
                         previous.tv = payload.tv
                         previous.base_price = payload.base_price
