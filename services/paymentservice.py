@@ -658,7 +658,7 @@ async def debitBusTicket(db:Session,request:Request,response:Response,setting:Se
                         if int(user.wallet.availableBalance) > int(payload.amount):
                             logger.info(f"balance is sufficient {user.wallet.availableBalance}")
                             merchant = adminQuery.getAdminByCustomerId(db=db,id=user.id)
-                            return await glAccountingService.debitBusTransaction(request=request,response=response,setting=setting,db=db,biller=product,customerAccount=user.wallet,payload=payload,bus=bus,background_task=background_task,remark=f"{bus.name}/{payload.busId}",merchant=merchant)
+                            return await glAccountingService.debitBusTransaction(request=request,response=response,setting=setting,db=db,biller=product,customer=user,payload=payload,bus=bus,background_task=background_task,remark=f"{bus.name}/{payload.busId}",merchant=merchant)
                         else:
                             logger.info(f"{INSUFFICIENTFUND} with user {user.firstname}")
                             response.status_code = status.HTTP_400_BAD_REQUEST
