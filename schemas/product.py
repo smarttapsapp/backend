@@ -5,6 +5,11 @@ from pydantic import BaseModel
 from schemas.response import BaseResponse
 from schemas.product_type import ProductType
 
+class ProductOut(BaseModel):
+    name: Union[str, None] = None
+    class Config:
+        from_attributes = True
+        populate_by_name = True
 
 class ProductBase(BaseModel):
     name: Union[str, None] = None

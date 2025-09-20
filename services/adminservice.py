@@ -16,6 +16,7 @@ from schemas.admin import *
 from schemas.station import *
 from schemas.seat import *
 from schemas.schedule import *
+from schemas.payment import *
 from schemas.route import RoutesResponse,AddRouteRequest
 from schemas.ticket import TicketsResponse
 from schemas.bus import BusesResponse,AddBusRequest
@@ -1165,3 +1166,17 @@ async def listOfBiller(request: Request,response: Response,setting: Setting,db: 
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+# payment
+async def paymentsAnalytics(response: Response,db: Session,admin: AdminModel):
+    try:
+        logger.info(
+            f"started querying payments last 10 days"
+        )
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
+            return PaymentsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=[Payment.from_orm(p).model_dump() for p in queries.getPaymentsLastTenDays(db=db)])
+        else:
+            return PaymentsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=[Payment.from_orm(p).model_dump() for p in queries.getPaymentsLastTenDays(db=db,adminId=admin.id)] )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return PaymentsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

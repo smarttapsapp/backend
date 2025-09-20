@@ -263,3 +263,8 @@ def getAdminCommission(db: Session, adminId: int):
     return db.query(CommissionModel).filter(CommissionModel.admin_id == adminId).first()
 def getAdminDiscount(db: Session, adminId: int):
     return db.query(ServiceRateModel).filter(ServiceRateModel.admin_id == adminId).first()
+def getPaymentsLastTenDays(db: Session,adminId:str=None):
+    cutoff_date = datetime.now() - timedelta(days=10)
+    if adminId:
+        return db.query(PaymentModel).filter(PaymentModel.admin_id == adminId).filter(PaymentModel.created_at >= cutoff_date).order_by(desc(PaymentModel.created_at)).all()
+    return db.query(PaymentModel).filter(PaymentModel.created_at >= cutoff_date).order_by(desc(PaymentModel.created_at)).all()    

@@ -4,7 +4,7 @@ from sqlalchemy import func
 from pydantic import BaseModel,validator
 from schemas.response import BaseResponse
 from schemas.request import PINRequest
-from schemas.product import Product
+from schemas.product import Product,ProductOut
 from schemas.product_type import ProductType
 from utils import util
 
@@ -14,6 +14,9 @@ class PaymentBase(BaseModel):
     payment_type:str
     reference: str
     event: str
+    class Config:
+        from_attributes = True
+        populate_by_name = True
 class PaymentRequest(PaymentBase):
     user: Union[List[str], None] = None
 class Payment(PaymentBase):
@@ -22,11 +25,30 @@ class Payment(PaymentBase):
     statusCode: Union[str, None] = None
     channel: Union[str, None] = None
     status: Union[str, None] = None
-    created_at: Union[datetime, None] = func.now()
-    updated_at: Union[datetime, None] = func.now()
+    name: str="AIRTIME"
+    created_at: Union[datetime, None] = datetime.now()
+    updated_at: Union[datetime, None] = datetime.now()
+    @classmethod
+    def from_orm(cls, obj):
+        return cls(
+            id=obj.id,
+            recipient=obj.recipient,
+            amount=obj.amount,
+            payment_type=obj.payment_type,
+            reference=obj.reference,
+            event=obj.event,
+            statusMessage=obj.statusMessage,
+            statusCode=obj.statusCode,
+            channel=obj.channel,
+            status=obj.status,
+            name=obj.product.name if obj.product else '',
+            created_at=obj.created_at,
+            updated_at=obj.updated_at,
+        )
     class Config:
         from_attributes = True
-        populate_by_name = True
+        #populate_by_name = True
+
 class Transaction(PaymentBase):
     statusMessage: Union[str, None] = None
     statusCode: Union[str, None] = None

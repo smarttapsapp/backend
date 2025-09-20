@@ -12,20 +12,15 @@ class AdminMini(BaseModel):
     class Config:
         from_attributes = True
         populate_by_name = True
-
 class AdminBase(BaseModel):
     firstname: str
     lastname: str
     phonenumber: str
     email: str
-
-
 class AdminCreate(AdminBase):
     password: Union[str, None] = None
     created_at: datetime
     updated_at: datetime
-
-
 class Admin(AdminBase):
     status: bool
     role: Role
@@ -35,14 +30,12 @@ class Admin(AdminBase):
     class Config:
         from_attributes = True
         populate_by_name = True
-
 class Provider(AdminBase):
     id: int
 
     class Config:
         from_attributes = True
         populate_by_name = True
-
 class AdminProfile(AdminBase):
     status: bool
     id: int
