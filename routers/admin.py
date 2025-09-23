@@ -19,6 +19,7 @@ from utils.dependencies import (
 from utils.database import get_db
 from services import adminservice,glAccountingService,productservice
 from schemas.admin import *
+from schemas.cashout import *
 from schemas.role import *
 from schemas.station import *
 from schemas.route import RoutesResponse,AddRouteRequest
@@ -1908,7 +1909,7 @@ async def get_providers(
         return AdminsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.get("/payment-analytics", 
     response_model=PaymentsResponse,
-    response_model_exclude_unset=True,tags=["payment"])
+    response_model_exclude_unset=True,tags=["analytics"])
 async def get_payment_analytics(
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
@@ -1920,3 +1921,31 @@ async def get_payment_analytics(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return AdminsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/ticket-analytics", 
+    response_model=TicketsResponse,
+    response_model_exclude_unset=True,tags=["analytics"])
+async def get_ticket_analytics(
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        return await adminservice.ticketsAnalytics(response=response,db=db,admin=admin)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/cashout-analytics", 
+    response_model=CashoutsResponse,
+    response_model_exclude_unset=True,tags=["analytics"])
+async def get_cashout_analytics(
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        return await adminservice.cashOutsAnalytics(response=response,db=db,admin=admin)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return CashoutsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

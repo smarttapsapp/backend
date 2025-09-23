@@ -42,6 +42,15 @@ def createAccount(
 def createUserAccount(db: Session,setting: Setting,payload: CustomerRequest, background_task: BackgroundTasks, request: Request,response: Response,customer:CustomerModel=None):
     if customer:
         logger.info(f"Started resending verification for user {payload.email} {customer.account_status}")
+        customer.firstname = payload.firstname
+        customer.lastname = payload.lastname
+        customer.password = util.get_password_hash(password=payload.password)
+        customer.username = payload.username
+        customer.updated_at = datetime.now()
+        updatedUser = authQuery.create_account(db=db,user=customer)
+        if not updatedUser:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
         latestOtp = authQuery.get_latest_otp(db=db,userId=customer.id)
         if latestOtp:
             if latestOtp.expired_at > datetime.now():
@@ -97,7 +106,7 @@ def verifyAccountOpening(
             logger.info(latest)
             current_datetime = datetime.now()
             if latest.expired_at >= current_datetime:
-                wallet = AccountModel(user_id=user.id,walletAccount=util.formatPhoneShort(user.phonenumber),availableBalance="0",referenceNo=util.formatPhoneShort(user.phonenumber),accountStatus=AccountStatusEnum.ACTIVE.value,created_at = datetime.now(),updated_at = datetime.now())
+                wallet = AccountModel(user_id=user.id,walletAccount=util.formatPhoneShort(user.phonenumber),availableBalance="0",referenceNo=util.formatPhoneShort(user.phonenumber),accountStatus=AccountStatusEnum.ACTIVE,created_at = datetime.now(),updated_at = datetime.now())
                 user.updated_at = current_datetime
                 user.account_status = AccountStatusEnum.ACTIVE
                 user.email_verified = True

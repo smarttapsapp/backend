@@ -326,6 +326,7 @@ class AccountModel(Base):
     walletAccount = Column(String(11))
     availableBalance= Column(String(50),default='0')
     referenceNo= Column(String(11),nullable=True)
+    accountStatus = Column(Enum(AccountStatusEnum), nullable=False, default=AccountStatusEnum.ACTIVE)
     #accountStatus= Column(String(20),default=AccountStatusEnum.ACTIVE)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())

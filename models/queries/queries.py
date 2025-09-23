@@ -268,3 +268,13 @@ def getPaymentsLastTenDays(db: Session,adminId:str=None):
     if adminId:
         return db.query(PaymentModel).filter(PaymentModel.admin_id == adminId).filter(PaymentModel.created_at >= cutoff_date).order_by(desc(PaymentModel.created_at)).all()
     return db.query(PaymentModel).filter(PaymentModel.created_at >= cutoff_date).order_by(desc(PaymentModel.created_at)).all()    
+def getTicketsLastTenDays(db: Session,adminId:str=None):
+    cutoff_date = datetime.now() - timedelta(days=10)
+    if adminId:
+        return db.query(TicketModel).filter(TicketModel.admin_id == adminId).filter(TicketModel.created_at >= cutoff_date).order_by(desc(TicketModel.created_at)).all()
+    return db.query(TicketModel).filter(TicketModel.created_at >= cutoff_date).order_by(desc(TicketModel.created_at)).all()    
+def getCashoutsLastTenDays(db: Session,adminId:str=None):
+    cutoff_date = datetime.now() - timedelta(days=10)
+    if adminId:
+        return db.query(CashOutModel).filter(CashOutModel.admin_id == adminId).filter(CashOutModel.created_at >= cutoff_date).order_by(desc(CashOutModel.created_at)).all()
+    return db.query(CashOutModel).filter(CashOutModel.created_at >= cutoff_date).order_by(desc(CashOutModel.created_at)).all()    

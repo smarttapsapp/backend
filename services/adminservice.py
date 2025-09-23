@@ -8,6 +8,7 @@ from schemas import otp
 from utils import util
 from schemas.setting import Setting
 from utils.constant import *
+from schemas.cashout import *
 from schemas.customer import *
 from schemas.role import *
 from schemas.product import *
@@ -135,7 +136,7 @@ async def createUserAccount(db: Session,setting: Setting,payload: CreateAdminReq
                     billerId = util.generateBillerId(),
                     created_at=datetime.now(),
                     updated_at=datetime.now(),
-                    wallet=AccountModel(walletAccount=util.formatPhoneShort(payload.phonenumber),availableBalance=0,created_at=datetime.now(),updated_at=datetime.now())
+                    wallet=AccountModel(walletAccount=util.formatPhoneShort(payload.phonenumber),accountStatus=AccountStatusEnum.ACTIVE,availableBalance=0,created_at=datetime.now(),updated_at=datetime.now())
                 )
             createdAccount = adminQuery.create(db=db, model=newAdmin)
             if createdAccount:
@@ -1180,3 +1181,31 @@ async def paymentsAnalytics(response: Response,db: Session,admin: AdminModel):
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return PaymentsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+# payment
+async def ticketsAnalytics(response: Response,db: Session,admin: AdminModel):
+    try:
+        logger.info(
+            f"started querying ticket last 10 days"
+        )
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
+            return TicketsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getTicketsLastTenDays(db=db))
+        else:
+            return TicketsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getTicketsLastTenDays(db=db,adminId=admin.id) )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return TicketsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+# payment
+async def cashOutsAnalytics(response: Response,db: Session,admin: AdminModel):
+    try:
+        logger.info(
+            f"started querying cashout last 10 days"
+        )
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
+            return CashoutsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getCashoutsLastTenDays(db=db))
+        else:
+            return CashoutsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getCashoutsLastTenDays(db=db,adminId=admin.id) )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return CashoutsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
