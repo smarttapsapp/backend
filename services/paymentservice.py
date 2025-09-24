@@ -826,10 +826,10 @@ async def singleTicket(response: Response,db: Session,user: Customer,ticketId: s
         return TicketResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 
 # cashout
-async def getbanks(request: Request,response: Response,setting: Setting,user: Customer):
+async def getbanks(response: Response,setting: Setting):
     try:
         logger.info(
-            f"started querying bank list from paystack for {user.email}"
+            f"started querying bank list from paystack"
         )
         headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
         result = util.http(f"{setting.paystack_url}bank?currency=NGN",headers=headers)
@@ -1045,7 +1045,6 @@ def adminPayments(request: Request,response: Response,setting: Setting,db: Sessi
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return PaymentsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-
 def listOfCashout(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
     try:
         logger.info(

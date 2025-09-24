@@ -17,7 +17,7 @@ from utils.dependencies import (
     getSystemSetting,validateAdmin,
 )
 from utils.database import get_db
-from services import adminservice,glAccountingService,productservice
+from services import adminservice,glAccountingService,productservice,paymentservice
 from schemas.admin import *
 from schemas.cashout import *
 from schemas.role import *
@@ -1870,7 +1870,82 @@ async def delete_package(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+@router.get("/banks",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["cashout"])
+async def getBanks(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+):
+    try:
+        return await paymentservice.getbanks(response=response,setting=setting)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.post("/cashout/recipient",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["cashout"])
+async def cashout_recipient(
+    payload: AddCashoutRequest,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await paymentservice.addCashoutRecipient(
+                payload=payload,
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                user=admin,
+                background_task=background_task,
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.post("/cashout/request",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["cashout"])
+async def cashout_request(
+    payload: CashoutRequest,
+    request: Request,
+    response: Response,
+    user: Annotated[CustomerModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        if user:
+            return await paymentservice.addCashout(
+                payload=payload,
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                user=user,
+                background_task=background_task,
+            )
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 
+# analytics
 @router.get("/services", 
     response_model=ProductTypesResponse,
     response_model_exclude_unset=True,tags=["product"])

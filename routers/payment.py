@@ -565,7 +565,7 @@ async def getBanks(
 ):
     try:
         if user:
-            return await paymentservice.getbanks(user=user,request=request,response=response,setting=setting)
+            return await paymentservice.getbanks(response=response,setting=setting)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
