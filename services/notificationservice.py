@@ -127,7 +127,7 @@ def notifyUser(
         logger.info(f"User with ID {userId} not found")
 async def sendNotification(request:Request,setting: Setting,notificationType:str,email:str,message:str,template:str):
     try:
-        logger.info(f"Started sending notification to {email} {datetime.now()}")
+        logger.info(f"Started sending notification to {email} {datetime.now()} {message}")
         if notificationType =="unlockInitiate":
             if template == "otp":
                 email_body = util.templates.TemplateResponse("otp_message.html",{"request": request,"message":message},)
