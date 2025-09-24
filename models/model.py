@@ -328,6 +328,11 @@ class AccountModel(Base):
     referenceNo= Column(String(11),nullable=True)
     accountStatus = Column(Enum(AccountStatusEnum), nullable=False, default=AccountStatusEnum.ACTIVE)
     #accountStatus= Column(String(20),default=AccountStatusEnum.ACTIVE)
+    cashout_enabled = Column(Boolean, default=False)
+    cashout_account = Column(String(50), nullable=True)
+    cashout_code = Column(String(50), nullable=True)
+    cashout_bank = Column(String(50), nullable=True)
+    cashout_limit = Column(String(50), default="10000000")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
 class CashOutModel(Base):

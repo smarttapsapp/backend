@@ -851,6 +851,48 @@ async def getbanks(response: Response,setting: Setting):
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def verifyCashoutAccount(
+        payload:AddCashoutRequest,
+        request: Request,
+        response: Response,
+        setting: Setting,
+        db: Session,
+        user: CustomerModel,
+        background_task:BackgroundTasks
+):
+        try:
+            logger.info(f"Started adding cashout recipient {user.firstname} {user.lastname} for {user.email}")
+            headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
+            params ={ "type": "nuban","name":f"{user.firstname} {user.lastname}","account_number": payload.accountNumber,"bank_code": payload.bankCode, "currency": "NGN" }
+            result = util.http(f"{setting.paystack_url}transferrecipient",params=params,headers=headers)
+            if result.status_code == 201:
+                paystackResponse = result.json()
+                if paystackResponse and paystackResponse["status"] is True:
+                    recipientData = paystackResponse.get("data", {})
+                    if recipientData:
+                        user.wallet.cashout_enabled = True
+                        user.wallet.cashout_account = payload.accountNumber
+                        user.wallet.cashout_code = recipientData.get("recipient_code")
+                        user.wallet.cashout_bank = payload.bankCode
+                        updatedUser = queries.create(db=db,model=user)
+                        if updatedUser:
+                            background_task.add_task(notifyUser,db=db,title=f"Cashout Recipient Added", message=f"Cashout recipient {user.firstname}{user.lastname} added successfully",userId=user.id, setting=setting)
+                            email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"recipient":recipientData},)
+                            background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Cashout Recipient Added",toAddress=user.email)
+                            return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                else:
+                    logger.info(f"Failed to add cashout recipient {user.firstname} {user.lastname} for {user.email}")
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse['message'],)
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse['message'],)
+            else:
+                logger.info(f"Failed to add cashout recipient {user.firstname} {user.lastname} for {user.email}")
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=result.json()['message'],)
+        except Exception as ex:
+            logger.info(ex)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 async def addCashoutRecipient(
         payload:AddCashoutRequest,
         request: Request,
@@ -870,10 +912,10 @@ async def addCashoutRecipient(
                 if paystackResponse and paystackResponse["status"] is True:
                     recipientData = paystackResponse.get("data", {})
                     if recipientData:
-                        user.cashout_enabled = True
-                        user.cashout_account = payload.accountNumber
-                        user.cashout_code = recipientData.get("recipient_code")
-                        user.cashout_bank = payload.bankCode
+                        user.wallet.cashout_enabled = True
+                        user.wallet.cashout_account = payload.accountNumber
+                        user.wallet.cashout_code = recipientData.get("recipient_code")
+                        user.wallet.cashout_bank = payload.bankCode
                         updatedUser = queries.create(db=db,model=user)
                         if updatedUser:
                             background_task.add_task(notifyUser,db=db,title=f"Cashout Recipient Added", message=f"Cashout recipient {user.firstname}{user.lastname} added successfully",userId=user.id, setting=setting)
