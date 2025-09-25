@@ -6,6 +6,8 @@ from models.model import PriorityEnum,OTPStatusEnum
 from schemas.response import BaseResponse
 from schemas.support_attachment import SupportAttachment
 from schemas.support_comment import SupportComment
+from schemas.customer import CustomerMini
+from schemas.admin import AdminMini
 class SupportTicketBase(BaseModel):
     subject:str
     description:str
@@ -17,6 +19,8 @@ class SupportTicket(SupportTicketBase):
     id: Optional[int]
     comments: Union[List[SupportComment], None] = []
     attachments: Union[List[SupportAttachment], None] = []
+    admin: Optional[AdminMini]=None
+    user: Optional[CustomerMini]=None
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 

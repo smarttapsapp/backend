@@ -23,7 +23,8 @@ from schemas.ticket import TicketsResponse
 from schemas.bus import BusesResponse,AddBusRequest
 from schemas.park import ParksResponse
 from schemas.train import *
-from schemas.notification import NotificationsResponse
+from schemas.notification import *
+from schemas.support_ticket import *
 from fastapi import (
     status,
     Response,
@@ -1209,3 +1210,24 @@ async def cashOutsAnalytics(response: Response,db: Session,admin: AdminModel):
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return CashoutsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def listOfSupportTickets(response: Response,db: Session,admin: AdminModel,startDate: str,endDate: str):
+    try:
+        logger.info(
+            f"started querying tickets list from {startDate} to {endDate}"
+        )
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
+            return SupportTicketsResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=adminQuery.getSupportTickets(db=db,startDate=startDate,endDate=endDate)
+            )
+        else:
+            return SupportTicketsResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=adminQuery.getSupportTickets(db=db,adminId=admin.id,startDate=startDate,endDate=endDate)
+            )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return SupportTicketsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

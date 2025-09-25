@@ -8,6 +8,12 @@ from schemas.account import Account
 from utils import util
 
 
+class CustomerMini(BaseModel):
+    firstname: str
+    lastname: str
+    class Config:
+        from_attributes = True
+        populate_by_name = True
 class CustomerBase(BaseModel):
     firstname: str
     lastname: str

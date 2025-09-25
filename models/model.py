@@ -183,6 +183,7 @@ class AdminModel(Base):
     preference = relationship('UserNotificationPreference', back_populates='admin')
     buses = relationship("BusModel", back_populates="provider")
     trains = relationship("TrainModel", back_populates="provider")
+    support_tickets = relationship('SupportTicketModel', back_populates='admin')
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
 class CustomerModel(Base):
@@ -269,7 +270,7 @@ class CustomerModel(Base):
     #notifications = relationship("NotificationModel", secondary="user_notifications", back_populates="users")
     preference = relationship('UserNotificationPreference', back_populates='user')
     # ticketing
-    support_tickets = relationship('SupportTicketModel', backref='user')
+    support_tickets = relationship('SupportTicketModel', back_populates='user')
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
 class BeneficiaryModel(Base):
@@ -604,7 +605,9 @@ class SupportTicketModel(Base):
     
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('customers.id'), nullable=False)  # Creator of the ticket
+    user = relationship('CustomerModel', back_populates='support_tickets')
     admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True)  # Assigned support agent
+    admin = relationship("AdminModel",  back_populates="support_tickets")
     subject = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
     priority = Column(Enum(PriorityEnum), default=PriorityEnum.INFO) 

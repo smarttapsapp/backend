@@ -38,6 +38,7 @@ from schemas.product_type import *
 from schemas.package import *
 from schemas.payment import *
 from schemas.transaction import *
+from schemas.support_ticket import *
 from schemas.seat import *
 from models.model import *
 from datetime import date
@@ -2024,3 +2025,89 @@ async def get_cashout_analytics(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return CashoutsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+#Support Tiocket
+@router.get("/support-tickets", 
+    response_model=SupportTicketsResponse,
+    response_model_exclude_unset=True,tags=["support"])
+async def get_support_tickets(
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+    startDate: str = Query(default=util.get_first_day_of_month()),
+    endDate: Optional[str] = Query(str(date.today())),
+):
+    try:
+        if admin:
+            if startDate and endDate:
+                start = datetime.strptime(startDate, "%Y-%m-%d")
+                end = datetime.strptime(endDate, "%Y-%m-%d")
+                if end < start:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
+            return await adminservice.listOfSupportTickets(
+                response=response,
+                db=db,
+                admin=admin,
+                startDate=startDate,
+                endDate=endDate)
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return SupportTicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.post("/seat/add", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["seat"])
+async def addSeat(
+    payload:AddSeatRequest,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await adminservice.addSeat(
+            payload=payload,
+                db=db,
+                setting=setting,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.delete("/seat/{id}/delete", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["seat"])
+async def deleteSeat(
+    id:int,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await adminservice.deleteSeat(
+            seatId=id,
+                db=db,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
