@@ -125,13 +125,14 @@ def verifyAccountOpening(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-def create_pin(
+async def create_pin(
     request: Request,
     response: Response,
     setting: Setting,
     db: Session,
     user: CustomerModel,
     payload: CreatePINRequest,
+    device:Device,
     background_task: BackgroundTasks,):
     try:
         if user.pin:
@@ -139,6 +140,15 @@ def create_pin(
         if payload.pin == payload.confirmPin:
             user.pin = util.get_password_hash(password=payload.pin)
             user.updated_at = datetime.now()
+            user.device = DeviceModel(
+                            imeiNo = device.imeiNo,
+                            modelName = device.modelName,
+                            manufacturer = device.manufacturer,
+                            deviceName = device.deviceName,
+                            apiLevel = device.apiLevel,
+                            isPhysicalDevice = device.isPhysicalDevice,
+                            platformVersion = device.platformVersion,
+                        )
             updatedUser = authQuery.create_account(db=db,user=user)
             if updatedUser:
                 email_body = util.templates.TemplateResponse("createpin.html",{"request": request, "user": user},)

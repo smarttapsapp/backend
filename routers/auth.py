@@ -120,13 +120,14 @@ async def create_Transaction_PIN(
     payload: CreatePINRequest,
     request: Request,
     response: Response,
+    device: Annotated[Device, Depends(validateDevice)],
     user: Annotated[CustomerModel, Depends(validateRegistration)],
     setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
 ):
     try:
-        return authservice.create_pin(request=request,response=response,setting=setting,db=db,user=user,payload=payload,background_task=background_task)
+        return await authservice.create_pin(request=request,response=response,setting=setting,db=db,user=user,payload=payload,device=device,background_task=background_task)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
