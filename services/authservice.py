@@ -284,8 +284,9 @@ async def deviceUnlockInitiate(
                     password = f"{otp}|{device.imeiNo}|{device.modelName}|{device.manufacturer}"
                     newOtp = OTPModel(otp=otp,user_id=account.id,status=OTPStatusEnum.OPEN,servicename="unlockInitiate",created_at=datetime.now(),expired_at=datetime.now()+timedelta(minutes=5),updated_at=datetime.now(),)
                     createdOTP = authQuery.create_otp(db=db,otp=newOtp)
-                    message =f"""<p>Dear {account.firstname} {account.lastname},<br />Kindly enter OTP {otp} to complete your activation or verification process<br /></p>"""
-                    background_task.add_task(notificationservice.sendNotification,request=request,notificationType="unlockInitiate",setting=setting,email=account.email,message=message,template="otp")
+                    email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": account,"otp":createdOTP.otp},)
+                    background_task.add_task(
+                    util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=f"Unlock Device Verification",toAddress=account.email,)
                     authToken = util.create_access_token(setting=setting,credentials={"username":account.phonenumber,"password": password,},exp=15,)
                     return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"token":authToken[0],"expire":authToken[1],"message":f"Please enter the OTP sent to {account.phonenumber[0:4]}xxxxxx{account.phonenumber[-2:]} to unlock your device"},)
                 else:

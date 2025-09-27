@@ -1,11 +1,16 @@
-<!-- Include the footer  -->
-{% include 'include/header.html' %}
+<!DOCTYPE html>
+<html lang="en">
+  <!-- Include the footer  -->
+  {% include 'include/header.html' %}
 
-<p>
-  Dear {{user.firstname}} {{user.lastname}},<br />
-  Kindly enter OTP {{otp.otp}} to complete your activation or verification
-  process<br />
-</p>
+  <body>
+    <p>
+      Dear {{user.firstname}} {{user.lastname}},<br />
+      Kindly enter OTP {{otp}} to complete your activation or verification
+      process<br />
+    </p>
 
-<!-- Include the footer  -->
-{% include 'include/footer.html' %}
+    <!-- Include the footer  -->
+    {% include 'include/footer.html' %}
+  </body>
+</html>

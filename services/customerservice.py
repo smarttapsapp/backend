@@ -218,18 +218,16 @@ def ninverification(
             db=db, userId=user.id, nin=nin
         )
         if userRecord:
+            to_otp = util.generateOTP()
             otpModel = OTPModel(
-                otp=util.generateOTP(),
+                otp=to_otp,
                 servicename="ninVerification",
                 user_id=user.id,
                 created_at=datetime.now(),
-                expired_at=(datetime.now() + timedelta(minutes=15)))
+                expired_at=(datetime.now() + timedelta(minutes=5)))
             createdOtp = queries.create(db=db,model=otpModel)
             if createdOtp:
-                email_body = util.templates.TemplateResponse(
-                        "otp.html",
-                        {"request": request, "user": userRecord,"otp":createdOtp.otp},
-                    )
+                email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": userRecord,"otp":to_otp},)
                 background_task.add_task(
                         util.mailer,
                         str(email_body.body, "utf-8"),
@@ -455,6 +453,7 @@ def updateNextOfKin(
             db=db, userId=user.id,name=payload.fullName,phone=payload.phone,address=payload.address,relationship=payload.relationship
         )
         if userRecord:
+            background_task.add_task(upgradeAccount,db=db,user=userRecord,setting=setting,request=request,background_task=background_task)
             background_task.add_task(notifyUser,db=db,title=f"Next Of Kin Update", message=f"Your Next of Kin details was submitted successfuly.",userId=user.id, setting=setting)
             email_body = util.templates.TemplateResponse("success.html",{"request": request, "user": userRecord,"message":f"Your Next of Kin details was submitted successfuly."},)
             background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="Next Of Kin",toAddress=user.email,)

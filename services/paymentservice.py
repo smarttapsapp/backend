@@ -91,7 +91,7 @@ def fundViaPaystack(
                     wallet_id = user.wallet.id,
                     user_id = user.id,
                     amount = amount,
-                    channel = "PAYSTACK",
+                    channel = ChannelEnum.PAYSTACK,
                     product_type_id = creditProductType.id,
                     product_id=product.id,
                     recipient=user.wallet.walletAccount,
@@ -151,56 +151,66 @@ async def fundNotificationViaPaystack(
     try:
         json_data = await request.json()
         logger.info(f"incoming payment from paystack {str(json_data)}")
-        headOffice = paymentQuery.getHeadofficeAccount(db=db)
+        headOffice = queries.getHeadofficeAccount(db=db)
         if headOffice:
             payment = paymentQuery.getPaymentByReference(db=db,reference=json_data["data"]["reference"])
             if payment:
-                getGlAccount = paymentQuery.getHeadoffice(db=db,glcode=setting.gl_inflow)
-                if getGlAccount:
-                    getGlAccount.gl_balance = int(getGlAccount.gl_balance)+int(json_data["data"]["amount"])
-                    getGlAccount.journal_entries.append(JournalEntryModel(code = getGlAccount.code,admin_id = headOffice.id,amount = int(json_data["data"]["amount"]),is_debit =False,created_at = datetime.now()))
-                    savedGl = paymentQuery.create(db=db,model=getGlAccount)
-                    if savedGl:
-                        payment.event = json_data["event"]
-                        payment.channel = json_data["data"]["channel"]
-                        payment.payment_date = json_data["data"]["channel"]
-                        payment.status = json_data["data"]["status"]
-                        payment.fee = json_data["data"]["fees"]
-                        payment.paystack_id = json_data["data"]["id"]
-                        payment.payment_date = json_data["data"]["paid_at"]
-                        payment.statusCode = TransactionCodeEnum.SUCCESS
-                        payment.statusDescription = TransactionStatusEnum.SUCCESS
-                        payment.balanceBefore = payment.wallet.availableBalance
-                        payment.balanceAfter = str(int(payment.wallet.availableBalance)+int(json_data["data"]["amount"]))
-                        payment.wallet.availableBalance = str(int(payment.wallet.availableBalance)+int(json_data["data"]["amount"]))
-                        payment.updated_at = datetime.now()
-                        payment.user.hasAuthToken = True
-                        updatedPayment = paymentQuery.create_payment(db=db,payment=payment)
-                        if updatedPayment:
-                            card = paymentQuery.getCardByLast4(db=db,last4=json_data["data"]["authorization"]["last4"])
-                            if card is None:
-                                createCard = CardsModel(
-                                    user_id= payment.user_id,
-                                    authorization_code=json_data["data"]["authorization"]["authorization_code"],
-                                    bin=json_data["data"]["authorization"]["bin"],
-                                    last4=json_data["data"]["authorization"]["last4"],
-                                    exp_month=json_data["data"]["authorization"]["exp_month"],
-                                    exp_year=json_data["data"]["authorization"]["exp_year"],
-                                    channel=json_data["data"]["authorization"]["channel"],
-                                    card_type=json_data["data"]["authorization"]["card_type"],
-                                    bank=json_data["data"]["authorization"]["bank"],
-                                    signature=json_data["data"]["authorization"]["signature"],
-                                    account_name=json_data["data"]["authorization"]["account_name"],
-                                    reusable=json_data["data"]["authorization"]["reusable"],
-                                    created_at=datetime.now(),
-                                    updated_at=datetime.now(),
-                                )
-                                addCard = paymentQuery.create_card(db=db,card=createCard)
-                            background_task.add_task(notifyUser,db=db,title=f"Fund Notification", message=updatedPayment.statusMessage,userId=payment.user_id, setting=setting)
-                            return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,)
-                        else:
-                            response.status_code = status.HTTP_400_BAD_REQUEST
-                            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Unable to add fund",)
+                payment.event = json_data["event"]
+                payment.channel = json_data["data"]["channel"]
+                payment.payment_date = json_data["data"]["channel"]
+                payment.status = json_data["data"]["status"]
+                payment.fee = json_data["data"]["fees"]
+                payment.paystack_id = json_data["data"]["id"]
+                payment.payment_date = json_data["data"]["paid_at"]
+                payment.statusCode = TransactionCodeEnum.SUCCESS
+                payment.statusDescription = TransactionStatusEnum.SUCCESS
+                payment.balanceBefore = payment.wallet.availableBalance
+                payment.balanceAfter = str(int(payment.wallet.availableBalance)+int(json_data["data"]["amount"]))
+                payment.wallet.availableBalance = str(int(payment.wallet.availableBalance)+int(json_data["data"]["amount"]))
+                payment.updated_at = datetime.now()
+                payment.wallet.updated_at = datetime.now()
+                payment.code = setting.gl_outflow
+                payment.user.hasAuthToken = True
+                updatedPayment = paymentQuery.create_payment(db=db,payment=payment)
+                if updatedPayment:
+                    headOffice.wallet.availableBalance = str(int(headOffice.wallet.availableBalance)+int(json_data["data"]["amount"]))
+                    headOffice.updated_at = datetime.now()
+                    headOffice.wallet.updated_at = datetime.now()
+                    headOffice.wallet.payments.append(PaymentModel(wallet_id=headOffice.wallet.id,admin_id=headOffice.id,amount = int(json_data["data"]["amount"]),
+                                    payment_type =PaymentEnum.CREDIT,reference =f"FUND-{util.generateId()}",code=setting.gl_inflow,
+                                    transactionreference=payment.reference,event = "charge.success",status = "success",channel =ChannelEnum.PAYSTACK,
+                                    fee = 0,statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,
+                                    product_type_id = payment.product_type_id,product_id=payment.product_id,recipient=headOffice.wallet.walletAccount,
+                                    statusMessage = payment.statusMessage,balanceBefore =headOffice.wallet.availableBalance,
+                                    balanceAfter =headOffice.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now()))
+                    updatedHeadOfficeCredit = queries.create(db=db,model=headOffice)
+                    if updatedHeadOfficeCredit:
+                        card = paymentQuery.getCardByLast4(db=db,last4=json_data["data"]["authorization"]["last4"])
+                        if card is None:
+                            createCard = CardsModel(
+                                user_id= payment.user_id,
+                                authorization_code=json_data["data"]["authorization"]["authorization_code"],
+                                bin=json_data["data"]["authorization"]["bin"],
+                                last4=json_data["data"]["authorization"]["last4"],
+                                exp_month=json_data["data"]["authorization"]["exp_month"],
+                                exp_year=json_data["data"]["authorization"]["exp_year"],
+                                channel=json_data["data"]["authorization"]["channel"],
+                                card_type=json_data["data"]["authorization"]["card_type"],
+                                bank=json_data["data"]["authorization"]["bank"],
+                                signature=json_data["data"]["authorization"]["signature"],
+                                account_name=json_data["data"]["authorization"]["account_name"],
+                                reusable=json_data["data"]["authorization"]["reusable"],
+                                created_at=datetime.now(),
+                                updated_at=datetime.now(),
+                            )
+                            addCard = paymentQuery.create_card(db=db,card=createCard)
+                        background_task.add_task(notifyUser,db=db,title=f"Fund Notification", message=updatedPayment.statusMessage,userId=payment.user_id, setting=setting)
+                        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,)
+                    else:
+                        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=PENDING,)
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Unable to add fund",)
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
                 return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
