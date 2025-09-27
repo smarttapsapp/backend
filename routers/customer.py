@@ -285,7 +285,7 @@ async def update_customer_information(
     payload: NextOfKinRequest,
     request: Request,
     responses: Response,
-    user: Annotated[Customer, Depends(verified_user)],
+    user: Annotated[CustomerModel, Depends(verified_user)],
     setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,

@@ -439,7 +439,7 @@ def changepassword(
 def updateNextOfKin(
         payload: NextOfKinRequest,
     request: Request,
-    user: Customer,
+    user: CustomerModel,
     response: Response,
     setting: Setting,
     db: Session,
@@ -449,9 +449,12 @@ def updateNextOfKin(
         logger.info(
             f"started updating next of kin of account {user.firstname} with {payload.model_dump_json()}"
         )
-        userRecord = queries.updateUserNextOfKin(
-            db=db, userId=user.id,name=payload.fullName,phone=payload.phone,address=payload.address,relationship=payload.relationship
-        )
+        user.next_of_kin_address = payload.address
+        user.next_of_kin_name=payload.fullName
+        user.next_of_kin_phone = util.formatPhone(payload.phone)
+        user.next_of_kin_relationship = payload.relationship
+        user.is_next_of_kin = True
+        userRecord = queries.create(db=db,model=user)
         if userRecord:
             background_task.add_task(upgradeAccount,db=db,user=userRecord,setting=setting,request=request,background_task=background_task)
             background_task.add_task(notifyUser,db=db,title=f"Next Of Kin Update", message=f"Your Next of Kin details was submitted successfuly.",userId=user.id, setting=setting)
