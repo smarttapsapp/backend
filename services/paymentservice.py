@@ -42,7 +42,7 @@ def saveFundThreshold(
             saved = queries.create(db=db,model=user)
             logger.info(f"I saved to db......at {datetime.now()}")
             if saved:
-                message = f"You have setup auto fund of ₦{util.kobo_to_naira(int(payload.amount)):,.2f} for your purse with a threshold of ₦{util.kobo_to_naira(int(payload.thresholdAmount)):,.2f} at "
+                message = f"You have setup auto fund of ₦{util.kobo_to_naira(int(payload.amount)):,.2f} for your purse with a threshold of ₦{util.kobo_to_naira(int(payload.thresholdAmount)):,.2f} at {datetime.now().strftime('%B %d, %Y %I:%M %p')}"
                 logger.info(message)
                 background_task.add_task(notifyUser,db=db,title=f"Auto Fund Purse", message=message,userId=user.id, setting=setting)
                 email_debit = util.templates.TemplateResponse("autofund.html",{"request": request, "user": user,"message":message},)
@@ -167,6 +167,7 @@ async def fundNotificationViaPaystack(
                 payment.payment_date = json_data["data"]["paid_at"]
                 payment.statusCode = TransactionCodeEnum.SUCCESS
                 payment.statusDescription = TransactionStatusEnum.SUCCESS
+                payment.statusMessage = TransactionStatusEnum.SUCCESS
                 payment.balanceBefore = payment.wallet.availableBalance
                 payment.balanceAfter = str(int(payment.wallet.availableBalance)+int(json_data["data"]["amount"]))
                 payment.wallet.availableBalance = str(int(payment.wallet.availableBalance)+int(json_data["data"]["amount"]))

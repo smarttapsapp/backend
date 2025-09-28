@@ -31,6 +31,7 @@ from email.mime.text import MIMEText
 
 logger = logging.getLogger(__name__)
 templates = Jinja2Templates(directory="templates/email")
+templates.env.globals['now'] = datetime.now
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
