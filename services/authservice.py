@@ -149,6 +149,11 @@ async def create_pin(
                             isPhysicalDevice = device.isPhysicalDevice,
                             platformVersion = device.platformVersion,
                         )
+            user.preference =UserNotificationPreference(
+                receive_via_email = True,
+                receive_in_app = True,
+                created_at=datetime.now()
+            )
             updatedUser = authQuery.create_account(db=db,user=user)
             if updatedUser:
                 email_body = util.templates.TemplateResponse("createpin.html",{"request": request, "user": user},)

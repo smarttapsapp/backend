@@ -137,7 +137,12 @@ async def createUserAccount(db: Session,setting: Setting,payload: CreateAdminReq
                     billerId = util.generateBillerId(),
                     created_at=datetime.now(),
                     updated_at=datetime.now(),
-                    wallet=AccountModel(walletAccount=util.formatPhoneShort(payload.phonenumber),accountStatus=AccountStatusEnum.ACTIVE,availableBalance=0,created_at=datetime.now(),updated_at=datetime.now())
+                    wallet=AccountModel(walletAccount=util.formatPhoneShort(payload.phonenumber),accountStatus=AccountStatusEnum.ACTIVE,availableBalance=0,created_at=datetime.now(),updated_at=datetime.now()),
+                    preference =UserNotificationPreference(
+                receive_via_email = True,
+                receive_in_app = True,
+                created_at=datetime.now()
+            )
                 )
             createdAccount = adminQuery.create(db=db, model=newAdmin)
             if createdAccount:

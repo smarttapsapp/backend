@@ -491,6 +491,11 @@ def upgradeAccount(db:Session,user:CustomerModel,setting:Setting,request:Request
                     status=True,
                     created_at=datetime.now(),
                     updated_at=datetime.now(),
+                    preference =UserNotificationPreference(
+                receive_via_email = True,
+                receive_in_app = True,
+                created_at=datetime.now()
+            )
                 )
                     queries.create(db=db, model=merchant)
                     email_body = util.templates.TemplateResponse(
