@@ -167,7 +167,7 @@ async def fundNotificationViaPaystack(
                 payment.payment_date = json_data["data"]["paid_at"]
                 payment.statusCode = TransactionCodeEnum.SUCCESS
                 payment.statusDescription = TransactionStatusEnum.SUCCESS
-                payment.statusMessage = TransactionStatusEnum.SUCCESS
+                payment.statusMessage = TransactionStatusEnum.SUCCESS.value
                 payment.balanceBefore = payment.wallet.availableBalance
                 payment.balanceAfter = str(int(payment.wallet.availableBalance)+int(json_data["data"]["amount"]))
                 payment.wallet.availableBalance = str(int(payment.wallet.availableBalance)+int(json_data["data"]["amount"]))
