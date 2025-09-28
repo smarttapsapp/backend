@@ -10,6 +10,7 @@ from utils import util
 from schemas.setting import Setting
 from utils.constant import *
 from schemas.customer import *
+from datetime import datetime
 from schemas.admin import Admin
 from fastapi import (
     status,
@@ -82,49 +83,52 @@ def notifyUser(
     message: str,
     userId:int,
     setting: Setting):
-    logger.info("started notifying user......................")
-    customer = queries.customer(db=db,userId=userId)
-    if customer:
-        if customer.preference:
-            if customer.preference.email:
-                email_body = util.templates.TemplateResponse(
-                    "notification.html",
-                    {"request": None, "user": customer, "message": message},
-                )
-                util.mailer(
-                    str(email_body.body, "utf-8"),
-                    setting=setting,
-                    subject=title,
-                    toAddress=customer.email,
-                )
-            if customer.preference.sms:
-                util.send_sms_message(
-                    setting=setting,
-                    toPhoneNumber=customer.phonenumber,
+    try:
+        logger.info("started notifying user......................")
+        customer = queries.customer(db=db,userId=userId)
+        if customer:
+            if customer.preference:
+                if customer.preference.email:
+                    email_body = util.templates.TemplateResponse(
+                        "notification.html",
+                        {"request": None, "user": customer, "message": message},
+                    )
+                    util.mailer(
+                        str(email_body.body, "utf-8"),
+                        setting=setting,
+                        subject=title,
+                        toAddress=customer.email,
+                    )
+                if customer.preference.sms:
+                    util.send_sms_message(
+                        setting=setting,
+                        toPhoneNumber=customer.phonenumber,
+                        message=message,
+                        transactionId=util.generateId(),
+                    )
+                notification = NotificationModel(
+                    title=title,
                     message=message,
-                    transactionId=util.generateId(),
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
                 )
-            notification = NotificationModel(
-                title=title,
-                message=message,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
-            )
-            user_notification = UserNotification(customer=customer, notification=notification)
-            createdNotification = queries.create(db=db, model=user_notification)
-            logger.info(f"Notification sent successfully to {customer.firstname}")
+                user_notification = UserNotification(customer=customer, notification=notification)
+                createdNotification = queries.create(db=db, model=user_notification)
+                logger.info(f"Notification sent successfully to {customer.firstname}")
+            else:
+                notification = NotificationModel(
+                    title=title,
+                    message=message,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                )
+                user_notification = UserNotification(customer=customer, notification=notification)
+                createdNotification = queries.create(db=db, model=user_notification)
+                logger.info(f"Notification sent successfully to {customer.firstname}")
         else:
-            notification = NotificationModel(
-                title=title,
-                message=message,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
-            )
-            user_notification = UserNotification(customer=customer, notification=notification)
-            createdNotification = queries.create(db=db, model=user_notification)
-            logger.info(f"Notification sent successfully to {customer.firstname}")
-    else:
-        logger.info(f"User with ID {userId} not found")
+            logger.info(f"User with ID {userId} not found")
+    except Exception as ex:
+        logger.info(f"Error {ex} occurred while processing your debit transaction at {datetime.now()}")
 async def sendNotification(request:Request,setting: Setting,notificationType:str,email:str,message:str,template:str):
     try:
         logger.info(f"Started sending notification to {email} {datetime.now()} {message}")
