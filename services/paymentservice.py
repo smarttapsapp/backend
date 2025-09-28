@@ -43,7 +43,7 @@ def saveFundThreshold(
             logger.info(f"I saved to db......at {datetime.now()}")
             if saved:
                 message = f"You have setup auto fund of ₦{util.kobo_to_naira(int(payload.amount)):,.2f} for your purse with a threshold of ₦{util.kobo_to_naira(int(payload.thresholdAmount)):,.2f} at {datetime.now().strftime('%B %d, %Y %I:%M %p')}"
-                background_task.add_task(notifyUser,db=db,title=f"Auto Fund Purse", message=message,userId=user.id, setting=setting)
+                #background_task.add_task(notifyUser,db=db,title=f"Auto Fund Purse", message=message,userId=user.id, setting=setting)
                 email_debit = util.templates.TemplateResponse("autofund.html",{"request": request, "user": user,"message":message},)
                 background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Auto Fund Purse",toAddress=user.email)
                 return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS)
