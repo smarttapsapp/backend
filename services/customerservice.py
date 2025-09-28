@@ -252,9 +252,9 @@ def ninverification(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),
                statusDescription = SYSTEMBUSY,)
-def handleOTPVerification(
+async def handleOTPVerification(
     request: Request,
-    user: Customer,
+    user: CustomerModel,
     response: Response,
     setting: Setting,
     db: Session,
@@ -281,7 +281,7 @@ def handleOTPVerification(
                 current_datetime = datetime.now()
                 if latestOtp.expired_at >= current_datetime:
                     if latestOtp.otp == payload.otp:
-                        userRecord = queries.update_user_agent_records(db=db, id=user.id, user=user)
+                        userRecord = queries.create(db=db,model=user)
                         if userRecord:
                             latestOtp.status = OTPStatusEnum.CLOSED
                             latestOtp.updated_at = current_datetime
@@ -297,7 +297,7 @@ def handleOTPVerification(
                                         str(email_body.body, "utf-8"),
                                         setting=setting,
                                         subject=f"{payload.action.capitalize()} Verification Successful",
-                                        toAddress=userRecord.email,
+                                        toAddress=user.email,
                                     )
                                 response.status_code = status.HTTP_200_OK
                                 return BaseResponse(
@@ -358,7 +358,7 @@ def handleOTPVerification(
         return BaseResponse(
                 statusCode =str(status.HTTP_400_BAD_REQUEST),
                statusDescription = SYSTEMBUSY,)
-def changepin(
+async def changepin(
     request: Request,
     user: CustomerModel,
     response: Response,
@@ -397,9 +397,9 @@ def changepin(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SYSTEMBUSY,)
-def changepassword(
+async def changepassword(
     request: Request,
-    user: Customer,
+    user: CustomerModel,
     response: Response,
     setting: Setting,
     db: Session,
@@ -436,7 +436,7 @@ def changepassword(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SYSTEMBUSY,)
-def updateNextOfKin(
+async def updateNextOfKin(
         payload: NextOfKinRequest,
     request: Request,
     user: CustomerModel,
@@ -456,9 +456,9 @@ def updateNextOfKin(
         user.is_next_of_kin = True
         userRecord = queries.create(db=db,model=user)
         if userRecord:
+            email_body = util.templates.TemplateResponse("success.html",{"request": request, "user": userRecord,"message":f"Your Next of Kin details was submitted successfuly."},)
             background_task.add_task(upgradeAccount,db=db,user=userRecord,setting=setting,request=request,background_task=background_task)
             background_task.add_task(notifyUser,db=db,title=f"Next Of Kin Update", message=f"Your Next of Kin details was submitted successfuly.",userId=user.id, setting=setting)
-            email_body = util.templates.TemplateResponse("success.html",{"request": request, "user": userRecord,"message":f"Your Next of Kin details was submitted successfuly."},)
             background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="Next Of Kin",toAddress=user.email,)
             response.status_code = status.HTTP_200_OK
             return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription = SUCCESS)
@@ -468,8 +468,7 @@ def updateNextOfKin(
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),
-               statusDescription = SYSTEMBUSY, )
+        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SYSTEMBUSY, )
 def upgradeAccount(db:Session,user:CustomerModel,setting:Setting,request:Request,background_task:BackgroundTasks):
     try:
         if user.bvn_verified and user.nin_verified and user.email_verified:

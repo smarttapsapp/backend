@@ -115,7 +115,7 @@ async def change_transaction_pin(
 ):
     try:
         if user:
-            return customerservice.changepin(
+            return await customerservice.changepin(
                 request=request,
                 user=user,
                 response=response,
@@ -144,14 +144,14 @@ async def change_transaction_password(
     payload: ChangePasswordRequest,
     request: Request,
     response: Response,
-    user: Annotated[Customer, Depends(verified_user)],
+    user: Annotated[CustomerModel, Depends(verified_user)],
     Setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
 ):
     try:
         if user:
-            return customerservice.changepassword(
+            return await customerservice.changepassword(
                 request=request,
                 user=user,
                 response=response,
@@ -256,13 +256,13 @@ async def updateAccountInfoVerification(
     payload: InfoVerificationRequest,
     request: Request,
     response: Response,
-    user: Annotated[Customer, Depends(verified_user)],
+    user: Annotated[CustomerModel, Depends(verified_user)],
     settings: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
 ):
     try:
-        return customerservice.handleOTPVerification(
+        return await customerservice.handleOTPVerification(
                 request=request,
                 user=user,
                 response=response,
@@ -292,7 +292,7 @@ async def update_customer_information(
 ):
     try:
         if user:
-            return customerservice.updateNextOfKin(
+            return await customerservice.updateNextOfKin(
                 payload=payload,
                 request=request,
                 user=user,

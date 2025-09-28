@@ -37,8 +37,10 @@ def saveFundThreshold(
             user.autoFund = True
             user.autoFundThreshold = payload.thresholdAmount
             user.autoFundAmount = payload.amount
+            logger.info(f"I want to check......at {datetime.now()}")
             user.updated_at = datetime.now()
             saved = queries.create(db=db,model=user)
+            logger.info(f"I saved to db......at {datetime.now()}")
             if saved:
                 message = f"You have setup auto fund of ₦{util.kobo_to_naira(int(payload.amount)):,.2f} for your purse with a threshold of ₦{util.kobo_to_naira(int(payload.thresholdAmount)):,.2f} at {datetime.now().strftime('%B %d, %Y %I:%M %p')}"
                 background_task.add_task(notifyUser,db=db,title=f"Auto Fund Purse", message=message,userId=user.id, setting=setting)
@@ -914,33 +916,38 @@ async def addCashoutRecipient(
 ):
         try:
             logger.info(f"Started adding cashout recipient {user.firstname} {user.lastname} for {user.email}")
-            headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
-            params ={ "type": "nuban","name":f"{user.firstname} {user.lastname}","account_number": payload.accountNumber,"bank_code": payload.bankCode, "currency": "NGN" }
-            result = util.http(f"{setting.paystack_url}transferrecipient",params=params,headers=headers)
-            if result.status_code == 201:
-                paystackResponse = result.json()
-                if paystackResponse and paystackResponse["status"] is True:
-                    recipientData = paystackResponse.get("data", {})
-                    if recipientData:
-                        user.wallet.cashout_enabled = True
-                        user.wallet.cashout_account = payload.accountNumber
-                        user.wallet.cashout_code = recipientData.get("recipient_code")
-                        user.wallet.cashout_bank = payload.bankCode
-                        updatedUser = queries.create(db=db,model=user)
-                        if updatedUser:
-                            background_task.add_task(notifyUser,db=db,title=f"Cashout Recipient Added", message=f"Cashout recipient {user.firstname}{user.lastname} added successfully",userId=user.id, setting=setting)
-                            email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"recipient":recipientData},)
-                            background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Cashout Recipient Added",toAddress=user.email)
-                            return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS)
+            if user.cashout_enabled:
+                headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
+                params ={ "type": "nuban","name":f"{user.firstname} {user.lastname}","account_number": payload.accountNumber,"bank_code": payload.bankCode, "currency": "NGN" }
+                result = util.http(f"{setting.paystack_url}transferrecipient",params=params,headers=headers)
+                if result.status_code == 201:
+                    paystackResponse = result.json()
+                    if paystackResponse and paystackResponse["status"] is True:
+                        recipientData = paystackResponse.get("data", {})
+                        if recipientData:
+                            user.wallet.cashout_enabled = True
+                            user.wallet.cashout_account = payload.accountNumber
+                            user.wallet.cashout_code = recipientData.get("recipient_code")
+                            user.wallet.cashout_bank = payload.bankCode
+                            user.wallet.updated_at = datetime.now()
+                            updatedUser = queries.create(db=db,model=user)
+                            if updatedUser:
+                                background_task.add_task(notifyUser,db=db,title=f"Cashout Recipient Added", message=f"Cashout recipient {user.firstname}{user.lastname} added successfully",userId=user.id, setting=setting)
+                                email_debit = util.templates.TemplateResponse("cashout_setup.html",{"request": request, "user": user,"recipient":recipientData},)
+                                background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Cashout Recipient Added",toAddress=user.email)
+                                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                    else:
+                        logger.info(f"Failed to add cashout recipient {user.firstname} {user.lastname} for {user.email}")
+                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse['message'],)
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse['message'],)
                 else:
                     logger.info(f"Failed to add cashout recipient {user.firstname} {user.lastname} for {user.email}")
-                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse['message'],)
-                response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse['message'],)
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=result.json()['message'],)
             else:
-                logger.info(f"Failed to add cashout recipient {user.firstname} {user.lastname} for {user.email}")
                 response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=result.json()['message'],)
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Cashout account already exist",)
         except Exception as ex:
             logger.info(ex)
             response.status_code = status.HTTP_400_BAD_REQUEST
