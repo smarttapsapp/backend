@@ -235,13 +235,13 @@ async def updateCustomerInformation(
     payload:VerificationRequest,
     request: Request,
     response: Response,
-    user: Annotated[Customer, Depends(verified_user)],
+    user: Annotated[CustomerModel, Depends(verified_user)],
     settings: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
 ):
     try:
-        return customerservice.performAction(request=request,payload=payload,user=user,response=response,setting=settings,db=db,background_task=background_task)
+        return await customerservice.performAction(request=request,payload=payload,user=user,response=response,setting=settings,db=db,background_task=background_task)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST

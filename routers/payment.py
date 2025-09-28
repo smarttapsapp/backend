@@ -156,7 +156,6 @@ async def fund_wallet_threshold(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-
 @router.post("/notification",
     response_model=BaseResponse,
     response_model_exclude_unset=True,)

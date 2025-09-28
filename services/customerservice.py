@@ -56,9 +56,9 @@ def balance(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST), statusDescription=SYSTEMBUSY,)
-def performAction(request:Request,payload:VerificationRequest,user: Customer,response: Response,setting: Setting,db: Session,background_task:BackgroundTasks):
+async def performAction(request:Request,payload:VerificationRequest,user: CustomerModel,response: Response,setting: Setting,db: Session,background_task:BackgroundTasks):
     if payload.action.upper() == "NIN":
-        return ninverification(
+        return await ninverification(
                         request=request,
                     user=user,
                     response=response,
@@ -68,7 +68,7 @@ def performAction(request:Request,payload:VerificationRequest,user: Customer,res
                     background_task=background_task
                 )
     elif payload.action.upper() == "BVN":
-        return bvnverification(
+        return await bvnverification(
                         request=request,
                     user=user,
                     response=response,
@@ -78,7 +78,7 @@ def performAction(request:Request,payload:VerificationRequest,user: Customer,res
                     background_task=background_task
                 )
     elif payload.action.upper() == "EMAIL":
-        return submitEmailForVerification(
+        return await submitEmailForVerification(
                         request=request,
                     user=user,
                     response=response,
@@ -90,9 +90,9 @@ def performAction(request:Request,payload:VerificationRequest,user: Customer,res
     else:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNABLE,)
-def submitEmailForVerification(
+async def submitEmailForVerification(
     request: Request,
-    user: Customer,
+    user: CustomerModel,
     response: Response,
     setting: Setting,
     db: Session,
@@ -104,16 +104,14 @@ def submitEmailForVerification(
             f"started updating/verification of account with email for {user.firstname} with {email}"
         )
         user.email = email
-        userRecord = queries.update_user_agent_records(
-            db=db, id=user.id, user=user
-        )
+        userRecord = queries.create(db=db, model=user)
         if userRecord:
             otpModel = OTPModel(
                 otp=util.generateOTP(),
                 servicename="emailVerification",
                 user_id=user.id,
                 created_at=datetime.now(),
-                expired_at=(datetime.now() + timedelta(minutes=15))
+                expired_at=(datetime.now() + timedelta(minutes=5))
                 )
             createdOtp = queries.create(db=db,model=otpModel)
             if createdOtp:
@@ -148,9 +146,9 @@ def submitEmailForVerification(
         return BaseResponse(
                 statusCode =str(status.HTTP_400_BAD_REQUEST),
                statusDescription = SYSTEMBUSY, )
-def bvnverification(
+async def bvnverification(
     request: Request,
-    user: Customer,
+    user: CustomerModel,
     response: Response,
     setting: Setting,
     db: Session,
@@ -161,8 +159,10 @@ def bvnverification(
         logger.info(
             f"started updating/verification of account with bvn for {user.firstname} with {bvn}"
         )
-        userRecord = queries.updateUserBvn(
-            db=db, userId=user.id, bvn=bvn
+        user.bvn = bvn
+        user.updated_at =datetime.now()
+        userRecord = queries.create(
+            db=db, model=user
         )
         if userRecord:
             otpModel = OTPModel(
@@ -170,12 +170,12 @@ def bvnverification(
                 servicename="bvnVerification",
                 user_id=user.id,
                 created_at=datetime.now(),
-                expired_at=(datetime.now() + timedelta(minutes=15)))
+                expired_at=(datetime.now() + timedelta(minutes=5)))
             createdOtp = queries.create(db=db,model=otpModel)
             if createdOtp:
                 email_body = util.templates.TemplateResponse(
                         "otp.html",
-                        {"request": request, "user": userRecord,"otp":createdOtp.otp},
+                        {"request": request, "user": user,"otp":createdOtp.otp},
                     )
                 background_task.add_task(
                         util.mailer,
@@ -190,20 +190,20 @@ def bvnverification(
                 response.status_code = status.HTTP_400_BAD_REQUEST
                 return BaseResponse(
                     statusCode =str(status.HTTP_400_BAD_REQUEST),
-                   statusDescription = SYSTEMBUSY,)
+                   statusDescription = FAILED,)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(
                     statusCode =str(status.HTTP_400_BAD_REQUEST),
-                   statusDescription = SYSTEMBUSY,)
+                   statusDescription = UNAUTHORISED,)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),
                statusDescription = SYSTEMBUSY, )
-def ninverification(
+async def ninverification(
     request: Request,
-    user: Customer,
+    user: CustomerModel,
     response: Response,
     setting: Setting,
     db: Session,
@@ -214,9 +214,9 @@ def ninverification(
         logger.info(
             f"started updating/verification of account with bvn for {user.firstname} with {nin}"
         )
-        userRecord = queries.updateUserNiN(
-            db=db, userId=user.id, nin=nin
-        )
+        user.nin = nin
+        user.updated_at = datetime.now()
+        userRecord = queries.create(db=db, model=user)
         if userRecord:
             to_otp = util.generateOTP()
             otpModel = OTPModel(
@@ -241,12 +241,12 @@ def ninverification(
                 response.status_code = status.HTTP_400_BAD_REQUEST
                 return BaseResponse(
                     statusCode =str(status.HTTP_400_BAD_REQUEST),
-                   statusDescription = SYSTEMBUSY,)
+                   statusDescription = FAILED,)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(
                     statusCode =str(status.HTTP_400_BAD_REQUEST),
-                   statusDescription = SYSTEMBUSY )
+                   statusDescription = UNAUTHORISED )
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST

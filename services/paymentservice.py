@@ -37,13 +37,10 @@ def saveFundThreshold(
             user.autoFund = True
             user.autoFundThreshold = payload.thresholdAmount
             user.autoFundAmount = payload.amount
-            logger.info(f"I want to check......at {datetime.now()}")
             user.updated_at = datetime.now()
             saved = queries.create(db=db,model=user)
-            logger.info(f"I saved to db......at {datetime.now()}")
             if saved:
                 message = f"You have setup auto fund of ₦{util.kobo_to_naira(int(payload.amount)):,.2f} for your purse with a threshold of ₦{util.kobo_to_naira(int(payload.thresholdAmount)):,.2f} at {datetime.now().strftime('%B %d, %Y %I:%M %p')}"
-                logger.info(message)
                 background_task.add_task(notifyUser,db=db,title=f"Auto Fund Purse", message=message,userId=user.id, setting=setting)
                 email_debit = util.templates.TemplateResponse("autofund.html",{"request": request, "user": user,"message":message},)
                 background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Auto Fund Purse",toAddress=user.email)
@@ -838,7 +835,6 @@ async def singleTicket(response: Response,db: Session,user: Customer,ticketId: s
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TicketResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-
 # cashout
 async def getbanks(response: Response,setting: Setting):
     try:
@@ -919,6 +915,9 @@ async def addCashoutRecipient(
         try:
             logger.info(f"Started adding cashout recipient {user.firstname} {user.lastname} for {user.email}")
             if user.cashout_enabled:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Cashout account already exist",)
+            else:
                 headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
                 params ={ "type": "nuban","name":f"{user.firstname} {user.lastname}","account_number": payload.accountNumber,"bank_code": payload.bankCode, "currency": "NGN" }
                 result = util.http(f"{setting.paystack_url}transferrecipient",params=params,headers=headers)
@@ -947,9 +946,6 @@ async def addCashoutRecipient(
                     logger.info(f"Failed to add cashout recipient {user.firstname} {user.lastname} for {user.email}")
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=result.json()['message'],)
-            else:
-                response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Cashout account already exist",)
         except Exception as ex:
             logger.info(ex)
             response.status_code = status.HTTP_400_BAD_REQUEST
@@ -1082,8 +1078,6 @@ async def addCashout(
             logger.info(ex)
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-
-
 # Admin Payments
 def adminPayments(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
     try:
