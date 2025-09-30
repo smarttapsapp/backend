@@ -85,7 +85,7 @@ def generateAndSendOTP(request: Request,db: Session,setting: Setting,background_
     if newOtp:
         authToken = util.create_access_token(setting=setting,credentials={"username": customer.email,"password": newOtp.otp},exp=60)
         if authToken:
-            email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": customer,"otp":newOtp},)
+            email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": customer,"otp":newOtp.otp},)
             background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=f"Verification",toAddress=customer.email,)
         return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=f"Please enter the OTP sent to {util.mask_email(customer.email)} to complete your registration",data={"token":authToken[0],"expires":authToken[1] })
     else:
@@ -337,7 +337,7 @@ async def deviceUnlockFinal(request: Request,device:Device,db:Session,response:R
                         user.otps.append(otp)
                         updatedUser = authQuery.create_account(db=db,user=user)
                         response.status_code = status.HTTP_200_OK
-                        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription="Device unlock Successful",)
+                        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription="Device unlocked Successfully",)
                     else:
                         logger.info(f"otp already expired for device @ {datetime.now()}........")
                         response.status_code = status.HTTP_400_BAD_REQUEST
