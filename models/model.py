@@ -180,7 +180,7 @@ class AdminModel(Base):
     role = relationship("RoleModel", back_populates="admins")
     cashouts = relationship("CashOutModel", backref="admin")
     user_notifications = relationship("UserNotification", back_populates="admin")
-    preference = relationship('UserNotificationPreference', back_populates='admin')
+    preference = relationship('UserNotificationPreference', uselist=False,back_populates='admin')
     buses = relationship("BusModel", back_populates="provider")
     trains = relationship("TrainModel", back_populates="provider")
     support_tickets = relationship('SupportTicketModel', back_populates='admin')
@@ -268,7 +268,7 @@ class CustomerModel(Base):
 
     #user_notifications = relationship("UserNotification", back_populates="customer")
     #notifications = relationship("NotificationModel", secondary="user_notifications", back_populates="users")
-    preference = relationship('UserNotificationPreference', back_populates='user')
+    preference = relationship('UserNotificationPreference', uselist=False, back_populates='user')
     # ticketing
     support_tickets = relationship('SupportTicketModel', back_populates='user')
     created_at = Column(DateTime, default=func.now())

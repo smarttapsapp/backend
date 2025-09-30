@@ -149,7 +149,7 @@ async def create_pin(
                             isPhysicalDevice = device.isPhysicalDevice,
                             platformVersion = device.platformVersion,
                         )
-            user.preference =UserNotificationPreference(
+            user.preference = UserNotificationPreference(
                 receive_via_email = True,
                 receive_in_app = True,
                 created_at=datetime.now()
