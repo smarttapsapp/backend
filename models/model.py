@@ -576,7 +576,7 @@ class UserNotificationPreference(Base):
     
     id = Column(Integer, primary_key=True)
     customer_id = Column(Integer, ForeignKey('customers.id'), nullable=False)
-    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True)
     #notification_type_id = Column(Integer, ForeignKey('notification_types.id'), nullable=False)
     receive_via_email = Column(Boolean, default=True)
     receive_via_sms = Column(Boolean, default=False)
@@ -590,7 +590,7 @@ class UserNotification(Base):
     
     id = Column(Integer, primary_key=True)
     customer_id = Column(Integer, ForeignKey('customers.id'), nullable=True)
-    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True)
     notification_id = Column(Integer, ForeignKey('notifications.id', ondelete="CASCADE"), nullable=False,)
     is_read = Column(Boolean, default=False)
     created_at = Column(DateTime, default=func.now())
