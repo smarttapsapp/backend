@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from schemas.response import BaseResponse
 from schemas.train import Train
 from schemas.bus import Bus
+from schemas.seat import SeatBase,Seat
 from schemas.station import Station
 
 
@@ -20,6 +21,7 @@ class Route(RouteBase):
     destinationStation: Union[Station, None] = None
     trains:Union[List[Train],None] = None
     buses:Union[List[Bus],None] = None
+    seats:Union[List[Seat],None] = None
     id: Optional[int]
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
@@ -36,6 +38,7 @@ class AddRouteRequest(RouteBase):
     admin_id: int
     startId:int
     stopId:int
+    seats:Union[List[dict],None]=None
     buses:Union[List[int],None]=None
 
 class RouteResponse(BaseResponse):

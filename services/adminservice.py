@@ -956,7 +956,8 @@ async def addRoute(db: Session,setting: Setting,payload: AddRouteRequest, backgr
                             previous.sourceStation_id=startStation.id
                             previous.updated_at = datetime.now()
                         else:
-                            previous = RouteModel(routeName=payload.routeName,sourceStation_id=startStation.id,destinationStation_id=stopStation.id,mode=startStation.mode,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now())
+                            seatsm = [SeatModel(admin_id = admin.id,price = int(seat['price'])*100,classType = seat['classType'],availabilityStatus = "available",created_at=datetime.now(),updated_at=datetime.now(),) for seat in payload.seats]
+                            previous = RouteModel(routeName=payload.routeName,sourceStation_id=startStation.id,destinationStation_id=stopStation.id,mode=startStation.mode,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now(),seats=seatsm)
                         created = adminQuery.create(db=db, model=previous)
                         if created:
                             email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
