@@ -19,12 +19,12 @@ class RouteRequest(RouteBase):
 class Route(RouteBase):
     sourceStation: Union[Station, None] = None
     destinationStation: Union[Station, None] = None
-    trains:Union[List[Train],None] = None
-    buses:Union[List[Bus],None] = None
-    seats:Union[List[Seat],None] = None
+    trains:Union[List[Train],None] = []
+    buses:Union[List[Bus],None] = []
+    seats:Union[List[Seat],None] = []
     id: Optional[int]
-    created_at: Union[datetime, None] = func.now()
-    updated_at: Union[datetime, None] = func.now()
+    created_at: Union[datetime, None] = datetime.now()
+    updated_at: Union[datetime, None] = datetime.now()
 
     class Config:
         from_attributes = True
