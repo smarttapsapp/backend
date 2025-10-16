@@ -18,6 +18,7 @@ class CustomerBase(BaseModel):
     firstname: str
     lastname: str
     phonenumber: str
+    identifier: Optional[str]=None
     @validator("phonenumber")
     def phoneNumber_validator(cls, phonenumber):
         phone = util.formatPhoneWithDialingCode(msisdn=phonenumber)

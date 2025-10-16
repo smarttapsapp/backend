@@ -19,6 +19,7 @@ from schemas.seat import *
 from schemas.schedule import *
 from schemas.payment import *
 from schemas.route import RoutesResponse,AddRouteRequest
+from schemas.bus_route import BusRoutesResponse,AddBusRouteRequest
 from schemas.ticket import TicketsResponse
 from schemas.bus import BusesResponse,AddBusRequest
 from schemas.park import ParksResponse
@@ -537,7 +538,7 @@ async def addRole(db: Session,setting: Setting,payload: AddRoleRequest, backgrou
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ALREADYEXIST)
         else:
-            new = RoleModel(name=payload.name,tag=AdminRoleEnum(payload.tag),status=payload.status,description=payload.description,created_at=datetime.now(),updated_at=datetime.now(),)
+            new = RoleModel(identifier=util.generateId(length=6),name=payload.name,tag=AdminRoleEnum(payload.tag),status=payload.status,description=payload.description,created_at=datetime.now(),updated_at=datetime.now(),)
             created = queries.create(db=db, model=new)
             if created:
                 email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
@@ -601,6 +602,67 @@ async def listOfParks(request: Request,response: Response,setting: Setting,db: S
         response.status_code = status.HTTP_400_BAD_REQUEST
         return ParksResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 # buses
+async def listOfBusRoutes(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+    try:
+        logger.info(f"started querying products")
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
+            return BusRoutesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getBusRoutes(db=db))
+        else:
+            return BusRoutesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getBusRoutes(db=db,adminId=admin.id))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BusRoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def addBusRoute(db: Session,setting: Setting,payload: AddBusRouteRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started creating new route @ {datetime.now()}")
+        if admin.role.tag in[AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
+        #if admin.role.tag in [AdminRoleEnum.BUSINESS,AdminRoleEnum.SUPERADMIN]:
+            existing = queries.getBusRouteByStartStopStation(db=db,start=payload.startId, stop=payload.stopId,adminId=admin.id)
+            if existing:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ALREADYEXIST)
+            else:
+                startStation = adminQuery.getStationById(db=db,stationId=payload.startId)
+                if startStation:
+                    stopStation = adminQuery.getStationById(db=db,stationId=payload.stopId)
+                    if stopStation:
+                        #busess = adminQuery.getBusesByIds(db=db,ids=payload.buses)
+                        #logger.info(busess)
+                        #if busess:
+                        previous = queries.getBusRouteById(db=db,routeId=payload.id)
+                        if previous and previous.admin_id == admin.id:
+                            #previous.buses = busess
+                            previous.destinationStation_id=stopStation.id
+                            previous.sourceStation_id=startStation.id
+                            previous.updated_at = datetime.now()
+                            previous.baseprice = int(payload.baseprice)*100
+                        else:
+                            previous = BusRouteModel(identifier=util.generateId(length=6),routeName=payload.routeName,sourceStation_id=startStation.id,destinationStation_id=stopStation.id,mode=startStation.mode,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now(),baseprice=int(payload.baseprice)*100)
+                        created = adminQuery.create(db=db, model=previous)
+                        if created:
+                            email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Route Created",toAddress=admin.email,)
+                            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                        else:
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+                        #else:
+                        #    response.status_code = status.HTTP_400_BAD_REQUEST
+                        #    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOROUTE)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ENDSTATIONERR)
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=STARTSTATIONERR)
+        else:
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            return BaseResponse(statusCode = str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
 async def listOfBuses(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
     try:
         logger.info(f"started querying buses")
@@ -615,30 +677,36 @@ async def listOfBuses(request: Request,response: Response,setting: Setting,db: S
 async def addBus(db: Session,setting: Setting,payload: AddBusRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
     try:
         logger.info(f"started creating/updating bus @ {datetime.now()}")
-        if admin.role.tag in[AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
-            adminId = admin.id if admin.role.tag in [AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER] else None
-            routes = adminQuery.getRoutesByIds(db=db,ids=payload.busroutes,adminId=adminId)
-            if routes:
-                schedules =  adminQuery.getSchedulesByIds(db=db,ids=payload.busschedules,adminId=None)
-                if schedules:
-                    previous = adminQuery.getBus(db=db,busNumber=payload.bus_number)
-                    if previous:
-                        logger.info(previous.name)
-                        logger.info(previous.admin_id)
-                        logger.info(admin.id)
-                        previous.airCondition = payload.airCondition
-                        previous.tv = payload.tv
-                        previous.base_price = payload.base_price
-                        previous.camera = payload.camera
-                        previous.name = payload.name
-                        previous.seatCount = payload.seatCount
-                        previous.description = payload.description
-                        previous.billerId = admin.billerId
-                        previous.schedules = schedules
-                        previous.routes = routes
-                        previous.updated_at = datetime.now()
-                    else:
-                        previous = BusModel(admin_id=admin.id,seatCount=payload.seatCount,name=payload.name,bus_number=payload.bus_number,description=payload.description,tv=payload.tv,camera=payload.camera,airCondition=payload.airCondition,base_price=payload.base_price,created_at=datetime.now(),updated_at=datetime.now(),billerId=admin.billerId,schedules=schedules,routes=routes)
+        if admin.role.tag in[AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
+            busRoutes = []
+            adminId = admin.id if admin.role.tag in [AdminRoleEnum.BUSPROVIDER] else None
+            previous = adminQuery.getBus(db=db,busNumber=payload.bus_number)
+            if previous:
+                schedules = [BusScheduleModel(admin_id = admin.id,price = int(schedule['price'])*100,departureTime = schedule['departureTime'],arrivalTime = schedule['arrivalTime'],timeOfOperation = schedule['timeOfOperation'],created_at=datetime.now(),updated_at=datetime.now(),) for schedule in payload.schedules]
+                logger.info(schedules)
+                logger.info(previous.name)
+                logger.info(previous.admin_id)
+                logger.info(admin.id)
+                previous.airCondition = payload.airCondition
+                previous.tv = payload.tv
+                previous.base_price = payload.base_price
+                previous.camera = payload.camera
+                previous.name = payload.name
+                previous.description = payload.description
+                previous.billerId = admin.billerId
+                previous.routes = busRoutes
+                previous.updated_at = datetime.now()
+            else:
+                for route in payload.routes:
+                    startStation = adminQuery.getStationById(db=db,stationId=route['departure'])
+                    if startStation:
+                        stopStation = adminQuery.getStationById(db=db,stationId=route['arrival'])
+                        if stopStation:
+                            busRoutes.append(BusRouteModel(identifier=util.generateId(length=6),routeName=f"{startStation.location} {stopStation.location}",sourceStation_id=startStation.id,destinationStation_id=stopStation.id,mode=startStation.mode,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now(),baseprice=int(route['price'])*100))
+                if busRoutes:
+                    schedules = [BusScheduleModel(identifier=util.generateId(length=6),admin_id =admin.id,price = int(schedule['price'])*100,departureTime = schedule['departureTime'],arrivalTime = schedule['arrivalTime'],timeOfOperation = schedule['timeOfOperation'],created_at=datetime.now(),updated_at=datetime.now(),) for schedule in payload.schedules]
+                    logger.info(schedules)
+                    previous = BusModel(identifier=util.generateId(length=6),admin_id=admin.id,name=payload.name,bus_number=payload.bus_number,description=payload.description,tv=payload.tv,camera=payload.camera,airCondition=payload.airCondition,base_price=int(payload.base_price)*100,availabilityStatus=True,created_at=datetime.now(),updated_at=datetime.now(),billerId=admin.billerId,schedules=schedules,routes=busRoutes)
                     created = queries.create(db=db, model=previous)
                     if created:
                         email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
@@ -649,10 +717,7 @@ async def addBus(db: Session,setting: Setting,payload: AddBusRequest, background
                         return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
-                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOSCHEDULE)
-            else:
-                response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOROUTE)
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ROUTEERROR)
         else:
             response.status_code = status.HTTP_401_UNAUTHORIZED
             return BaseResponse(statusCode = str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED)
@@ -718,6 +783,7 @@ async def addSchedule(db: Session,setting: Setting,payload: AddScheduleRequest, 
             existing.timeOfOperation = payload.timeOfOperation
         else:
             existing = ScheduleModel(
+                identifier=util.generateId(length=6),
                 admin_id = admin.id,
                 timeOfOperation = payload.timeOfOperation,
                 departureTime = payload.departureTime,
@@ -957,7 +1023,7 @@ async def addRoute(db: Session,setting: Setting,payload: AddRouteRequest, backgr
                             previous.updated_at = datetime.now()
                         else:
                             seatsm = [SeatModel(admin_id = admin.id,price = int(seat['price'])*100,classType = seat['classType'],availabilityStatus = "available",created_at=datetime.now(),updated_at=datetime.now(),) for seat in payload.seats]
-                            previous = RouteModel(routeName=payload.routeName,sourceStation_id=startStation.id,destinationStation_id=stopStation.id,mode=startStation.mode,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now(),seats=seatsm)
+                            previous = RouteModel(identifier=util.generateId(length=6),routeName=payload.routeName,sourceStation_id=startStation.id,destinationStation_id=stopStation.id,mode=startStation.mode,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now(),seats=seatsm)
                         created = adminQuery.create(db=db, model=previous)
                         if created:
                             email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
@@ -1035,13 +1101,23 @@ async def addStation(db: Session,setting: Setting,payload: AddStationRequest, ba
         logger.info(f"started creating/updating new station @ {datetime.now()}")
         if admin.role.tag in [AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
             if admin:
-                if payload.id:
-                    existing = queries.getStationById(db=db,stationId=payload.id)
+                if payload.identifier:
+                    existing = queries.getStationById(db=db,stationId=payload.identifier)
                     if existing:
+                        logger.info(existing)
+                        if existing.long is None:
+                            geo = util.get_lat_lon(location_name=payload.location)
+                            existing.lat = geo[0]
+                            existing.long = geo[1]
+                        if existing.identifier is None:
+                            existing.identifier=util.generateId(length=6)
                         existing.stationName = payload.stationName
                         existing.location = payload.location
                 else:
-                    existing = StationModel(
+                    geo = util.get_lat_lon(location_name=payload.location)
+                    if geo:
+                        existing = StationModel(
+                            identifier=util.generateId(length=6),
                                     admin_id = admin.id,
                                     stationName = payload.stationName,
                                     location =  payload.location,
@@ -1051,6 +1127,8 @@ async def addStation(db: Session,setting: Setting,payload: AddStationRequest, ba
                                     contact = admin.phonenumber,
                                     policy = "",
                                     status = True,
+                                    long = geo[1],
+                                    lat =geo[0],
                                     mode= TicketModeEnum(payload.mode) )
                 created = queries.create(db=db,model=existing)
                 if created:

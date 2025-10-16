@@ -1,27 +1,21 @@
 from typing import Optional, Union,List
 from datetime import datetime
-from sqlalchemy import func
 from pydantic import BaseModel
 from schemas.response import BaseResponse
-from schemas.train import Train
-from schemas.seat import SeatBase,Seat
+from schemas.bus import Bus
 from schemas.station import Station
 from schemas.admin import AdminMini
 
 
-class RouteBase(BaseModel):
+class BusRouteBase(BaseModel):
     routeName: Union[str, None] = None
-
-
-class RouteRequest(RouteBase):
-    user: Union[List[str], None] = None
-
-class Route(RouteBase):
+    baseprice: Union[str, None] = None
+class BusRoute(BusRouteBase):
     sourceStation: Union[Station, None] = None
     destinationStation: Union[Station, None] = None
-    trains:Union[List[Train],None] = []
-    seats:Union[List[Seat],None] = []
     identifier: Union[str, None] = None
+    id: Optional[int]
+    bus:Union[Bus,None] = []
     provider:AdminMini
     created_at: Union[datetime, None] = datetime.now()
     updated_at: Union[datetime, None] = datetime.now()
@@ -30,16 +24,28 @@ class Route(RouteBase):
         from_attributes = True
         populate_by_name = True
 
-class RoutesResponse(BaseResponse):
+class Route(BaseModel):
+    baseprice: Union[str, None] = None
+    sourceStation: Union[Station, None] = None
+    destinationStation: Union[Station, None] = None
+    identifier: Union[str, None] = None
+    bus:Union[Bus,None] = []
+    id: Optional[int]
+    provider:AdminMini
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class BusRoutesResponse(BaseResponse):
     data: Union[List[Route],None] = None
 
-class AddRouteRequest(RouteBase):
+class AddBusRouteRequest(BusRouteBase):
     id: Optional[int]=None
     admin_id: int
     startId:int
     stopId:int
-    seats:Union[List[dict],None]=None
     buses:Union[List[int],None]=None
 
-class RouteResponse(BaseResponse):
-    data: Route = None
+class BusRouteResponse(BaseResponse):
+    data: BusRoute = None

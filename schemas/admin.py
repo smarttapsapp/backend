@@ -6,6 +6,7 @@ from datetime import datetime
 from schemas.response import BaseResponse
 from schemas.role import Role
 
+
 class AdminMini(BaseModel):
     firstname: str
     lastname: str
@@ -24,6 +25,7 @@ class AdminCreate(AdminBase):
 class Admin(AdminBase):
     status: bool
     role: Role
+    identifier: Optional[str]=None
     billerId: Optional[str]=None
     id: int
 
@@ -40,6 +42,7 @@ class AdminProfile(AdminBase):
     status: bool
     id: int
     tag: str
+    identifier: Optional[str]=None
     wallet: Optional[Account]=None 
     @classmethod
     def from_orm(cls, obj):
@@ -50,8 +53,9 @@ class AdminProfile(AdminBase):
             phonenumber=obj.phonenumber,
             status=obj.status,
             email=obj.email,
+            identifier=obj.identifier,
+            wallet=obj.wallet,
             tag=obj.role.tag,
-            wallet=obj.wallet
         )
     class Config:
         from_attributes = True
@@ -77,3 +81,5 @@ class AdminResponse(BaseResponse):
     data: Admin = None
 class ProvidersResponse(BaseResponse):
     data: Union[List[Provider],None] = None
+#class AdminRoutesResponse(BaseResponse):
+#    data: Union[List[AdminTransport],None] = []

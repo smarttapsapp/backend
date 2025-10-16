@@ -12,6 +12,7 @@ from schemas.product_type import *
 from schemas.admin import ProvidersResponse
 from schemas.station import StationsResponse
 from schemas.route import RoutesResponse,RouteResponse
+from schemas.bus_route import BusRoutesResponse,BusRouteResponse
 from fastapi import Response,Request,status
 from models.queries import productQuery,queries
 from schemas.beneficiary import *
@@ -34,21 +35,32 @@ def getAllBillers(db: Session):
     return productQuery.get_all_biller(db=db)
 def getSingleBiller(db: Session, id: int):
     return productQuery.get_single_biller_by_id(db=db, id=id)
-async def searchMovablesRoutes(request: Request,response: Response,setting: Setting,db: Session,user: Customer,departure: str,arrival: str,mode: str):
+async def searchMovablesRoutes(response: Response,db: Session,user: Customer,departure: str,arrival: str,mode: str,latitude:str,longitude:str):
     try:
-        logger.info(f"Started searching for {mode} route by {user.firstname}") 
+        logger.info(f"Started searching for {mode} route by {user.firstname}")
+        #admins = queries.getAdminsByRole(db=db,role=AdminRoleEnum.BUSPROVIDER)
         data = []
         if departure and arrival:
             logger.info(f"Searching for {mode} route from {departure} to {arrival}")
-            route = queries.query_routes_by_stations(db=db,departure=departure,arrival=arrival,mode=mode)
+            route = queries.getBusRoutesByStations(db=db,departure=departure,arrival=arrival,mode=mode)
             if route:
-                return RoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=route)
+                return BusRoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=route)
+        if longitude and latitude:
+            data = queries.getAdminRoutes(db=db,role=AdminRoleEnum.BUSPROVIDER,latitude=float(latitude),longitude=float(longitude),radius_km=20)
+            #datad = queries.getAdminRoutes(db=db,role=AdminRoleEnum.BUSPROVIDER,latitude=float(latitude),longitude=float(longitude),radius_km=5)
+            #logger.info(datad)
+            #for admin in admins:
+            #    admin.routes = [route for route in admin.routes if admin.routes and util.is_within_radius(lat1=float(route.sourceStation.lat),lon1=float(route.sourceStation.long),lat2=float(latitude),lon2=float(longitude),radius_km=50)]
+            #    data.append(admin)
+            #logger.info(data)
+            if data:
+                return BusRoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=data)
         data = queries.query_routes(db=db,mode=mode)
-        return RoutesResponse(statusCode=str(status.HTTP_404_NOT_FOUND),statusDescription=SUCCESS,data=data)
+        return BusRoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=data)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return RoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+        return BusRoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 def searchTrainRoutes(request: Request,response: Response,setting: Setting,db: Session,user: Customer,departure: str,arrival: str,seatType: str,operationTime:str):
     try:
         logger.info(f"Started searching for train from {departure} to {arrival} with {seatType} for {operationTime}") 
@@ -115,6 +127,7 @@ def addBeneficiary(db: Session,request:Request,response:Response,payload:AddBene
     biller = productQuery.get_single_biller_by_billerId(db=db,billerId=payload.billercode)
     if biller:
         newBeneficiary = BeneficiaryModel(
+            identifier=util.generateId(length=6),
         transaction_type = payload.transaction_type,
         nickname = payload.nickname,
         customerId = payload.customerId,

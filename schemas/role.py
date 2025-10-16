@@ -16,6 +16,7 @@ class RoleRequest(RoleBase):
 
 class Role(RoleBase):
     status: Union[bool, None] = False
+    identifier: Optional[str]=None
     id: Optional[int]=None
 
     class Config:

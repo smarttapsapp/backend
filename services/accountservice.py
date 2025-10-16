@@ -156,6 +156,7 @@ def createUserAccount(db: Session,setting: Setting,payload: CustomerRequest, bac
         logger.info("started getting bvn records from bvn provider")
         password = util.generateOTP()
         user = AdminModel(
+            identifier=util.generateId(length=6),
             firstname=payload.firstname,
             lastname=payload.lastname,
             email=payload.email,

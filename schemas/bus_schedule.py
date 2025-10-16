@@ -3,20 +3,15 @@ from datetime import datetime
 from sqlalchemy import func
 from pydantic import BaseModel
 from schemas.response import BaseResponse
-from schemas.seat import Seat
 
 
-class ScheduleBase(BaseModel):
+class BusScheduleBase(BaseModel):
     timeOfOperation: Union[str, None] = None
     departureTime: Union[str, None] = None
     arrivalTime: Union[str, None] = None
+    price: Union[str, None] = "0"
 
-
-class ScheduleRequest(ScheduleBase):
-    user: Union[List[str], None] = None
-
-class Schedule(ScheduleBase):    
-    seats: Union[List[Seat],None] = None
+class BusSchedule(BusScheduleBase):    
     daysOfOperation: Union[str, None] = None
     identifier: Union[str, None] = None
     id: Optional[int]
@@ -27,12 +22,12 @@ class Schedule(ScheduleBase):
         from_attributes = True
         populate_by_name = True
 
-class AddScheduleRequest(ScheduleBase):
+class AddBusScheduleRequest(BusScheduleBase):
     id: Optional[int]=None
     admin_id: int
     mode:str
-class SchedulesResponse(BaseResponse):
-    data: Union[List[Schedule],None] = None
+class BusSchedulesResponse(BaseResponse):
+    data: Union[List[BusSchedule],None] = None
     
-class ScheduleResponse(BaseResponse):
-    data: Schedule = None
+class BusScheduleResponse(BaseResponse):
+    data: BusSchedule = None

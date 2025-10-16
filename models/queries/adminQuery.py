@@ -103,7 +103,7 @@ def getBuses(db: Session,adminId:int=None):
         return db.query(BusModel).filter(BusModel.admin_id ==adminId).order_by(desc(BusModel.created_at)).all()
     return db.query(BusModel).order_by(desc(BusModel.created_at)).all()
 def getBus(db: Session,busNumber:str):
-    return db.query(BusModel).filter(BusModel.bus_number ==busNumber).first()
+    return db.query(BusModel).filter(BusModel.bus_number == busNumber).first()
 def getBusesByIds(db:Session,ids:list[int],adminId:int=None):
     if adminId:
         return db.query(BusModel).filter(BusModel.admin_id == adminId).filter(BusModel.id.in_(ids)).all()
@@ -119,8 +119,8 @@ def getstations(db: Session,adminId:int=None):
     if adminId:
         return db.query(StationModel).filter(StationModel.admin_id ==adminId).order_by(desc(StationModel.created_at)).all()
     return db.query(StationModel).all()
-def getStationById(db: Session,stationId:int):
-    return db.query(StationModel).filter(StationModel.id == stationId).first()
+def getStationById(db: Session,stationId:str):
+    return db.query(StationModel).filter(StationModel.identifier == stationId).first()
 def deleteStation(db: Session ,stationId:int):
     return db.query(StationModel).filter(StationModel.id == stationId).delete()
 # routes

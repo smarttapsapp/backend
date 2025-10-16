@@ -22,6 +22,7 @@ class BeneficiaryCreate(BeneficiaryBase):
 
 class Beneficiary(BeneficiaryBase):
     id: int
+    identifier: Optional[str] = None
     user_id: int
 
     class Config:

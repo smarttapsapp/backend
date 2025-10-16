@@ -8,7 +8,6 @@ from schemas.setting import Setting
 from utils.constant import *
 from typing import Annotated
 from schemas.customer import Customer
-from schemas.admin import Admin
 from jose import jwt, JWTError
 from schemas.device import Device
 from utils.database import get_db

@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import BackgroundTasks
 from enum import Enum as PythonEnum
+from geopy.geocoders import Nominatim
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 import xml.etree.ElementTree as ET
@@ -28,6 +29,7 @@ from email.mime.audio import MIMEAudio
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from email.mime.text import MIMEText
+from math import radians, sin, cos, sqrt, atan2
 
 logger = logging.getLogger(__name__)
 templates = Jinja2Templates(directory="templates/email")
@@ -191,8 +193,17 @@ def formatPhoneShort(msisdn:str)->str:
         return msisdn.replace("0", "", 1)
     else:
         return msisdn
-def mask_email(email):
+def mask_emailold(email):
     return re.sub(r'^[^@]+', '*' * len(re.search(r'^[^@]+', email).group()), email)
+def mask_email(email: str) -> str:
+    match = re.search(r'^[^@]+', email)
+    if not match:
+        return email  # no username part
+    username = match.group()
+    if len(username) <= 2:
+        return email  # nothing to mask
+    masked = username[:2] + '*' * (len(username) - 2)
+    return re.sub(r'^[^@]+', masked, email)
 def generateId(length: int = 12) -> str:
     return ''.join(secrets.choice('0123456789') for _ in range(length))
 def generateOTP():
@@ -314,6 +325,25 @@ def get_first_day_of_month():
     return datetime(today.year, today.month, 1).strftime("%Y-%m-%d")
 def get_today():
     return datetime.today().strftime("%Y-%m-%d")
+def get_lat_lon(location_name: str):
+    logger.info(f"getting geolocation info for ${location_name} at {datetime.now()}")
+    geolocator = Nominatim(user_agent="geoapi")
+    location = geolocator.geocode(location_name)
+    if location:
+        return location.latitude, location.longitude
+    return None, None
+def is_within_radius(lat1, lon1, lat2, lon2, radius_km):
+    logger.info(f"Started calculation............ {lat1,lat2} and {lon1,lon2}")
+    R = 6371.0  # Earth radius in km
+
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+
+    distance = R * c  # distance in km
+    logger.info(f"distance {distance} and radius {radius_km}")
+    return distance <= radius_km
 @lru_cache()
 def get_setting():
     return AppSetting()

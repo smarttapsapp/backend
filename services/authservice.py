@@ -69,6 +69,7 @@ def createUserAccount(db: Session,setting: Setting,payload: CustomerRequest, bac
             return generateAndSendOTP(request=request,db=db,response=response,setting=setting,customer=customer,background_task=background_task)
     else:
         user = CustomerModel(
+            identifier=util.generateId(length=6),
             firstname=payload.firstname,
             lastname=payload.lastname,
             email=payload.email,

@@ -4,7 +4,7 @@ from sqlalchemy import func
 from pydantic import BaseModel
 from schemas.response import BaseResponse
 from schemas.seat import Seat
-from schemas.admin import Provider
+#from schemas.admin import Provider
 from schemas.schedule import Schedule
 #from schemas.route import Route
 
@@ -21,9 +21,9 @@ class TrainRequest(TrainBase):
     user: Union[List[str], None] = None
 
 class Train(TrainBase):
-    provider: Optional[Provider]=None
+    #provider: Optional[Provider]=None
     schedules: Union[List[Schedule],None] = None
-    seats: Union[List[Seat],None] = None
+    #seats: Union[List[Seat],None] = None
     #routes:Union[List[Route],None] = None
     id: Optional[int]
     billerId: Optional[str]=None
@@ -38,7 +38,7 @@ class AddTrainRequest(TrainBase):
     id: Optional[int] = None
     schedules:List[int]
     routes:List[int]
-    seats:List[int]
+    #seats:List[int]
 
 class TrainsResponse(BaseResponse):
     data: Union[List[Train],None] = None

@@ -24,6 +24,7 @@ from schemas.station import StationsResponse
 from schemas.bus import BusesResponse
 from schemas.admin import ProvidersResponse
 from schemas.route import RouteResponse
+from schemas.bus_route import BusRoutesResponse,BusRouteResponse
 from schemas.beneficiary import *
 from models.model import CustomerModel,AdminModel
 from utils.dependencies import getSystemSetting, verified_user,validateTransactionPIN,validateAdmin
@@ -92,7 +93,7 @@ async def get_available_routes(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,data=[])
 @router.get("/bus_search",
-    response_model=RoutesResponse,
+    response_model=BusRoutesResponse,
     response_model_exclude_unset=True,tags=['bus'])
 async def get_Bus_Routes(
     request: Request,
@@ -103,17 +104,19 @@ async def get_Bus_Routes(
     departure: str = Query(None),
     arrival: str = Query(None),
     searchType: str = Query("bus"),
+    latitude: str = Query(None),
+    longitude: str = Query(None),
 ):
     try:
         if user:
-            return await productservice.searchMovablesRoutes(request=request,response=response,setting=setting,db=db,user=user,departure=departure,arrival=arrival,mode=searchType)
+            return await productservice.searchMovablesRoutes(response=response,db=db,user=user,departure=departure,arrival=arrival,mode=searchType,latitude=latitude,longitude=longitude)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
-            return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)
+            return BusRoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+        return BusRoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.get("/bus_provider/{providerId}",
     response_model=RoutesResponse,
     response_model_exclude_unset=True,tags=['bus'])
@@ -195,7 +198,6 @@ async def get_Trains_Routes(
 ):
     try:
         if user:
-            time.sleep(5)
             return productservice.searchTrainRoutes(request=request,response=response,setting=setting,db=db,user=user,departure=departure,arrival=arrival,seatType=seatType,operationTime=timeOperation)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST

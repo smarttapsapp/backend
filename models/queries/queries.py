@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session,aliased
+from sqlalchemy.orm import Session,aliased,selectinload
 from sqlalchemy import desc
 from typing import List
 from sqlalchemy.sql import select,update
@@ -8,8 +8,26 @@ from schemas.customer import Customer
 import logging
 
 logger = logging.getLogger(__name__)
+def getAdminsByRole(db: Session,role:AdminRoleEnum):
+    return db.query(AdminModel).join(RoleModel).filter(RoleModel.tag == role).order_by(desc(AdminModel.created_at)).all()
 def getAdminById(db: Session, adminId: int):
     return db.query(AdminModel).filter(AdminModel.id == adminId).first()
+def getAdminRoutes(db:Session,role:AdminRoleEnum,latitude:float,longitude:float,radius_km:int):
+    logger.info(f"{latitude} {longitude}")
+    EARTH_RADIUS_KM = 6371
+    distance_expr = (
+    EARTH_RADIUS_KM * 2 * func.asin(
+        func.sqrt(
+            func.pow(func.sin(func.radians(StationModel.lat - latitude) / 2), 2) +
+            func.cos(func.radians(latitude)) *
+            func.cos(func.radians(StationModel.lat)) *
+            func.pow(func.sin(func.radians(StationModel.long - longitude) / 2), 2)
+        )
+    )
+)
+    logger.info(distance_expr)
+    return db.query(BusRouteModel).join(BusRouteModel.sourceStation).filter(distance_expr <= radius_km).distinct().all()
+    #return db.query(AdminModel).join(RoleModel).filter(RoleModel.tag == role).options(selectinload(AdminModel.routes).selectinload(RouteModel.sourceStation)).join(AdminModel.routes).join(RouteModel.sourceStation).filter(distance_expr <= radius_km).distinct().all()
 def getBillByVas(db: Session,vasType:str):
     return db.query(ProductModel).filter(ProductModel.vasType == vasType).first()
 def customer(db: Session, userId: int):
@@ -136,8 +154,8 @@ def getstations(db: Session,mode:MovableEnum,adminId:int=None):
     if adminId:
         return db.query(StationModel).filter(StationModel.admin_id == adminId).filter(StationModel.mode == mode.value).all()
     return db.query(StationModel).filter(StationModel.mode == mode.value).all()
-def getStationById(db: Session,stationId:int):
-    return db.query(StationModel).filter(StationModel.id == stationId).first()
+def getStationById(db: Session,stationId:str):
+    return db.query(StationModel).filter(StationModel.identifier == stationId).first()
 def deleteStation(db: Session ,stationId:int):
     deleted = db.query(StationModel).filter(StationModel.id == stationId).delete()
     if deleted:
@@ -174,6 +192,33 @@ def query_routes_by_stations(db: Session,departure:str,arrival:str,mode:str):
         .filter(func.lower(DestinationStation.stationName).like(f"%{arrival.lower()}%"))
         .all()
     )
+def getBusRoutesByStations(db: Session,departure:str,arrival:str,mode:str):
+    SourceStation = aliased(StationModel)
+    DestinationStation = aliased(StationModel)
+    return (
+        db.query(BusRouteModel)
+        .join(SourceStation, BusRouteModel.sourceStation)
+        .join(DestinationStation, BusRouteModel.destinationStation)
+        .filter(BusRouteModel.mode == mode)
+        .filter(func.lower(SourceStation.stationName).like(f"%{departure.lower()}%"))
+        .filter(func.lower(DestinationStation.stationName).like(f"%{arrival.lower()}%"))
+        .all()
+    )
+def getBusRoutes(db: Session,adminId:int=None):
+    if adminId:
+        return db.query(BusRouteModel).filter(BusRouteModel.admin_id ==adminId).order_by(desc(BusRouteModel.created_at)).all()
+    return db.query(BusRouteModel).order_by(desc(BusRouteModel.created_at)).all()
+def getBusRouteById(db: Session,routeId:int):
+    return db.query(BusRouteModel).filter(BusRouteModel.id == routeId).first()
+def getBusRouteByIdentifier(db: Session,routeId:str):
+    return db.query(BusRouteModel).filter(BusRouteModel.identifier == routeId).first()
+def getBusRouteByStartStopStation(db: Session,start:int,stop:int,adminId:int):
+    return db.query(BusRouteModel).filter(BusRouteModel.admin_id == adminId).filter(BusRouteModel.sourceStation_id == start).filter(BusRouteModel.destinationStation_id == stop).first()
+def getBusRoutesByIds(db:Session,ids:list[int],adminId:int=None):
+    if adminId:
+        return db.query(BusRouteModel).filter(BusRouteModel.admin_id ==adminId).filter(BusRouteModel.identifier.in_(ids)).all()
+    return db.query(BusRouteModel).filter(BusRouteModel.identifier.in_(ids)).all()
+
 def busById(db: Session,busId:int):
     return db.query(BusModel).filter(BusModel.id == busId).first()
 def deleteBus(db: Session ,busId:int):

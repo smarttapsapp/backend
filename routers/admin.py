@@ -23,6 +23,7 @@ from schemas.cashout import *
 from schemas.role import *
 from schemas.station import *
 from schemas.route import RoutesResponse,AddRouteRequest
+from schemas.bus_route import BusRoutesResponse,AddBusRouteRequest
 from schemas.train import *
 from schemas.bus import BusesResponse,AddBusRequest
 from schemas.park import ParksResponse
@@ -925,6 +926,57 @@ async def deletePark(
             statusDescription=str(ex),
         )
 #bus
+@router.get("/bus/routes", 
+    response_model=BusRoutesResponse,
+    response_model_exclude_unset=True,tags=["route"])
+async def get_bus_routes(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if admin:
+            return await adminservice.listOfBusRoutes(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                admin=admin,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.post("/bus/route/add", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["route"])
+async def addBusRoute(
+    payload:AddBusRouteRequest,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await adminservice.addBusRoute(
+            payload=payload,
+                db=db,
+                setting=setting,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
 @router.get("/buses", 
     response_model=BusesResponse,
     response_model_exclude_unset=True,tags=["bus"])

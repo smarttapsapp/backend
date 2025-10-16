@@ -250,9 +250,9 @@ async def debitTransaction(response:Response,setting: Setting,db: Session,biller
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
 
-async def debitBusTransaction(request: Request,response:Response,setting: Setting,db: Session,biller:ProductTypeModel,customer:CustomerModel,payload:BuyTicketRequest,background_task:BackgroundTasks,bus:BusModel,remark:str=None,merchant:AdminModel=None):
+async def debitBusTransaction(request: Request,response:Response,setting: Setting,db: Session,biller:ProductTypeModel,customer:CustomerModel,payload:BuyTicketRequest,route:BusRouteModel,background_task:BackgroundTasks,bus:BusModel,remark:str=None,merchant:AdminModel=None):
     try:
-        logger.info(f"started gl debit transaction for biller {biller.id} at {datetime.now()}")
+        logger.info(f"started gl debit transaction for biller {biller.id} customer {customer.email} {customer.wallet.availableBalance} at {datetime.now()}")
         headoffice = queries.getHeadofficeAccount(db=db)
         if headoffice:
             logger.info(f"headoffice is configured at {datetime.now()}")
@@ -326,8 +326,8 @@ async def debitBusTransaction(request: Request,response:Response,setting: Settin
                                         bus_id = bus.id,
                                         admin_id=bus.admin_id,
                                         customer_id = customer.id,
-                                        route_id = payload.routeId,
-                                        schedule_id = payload.scheduleId,
+                                        busroute_id = route.id,
+                                        busschedule_id = payload.scheduleId,
                                         qr_code = f"{ticketId}|{bus.bus_number}|{TicketModeEnum.BUS.value}|{customer.wallet.walletAccount}",
                                         mode = TicketModeEnum.BUS,
                                         price = int(payload.amount),
