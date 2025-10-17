@@ -899,6 +899,7 @@ class TicketModel(Base):
     qr_code = Column(String(255), nullable=False,unique=True)  # QR code string or URL
     status= Column(Enum(TicketStatusEnum), default=TicketStatusEnum.BOOKED)  # Ticket status
     mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS)  # Ticket status
+    boarding_date = Column(String(50), nullable=True)
     booked_at = Column(DateTime, default=func.now())  
     expired_at = Column(DateTime, default=func.now())# Purchase time
     created_at = Column(DateTime, default=func.now())

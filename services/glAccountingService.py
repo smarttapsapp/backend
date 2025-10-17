@@ -328,6 +328,7 @@ async def debitBusTransaction(request: Request,response:Response,setting: Settin
                                         customer_id = customer.id,
                                         busroute_id = route.id,
                                         busschedule_id = payload.scheduleId,
+                                        boarding_date = payload.boardingDate,
                                         qr_code = f"{ticketId}|{bus.bus_number}|{TicketModeEnum.BUS.value}|{customer.wallet.walletAccount}",
                                         mode = TicketModeEnum.BUS,
                                         price = int(payload.amount),
