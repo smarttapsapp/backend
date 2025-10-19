@@ -4,6 +4,7 @@ from sqlalchemy import func
 from pydantic import BaseModel,validator
 from schemas.response import BaseResponse
 #from schemas.bus_route import BusRoute
+from schemas.admin import AdminMini
 from schemas.bus_schedule import BusSchedule
 
 
@@ -14,16 +15,20 @@ class BusBase(BaseModel):
     tv: Union[bool, None] = False
     camera: Union[bool, None] = False
     airCondition: Union[bool, None] = False
+    billerId: Optional[str]=None
+    identifier: Union[str, None] = None
+    provider:AdminMini
     @validator("bus_number")
     def bus_number_validator(cls, bus_number:str):
         return bus_number.strip().replace(' ','').upper()
     busImage: Union[str, None] = None
     description: Union[str, None] = None
     base_price: Union[str, None] = None
+    class Config:
+        from_attributes = True
+        populate_by_name = True
 class Bus(BusBase):
     id: Optional[int]=None
-    billerId: Optional[str]=None
-    identifier: Union[str, None] = None
     #provider: Optional[Provider]=None
     schedules: Optional[List[BusSchedule]] = []
     created_at: Union[datetime, None] = func.now()

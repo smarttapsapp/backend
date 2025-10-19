@@ -126,18 +126,21 @@ def deleteStation(db: Session ,stationId:int):
 # routes
 def getRoutes(db: Session,adminId:int=None):
     if adminId:
-        return db.query(RouteModel).filter(RouteModel.admin_id ==adminId).order_by(desc(RouteModel.created_at)).all()
-    return db.query(RouteModel).all()
+        return db.query(TrainRouteModel).filter(TrainRouteModel.admin_id ==adminId).order_by(desc(TrainRouteModel.created_at)).all()
+    return db.query(TrainRouteModel).all()
 def getRouteById(db: Session,routeId:int):
-    return db.query(RouteModel).filter(RouteModel.id == routeId).first()
+    return db.query(TrainRouteModel).filter(TrainRouteModel.id == routeId).first()
 def getRouteByStartStopStation(db: Session,start:int,stop:int,adminId:int):
-    return db.query(RouteModel).filter(RouteModel.admin_id == adminId).filter(RouteModel.sourceStation_id == start).filter(RouteModel.destinationStation_id == stop).first()
-def getRoutesByIds(db:Session,ids:list[int],adminId:int=None):
+    return db.query(TrainRouteModel).filter(TrainRouteModel.admin_id == adminId).filter(TrainRouteModel.sourceStation_id == start).filter(TrainRouteModel.destinationStation_id == stop).first()
+def getRouteByStartStopIdentifier(db: Session,start:str,stop:str,adminId:int):
+    return db.query(TrainRouteModel).filter(TrainRouteModel.admin_id == adminId).filter(TrainRouteModel.sourceStation_id == start).filter(TrainRouteModel.destinationStation_id == stop).first()
+
+def getRoutesByIds(db:Session,ids:list[str],adminId:int=None):
     if adminId:
-        return db.query(RouteModel).filter(RouteModel.admin_id ==adminId).filter(RouteModel.id.in_(ids)).all()
-    return db.query(RouteModel).filter(RouteModel.id.in_(ids)).all()
-def deleteRoute(db: Session ,routeId:int):
-    return db.query(RouteModel).filter(RouteModel.id == routeId).delete()
+        return db.query(TrainRouteModel).filter(TrainRouteModel.admin_id ==adminId).filter(TrainRouteModel.identifier.in_(ids)).all()
+    return db.query(TrainRouteModel).filter(TrainRouteModel.identifier.in_(ids)).all()
+def deleteRoute(db: Session ,routeId:str):
+    return db.query(TrainRouteModel).filter(TrainRouteModel.identifier == routeId).delete()
 # schedules
 def getSchedules(db: Session,adminId:int=None):
     if adminId:

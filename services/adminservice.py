@@ -906,9 +906,58 @@ async def listOfTrains(request: Request,response: Response,setting: Setting,db: 
         return TrainsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 async def addTrain(db: Session,setting: Setting,payload: AddTrainRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
     try:
-        logger.info(f"started creating new admin role @ {datetime.now()}")
-        if admin.role.tag in[AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
-            adminId = admin.id if admin.role.tag in [AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER] else payload.admin_id
+        logger.info(f"started creating new train by {admin.email} at {datetime.now()}")
+        if admin.role.tag in [AdminRoleEnum.TRAINPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
+            trainAdmin = admin
+            if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
+                trainAdmin = queries.getAdminByIdentifier(db=db,adminId=payload.admin_id)
+            routes = adminQuery.getRoutesByIds(db=db,ids=payload.routes,adminId=trainAdmin.id)
+            if routes:
+                schedules = [TrainScheduleModel(
+                    identifier=util.generateId(length=6),
+                    admin_id =admin.id,
+                    departureTime = schedule['departureTime'],
+                    arrivalTime = schedule['arrivalTime'],
+                    timeOfOperation = schedule['timeOfOperation'],
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),) for schedule in payload.schedules]
+                logger.info(schedules)
+                previous = adminQuery.getTrain(db=db,trainNumber=payload.trainNumber)
+                if previous and previous.admin_id == trainAdmin.id:
+                    previous.trainName = payload.trainName
+                    previous.billerId = admin.billerId
+                    previous.description = payload.description
+                    previous.schedules = schedules
+                    previous.routes = routes
+                    previous.updated_at = datetime.now()
+                else:
+                    previous = TrainModel(admin_id=trainAdmin.id,trainNumber=payload.trainNumber,trainName=payload.trainName,description=payload.description,created_at=datetime.now(),updated_at=datetime.now(),billerId=trainAdmin.billerId,schedules=schedules,routes=routes)
+                    created = queries.create(db=db, model=previous)
+                    if created:
+                        email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                        background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
+                        return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription="New Train added successfully")
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+
+
+            trainRoutes = []
+            existing = adminQuery.getTrain(db=db,trainNumber=payload.trainNumber)
+            if existing and existing.admin_id == trainAdmin.id:
+                existing.billerId = trainAdmin.billerId
+                existing.trainName = payload.trainName
+                existing.description = payload.description
+                existing.updated_at = datetime.now()
+            else:
+                for route in payload.routes:
+                    startStation = adminQuery.getStationById(db=db,stationId=route['departure'])
+                    if startStation:
+                        stopStation = adminQuery.getStationById(db=db,stationId=route['arrival'])
+                        if stopStation:
+                            trainRoutes.append(BusRouteModel(identifier=util.generateId(length=6),routeName=f"{startStation.location} - {stopStation.location}",sourceStation_id=startStation.id,destinationStation_id=stopStation.id,mode=startStation.mode,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now(),baseprice="0"))
+                
+
             routes = adminQuery.getRoutesByIds(db=db,ids=payload.routes,adminId=adminId)
             if routes:
                 schedules =  adminQuery.getSchedulesByIds(db=db,ids=payload.schedules,adminId=None)
@@ -1003,44 +1052,40 @@ async def addRoute(db: Session,setting: Setting,payload: AddRouteRequest, backgr
         logger.info(f"started creating new route @ {datetime.now()}")
         if admin.role.tag in[AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
         #if admin.role.tag in [AdminRoleEnum.BUSINESS,AdminRoleEnum.SUPERADMIN]:
-            existing = adminQuery.getRouteByStartStopStation(db=db,start=payload.startId, stop=payload.stopId,adminId=admin.id)
-            if existing:
-                response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ALREADYEXIST)
-            else:
-                startStation = adminQuery.getStationById(db=db,stationId=payload.startId)
-                if startStation:
-                    stopStation = adminQuery.getStationById(db=db,stationId=payload.stopId)
-                    if stopStation:
-                        #busess = adminQuery.getBusesByIds(db=db,ids=payload.buses)
-                        #logger.info(busess)
-                        #if busess:
+            startStation = adminQuery.getStationById(db=db,stationId=payload.startId)
+            if startStation:
+                stopStation = adminQuery.getStationById(db=db,stationId=payload.stopId)
+                if stopStation:
+                    existing = adminQuery.getRouteByStartStopStation(db=db,start=startStation.id, stop=stopStation.id,adminId=admin.id)
+                    if existing and payload.id is None:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ALREADYEXIST)
+                    else:
                         previous = adminQuery.getRouteById(db=db,routeId=payload.id)
                         if previous and previous.admin_id == admin.id:
-                            #previous.buses = busess
                             previous.destinationStation_id=stopStation.id
                             previous.sourceStation_id=startStation.id
                             previous.updated_at = datetime.now()
                         else:
-                            seatsm = [SeatModel(admin_id = admin.id,price = int(seat['price'])*100,classType = seat['classType'],availabilityStatus = "available",created_at=datetime.now(),updated_at=datetime.now(),) for seat in payload.seats]
-                            previous = RouteModel(identifier=util.generateId(length=6),routeName=payload.routeName,sourceStation_id=startStation.id,destinationStation_id=stopStation.id,mode=startStation.mode,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now(),seats=seatsm)
+                            seatsm = [PricingModel(price = int(seat['price'])*100,classType = seat['classType'],availabilityStatus = "available",per_km_rate="0",created_at=datetime.now(),updated_at=datetime.now(),) for seat in payload.seats]
+                            previous = TrainRouteModel(identifier=util.generateId(length=6),sourceStation_id=startStation.id,destinationStation_id=stopStation.id,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now(),prices=seatsm)
                         created = adminQuery.create(db=db, model=previous)
                         if created:
                             email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
                             background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Route Created",toAddress=admin.email,)
-                            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription="New Route Created Successfully")
                         else:
                             response.status_code = status.HTTP_400_BAD_REQUEST
                             return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
-                        #else:
-                        #    response.status_code = status.HTTP_400_BAD_REQUEST
-                        #    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOROUTE)
-                    else:
-                        response.status_code = status.HTTP_400_BAD_REQUEST
-                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ENDSTATIONERR)
+                    #else:
+                    #    response.status_code = status.HTTP_400_BAD_REQUEST
+                    #    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOROUTE)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
-                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=STARTSTATIONERR)
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ENDSTATIONERR)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=STARTSTATIONERR)
         else:
             response.status_code = status.HTTP_401_UNAUTHORIZED
             return BaseResponse(statusCode = str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED)

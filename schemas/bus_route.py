@@ -3,20 +3,25 @@ from datetime import datetime
 from pydantic import BaseModel
 from schemas.response import BaseResponse
 from schemas.bus import Bus
-from schemas.station import Station
+from schemas.station import Station,StationBase
 from schemas.admin import AdminMini
 
-
 class BusRouteBase(BaseModel):
-    routeName: Union[str, None] = None
-    baseprice: Union[str, None] = None
-class BusRoute(BusRouteBase):
+    sourceStation: Union[StationBase, None] = None
+    destinationStation: Union[StationBase, None] = None
+    identifier: Union[str, None] = None
+    provider:AdminMini
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+class BusRoute(BaseModel):
     sourceStation: Union[Station, None] = None
     destinationStation: Union[Station, None] = None
     identifier: Union[str, None] = None
+    provider:AdminMini
+    baseprice: Union[str, None] = None
     id: Optional[int]
     bus:Union[Bus,None] = []
-    provider:AdminMini
     created_at: Union[datetime, None] = datetime.now()
     updated_at: Union[datetime, None] = datetime.now()
 

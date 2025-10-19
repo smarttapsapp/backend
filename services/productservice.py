@@ -61,10 +61,25 @@ async def searchMovablesRoutes(response: Response,db: Session,user: Customer,dep
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BusRoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-def searchTrainRoutes(request: Request,response: Response,setting: Setting,db: Session,user: Customer,departure: str,arrival: str,seatType: str,operationTime:str):
+def searchTrainRoutes(response: Response,db: Session,user: Customer,departure: str,arrival: str,mode: str,latitude:str,longitude:str):
     try:
-        logger.info(f"Started searching for train from {departure} to {arrival} with {seatType} for {operationTime}") 
+        logger.info(f"Started searching for train from {departure} to {arrival} latitude {latitude} longtitude {longitude} at {datetime.now()}") 
         data = []
+        if departure and arrival:
+            logger.info(f"Searching for {mode} route from {departure} to {arrival}")
+            route = queries.getTrainRoutesByStations(db=db,departure=departure,arrival=arrival,mode=mode)
+            if route:
+                return RoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=route)
+        if longitude and latitude:
+            data = queries.getAvailableTrainRoutes(db=db,latitude=float(latitude),longitude=float(longitude),radius_km=20)
+            #datad = queries.getAdminRoutes(db=db,role=AdminRoleEnum.BUSPROVIDER,latitude=float(latitude),longitude=float(longitude),radius_km=5)
+            #logger.info(datad)
+            #for admin in admins:
+            #    admin.routes = [route for route in admin.routes if admin.routes and util.is_within_radius(lat1=float(route.sourceStation.lat),lon1=float(route.sourceStation.long),lat2=float(latitude),lon2=float(longitude),radius_km=50)]
+            #    data.append(admin)
+            #logger.info(data)
+            if data:
+                return RoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=data)
         data = productQuery.query_train_routes(db=db,departure=departure,arrival=arrival,seatType=seatType,takeOffTime=operationTime)
         return RoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=data)
     except Exception as ex:

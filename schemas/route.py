@@ -5,24 +5,26 @@ from pydantic import BaseModel
 from schemas.response import BaseResponse
 from schemas.train import Train
 from schemas.seat import SeatBase,Seat
-from schemas.station import Station
+from schemas.station import StationBase,Station
 from schemas.admin import AdminMini
 
 
 class RouteBase(BaseModel):
-    routeName: Union[str, None] = None
-
-
-class RouteRequest(RouteBase):
-    user: Union[List[str], None] = None
+    sourceStation: Union[StationBase, None] = None
+    destinationStation: Union[StationBase, None] = None
+    identifier: Union[str, None] = None
+    provider:AdminMini
+    class Config:
+        from_attributes = True
+        populate_by_name = True
 
 class Route(RouteBase):
     sourceStation: Union[Station, None] = None
     destinationStation: Union[Station, None] = None
-    trains:Union[List[Train],None] = []
-    seats:Union[List[Seat],None] = []
     identifier: Union[str, None] = None
     provider:AdminMini
+    trains:Union[List[Train],None] = []
+    prices:Union[List[Seat],None] = []
     created_at: Union[datetime, None] = datetime.now()
     updated_at: Union[datetime, None] = datetime.now()
 

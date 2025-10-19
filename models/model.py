@@ -3,7 +3,7 @@ from sqlalchemy import (
     Column,
     ForeignKey,
     Integer,
-    String,
+    String,Float,
     DateTime,
     Enum,
     Numeric,Table,
@@ -184,7 +184,7 @@ class AdminModel(Base):
     user_notifications = relationship("UserNotification", back_populates="admin")
     preference = relationship('UserNotificationPreference', uselist=False,back_populates='admin')
     buses = relationship("BusModel", back_populates="provider")
-    routes = relationship("RouteModel", back_populates="provider")
+    routes = relationship("TrainRouteModel", back_populates="provider")
     bus_routes = relationship("BusRouteModel", back_populates="provider")
     trains = relationship("TrainModel", back_populates="provider")
     support_tickets = relationship('SupportTicketModel', back_populates='admin')
@@ -742,8 +742,8 @@ class StationModel(Base):
     policy = Column(String(255), nullable=True)
     status = Column(Boolean, default=False)
     mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS)  # schedule mode
-    depature = relationship("RouteModel", foreign_keys="RouteModel.sourceStation_id", back_populates="sourceStation")
-    arrival = relationship("RouteModel", foreign_keys="RouteModel.destinationStation_id", back_populates="destinationStation")
+    depature = relationship("TrainRouteModel", foreign_keys="TrainRouteModel.sourceStation_id", back_populates="sourceStation")
+    arrival = relationship("TrainRouteModel", foreign_keys="TrainRouteModel.destinationStation_id", back_populates="destinationStation")
     bus_departures = relationship(
         "BusRouteModel",
         foreign_keys="BusRouteModel.sourceStation_id",
@@ -761,11 +761,7 @@ bus_route = Table('bus_route',
     Column('bus_id', Integer, ForeignKey('buses.id' ,ondelete="CASCADE"), primary_key=True),
     Column('bus_routes_id', Integer, ForeignKey('bus_routes.id',ondelete="CASCADE"), primary_key=True)
 )
-train_route = Table('train_route',
-    Base.metadata,
-    Column('train_id', Integer, ForeignKey('trains.id',ondelete="CASCADE"), primary_key=True),
-    Column('route_id', Integer, ForeignKey('routes.id',ondelete="CASCADE"), primary_key=True)
-)
+
 class BusRouteModel(Base):
     __tablename__ = 'bus_routes'
     
@@ -831,27 +827,10 @@ class RouteModel(Base):
     mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.TRAIN)  # schedule mode
     sourceStation_id = Column(Integer, ForeignKey("stations.id"))
     destinationStation_id = Column(Integer, ForeignKey("stations.id"))
-    sourceStation = relationship("StationModel", foreign_keys=[sourceStation_id], back_populates="depature")
-    destinationStation = relationship("StationModel", foreign_keys=[destinationStation_id], back_populates="arrival")
+    #sourceStation = relationship("StationModel", foreign_keys=[sourceStation_id], back_populates="depature")
+    #destinationStation = relationship("StationModel", foreign_keys=[destinationStation_id], back_populates="arrival")
     seats = relationship('SeatModel',back_populates='route',cascade="all")
-    trains = relationship('TrainModel',secondary=train_route,back_populates='routes',cascade="all")
-    provider = relationship("AdminModel", back_populates="routes")
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-class TrainModel(Base):
-    __tablename__ = 'trains'
-    
-    id = Column(Integer, primary_key=True)
-    trainNumber = Column(String(50), nullable=False, unique=True)
-    trainName = Column(String(50), nullable=False)
-    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
-    image = Column(String(255), nullable=True)
-    billerId = Column(String(25),nullable=True)
-    provider = relationship("AdminModel", back_populates="trains")
-    routes = relationship('RouteModel',secondary=train_route,back_populates='trains',cascade="all")
-    schedules =  relationship("ScheduleModel", secondary="train_schedule", back_populates="trains")
-    #seats = relationship('SeatModel',back_populates='trains',cascade="all")
-    description = Column(String(255), nullable=True)
+    #provider = relationship("AdminModel", back_populates="routes")
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 class ScheduleModel(Base):
@@ -871,7 +850,7 @@ class ScheduleModel(Base):
     mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS)  # schedule mode
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    trains = relationship("TrainModel", secondary="train_schedule", back_populates="schedules")
+    #trains = relationship("TrainModel", secondary="train_schedule", back_populates="schedules")
     #buses = relationship("BusModel", secondary="bus_schedule", back_populates="schedules")
 class TicketModel(Base):
     __tablename__ = 'tickets'
@@ -882,16 +861,16 @@ class TicketModel(Base):
     customer = relationship('CustomerModel', backref='tickets')
     bus_id = Column(Integer, ForeignKey('buses.id'), nullable=True)
     train_id = Column(Integer, ForeignKey('trains.id'), nullable=True)
-    route_id = Column(Integer, ForeignKey('routes.id'), nullable=True)
+    route_id = Column(Integer, ForeignKey('train_routes.id'), nullable=True)
     busroute_id = Column(Integer, ForeignKey('bus_routes.id'), nullable=True)
-    seat_id = Column(Integer, ForeignKey('seats.id'), nullable=True)
+    seat_id = Column(Integer, ForeignKey('train_pricing.id'), nullable=True)
     bus = relationship('BusModel', backref='tickets')
     train = relationship('TrainModel', backref='tickets')
-    route = relationship('RouteModel', backref='tickets')
+    route = relationship('TrainRouteModel', backref='tickets')
     busroute = relationship('BusRouteModel', back_populates='tickets')
-    schedule_id = Column(Integer, ForeignKey('schedules.id'), nullable=True)  # Train schedule
+    schedule_id = Column(Integer, ForeignKey('train_schedules.id'), nullable=True)  # Train schedule
     busschedule_id = Column(Integer, ForeignKey('bus_schedules.id'), nullable=True)  # Train schedule
-    schedule = relationship('ScheduleModel', backref='tickets')
+    schedule = relationship('TrainScheduleModel', backref='tickets')
     busschedule = relationship('BusScheduleModel', backref='tickets')
     ticket_number =  Column(String(50), unique=True)
     seat_number = Column(String(50), nullable=True)  # Seat number
@@ -956,3 +935,71 @@ class CommissionModel(Base):
     __table_args__ = (
         UniqueConstraint('admin_id', 'product_type_id', name='uix_admin_product_type'),
     )
+train_route = Table('train_route',
+    Base.metadata,
+    Column('train_id', Integer, ForeignKey('trains.id',ondelete="CASCADE"), primary_key=True),
+    Column('route_id', Integer, ForeignKey('train_routes.id',ondelete="CASCADE"), primary_key=True)
+)
+class TrainRouteModel(Base):
+    __tablename__ = "train_routes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    identifier = Column(String(50), unique=False)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True)
+    distance_km = Column(Float, nullable=True)
+    sourceStation_id = Column(Integer, ForeignKey("stations.id"))
+    destinationStation_id = Column(Integer, ForeignKey("stations.id"))
+    sourceStation = relationship("StationModel", foreign_keys=[sourceStation_id], back_populates="depature")
+    destinationStation = relationship("StationModel", foreign_keys=[destinationStation_id], back_populates="arrival")
+    #trains = relationship("TrainModel", back_populates="route")
+    trains = relationship('TrainModel',secondary=train_route,back_populates='routes',cascade="all")
+    provider = relationship("AdminModel", back_populates="routes")
+    prices = relationship("PricingModel", back_populates="route")
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+class TrainModel(Base):
+    __tablename__ = "trains"
+    
+    id = Column(Integer, primary_key=True)
+    trainNumber = Column(String(50), nullable=False, unique=True)
+    identifier = Column(String(50), unique=False)
+    trainName = Column(String(50), nullable=False)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True)
+    route_id = Column(Integer, ForeignKey("train_routes.id"))
+    image = Column(String(255), nullable=True)
+    billerId = Column(String(25),nullable=True)
+    description = Column(String(255), nullable=True)
+    provider = relationship("AdminModel", back_populates="trains")
+    #route = relationship("TrainRouteModel", back_populates="trains")
+    routes = relationship('TrainRouteModel',secondary=train_route,back_populates='trains',cascade="all")
+    schedules = relationship("TrainScheduleModel", back_populates="train")
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+class TrainScheduleModel(Base):
+    __tablename__ = "train_schedules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    identifier = Column(String(50), unique=False)
+    train_id = Column(Integer, ForeignKey("trains.id"), nullable=False)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True)
+    departureTime = Column(String(50), nullable=False)
+    arrivalTime = Column(String(255), nullable=True)
+    timeOfOperation = Column(Enum(TimeOfOperationEnum), default=TimeOfOperationEnum.MORNING)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    train = relationship("TrainModel", back_populates="schedules")
+    #bookings = relationship("BookingModel", back_populates="schedule")
+class PricingModel(Base):
+    __tablename__ = "train_pricing"
+
+    id = Column(Integer, primary_key=True, index=True)
+    route_id = Column(Integer, ForeignKey("train_routes.id"))
+    #train_id = Column(Integer, ForeignKey("trains.id"), nullable=False)f4
+    classType = Column(String(50), nullable=False)  # Economy, Business, First
+    price = Column(String(25), nullable=False)
+    per_km_rate = Column(String(50), nullable=False)
+    dynamic_pricing = Column(Boolean, default=False)
+    availabilityStatus = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    route = relationship("TrainRouteModel", back_populates="prices")

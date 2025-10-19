@@ -375,8 +375,8 @@ async def debitBusTransaction(request: Request,response:Response,setting: Settin
 
 async def debitTrainTransaction(request: Request,response:Response,setting:Setting,db:Session,biller:ProductTypeModel,customer:CustomerModel,payload:BuyTrainTicketRequest,train:TrainModel,seat:SeatModel,schedule:ScheduleModel,route:RouteModel,background_task:BackgroundTasks):
     try:
-        logger.info(f"started gl debit transaction for biller {biller.id} at {datetime.now()}")
-        remark = f"{str(biller.billerId[:2]).upper()}/{train.trainNumber[:2]}/{seat.classType.value}"
+        logger.info(f"started gl debit transaction for biller {biller.billerName} at {datetime.now()}")
+        remark = f"{str(biller.billerId[:2]).upper()}/{train.trainNumber[:2]}/{seat.classType}"
         headoffice = queries.getHeadofficeAccount(db=db)
         if headoffice:
             logger.info(f"headoffice is configured at {datetime.now()}")
@@ -450,8 +450,9 @@ async def debitTrainTransaction(request: Request,response:Response,setting:Setti
                                         train_id = train.id,
                                         admin_id=train.admin_id,
                                         customer_id = customer.id,
-                                        route_id = payload.routeId,
-                                        schedule_id = payload.scheduleId,
+                                        route_id = route.id,
+                                        schedule_id = schedule.id,
+                                        boarding_date = payload.tripDate,
                                         seat_id =seat.id,
                                         qr_code = f"{ticketId}|{train.trainNumber}|{TicketModeEnum.TRAIN.value}|{customer.wallet.walletAccount}",
                                         mode = TicketModeEnum.TRAIN,

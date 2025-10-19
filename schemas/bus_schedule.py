@@ -10,10 +10,13 @@ class BusScheduleBase(BaseModel):
     departureTime: Union[str, None] = None
     arrivalTime: Union[str, None] = None
     price: Union[str, None] = "0"
+    identifier: Union[str, None] = None
+    class Config:
+        from_attributes = True
+        populate_by_name = True
 
 class BusSchedule(BusScheduleBase):    
     daysOfOperation: Union[str, None] = None
-    identifier: Union[str, None] = None
     id: Optional[int]
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()

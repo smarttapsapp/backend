@@ -10,15 +10,16 @@ class ScheduleBase(BaseModel):
     timeOfOperation: Union[str, None] = None
     departureTime: Union[str, None] = None
     arrivalTime: Union[str, None] = None
+    identifier: Union[str, None] = None
+    class Config:
+        from_attributes = True
+        populate_by_name = True
 
 
-class ScheduleRequest(ScheduleBase):
-    user: Union[List[str], None] = None
 
 class Schedule(ScheduleBase):    
     seats: Union[List[Seat],None] = None
     daysOfOperation: Union[str, None] = None
-    identifier: Union[str, None] = None
     id: Optional[int]
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()

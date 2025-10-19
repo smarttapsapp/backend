@@ -706,12 +706,16 @@ async def debitTrainTicket(db:Session,request:Request,response:Response,setting:
         if user.wallet.walletAccount == payload.walletAccount:
             train = queries.trainById(db=db,trainId=payload.trainId)
             if train:
+                logger.info(f"Train is available at {datetime.now()}")
                 product = queries.getBillerByBillerId(db=db,billerId=train.billerId)
                 if product:
+                    logger.info(f"Product is available at {datetime.now()}")
                     seat = queries.seatById(db=db,seatId=payload.seatId)
                     if seat:
-                        route = queries.getRouteById(db=db,routeId=payload.routeId)
+                        logger.info(f"pricing is available at {datetime.now()}")
+                        route = queries.getRouteByIdentier(db=db,routeId=payload.routeId)
                         if route:
+                            logger.info(f"Route is available at {datetime.now()}")
                             schedule = queries.getScheduleById(db=db,scheduleId=payload.scheduleId)
                             if schedule:
                                 totalAdult = payload.adult * int(seat.price)

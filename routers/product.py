@@ -189,16 +189,13 @@ async def get_Trains_Routes(
     db: Annotated[Session, Depends(get_db)],
     departure: str = Query(None),
     arrival: str = Query(None),
-    seatType: str = Query("Standard"),
-    timeOperation: str = Query("Morning"),
-    trip: str = Query(0),
-    tripDate: str = Query(None),
-    adult: str = Query(1),
-    minor: str = Query(0),
+    searchType: str = Query("train"),
+    latitude: str = Query(None),
+    longitude: str = Query(None),
 ):
     try:
         if user:
-            return productservice.searchTrainRoutes(request=request,response=response,setting=setting,db=db,user=user,departure=departure,arrival=arrival,seatType=seatType,operationTime=timeOperation)
+            return productservice.searchTrainRoutes(response=response,db=db,user=user,departure=departure,arrival=arrival,mode=searchType,latitude=latitude,longitude=longitude)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)

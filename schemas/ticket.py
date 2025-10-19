@@ -3,13 +3,12 @@ from datetime import datetime
 from sqlalchemy import func
 from pydantic import BaseModel,validator
 from schemas.response import BaseResponse
-from schemas.train import Train
-from schemas.schedule import Schedule
-from schemas.bus_schedule import BusSchedule
-from schemas.bus import Bus
-from schemas.bus_route import BusRoute
-from schemas.route import Route
-from utils import util
+from schemas.train import TrainBase
+from schemas.schedule import ScheduleBase
+from schemas.bus_schedule import BusScheduleBase
+from schemas.bus import BusBase
+from schemas.bus_route import BusRouteBase
+from schemas.route import RouteBase
 
 
 class TicketBase(BaseModel):
@@ -24,12 +23,12 @@ class Ticket(TicketBase):
     price: Union[str, None] = None
     boarding_date: Union[str, None] = ""
     qr_code: Union[str, None] = None
-    schedule: Union[Schedule, None] = None
-    busschedule: Union[BusSchedule, None] = None
-    bus: Union[Bus, None] = None
-    train: Union[Train, None] = None
-    route: Union[Route, None] = None
-    busroute: Union[BusRoute, None] = None
+    schedule: Union[ScheduleBase, None] = None
+    busschedule: Union[BusScheduleBase, None] = None
+    bus: Union[BusBase, None] = None
+    train: Union[TrainBase, None] = None
+    route: Union[RouteBase, None] = None
+    busroute: Union[BusRouteBase, None] = None
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 

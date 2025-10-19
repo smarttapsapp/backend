@@ -7,11 +7,14 @@ from schemas.response import BaseResponse
 class StationBase(BaseModel):
     stationName: Union[str, None] = None
     location: Union[str, None] = None
-    admin_id: int
     mode: Union[str, None] = None
+    identifier: Union[str, None] = None
+    class Config:
+        from_attributes = True
+        populate_by_name = True
 
 class Station(StationBase):
-    identifier: Union[str, None] = None
+    admin_id: int
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 
