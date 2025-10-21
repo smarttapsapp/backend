@@ -13,7 +13,7 @@ class RouteBase(BaseModel):
     sourceStation: Union[StationBase, None] = None
     destinationStation: Union[StationBase, None] = None
     identifier: Union[str, None] = None
-    provider:AdminMini
+    provider: Union[AdminMini, None] = None
     class Config:
         from_attributes = True
         populate_by_name = True

@@ -24,7 +24,6 @@ class TrainBase(BaseModel):
 class Train(TrainBase):
     schedules: Union[List[Schedule],None] = None
     id: Optional[int]
-    provider:AdminMini
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 
