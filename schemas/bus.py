@@ -17,7 +17,7 @@ class BusBase(BaseModel):
     airCondition: Union[bool, None] = False
     billerId: Optional[str]=None
     identifier: Union[str, None] = None
-    provider:AdminMini
+    provider:Union[AdminMini, None] = None
     @validator("bus_number")
     def bus_number_validator(cls, bus_number:str):
         return bus_number.strip().replace(' ','').upper()

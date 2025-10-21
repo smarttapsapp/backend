@@ -15,7 +15,7 @@ class TrainBase(BaseModel):
     image: Union[str, None] = None
     description: Union[str, None] = None
     admin_id: Optional[int]
-    provider:AdminMini
+    provider:Union[AdminMini, None] = None
     billerId: Optional[str]=None
     class Config:
         from_attributes = True
