@@ -37,9 +37,9 @@ class RoutesResponse(BaseResponse):
 
 class AddRouteRequest(RouteBase):
     id: Optional[int]=None
-    admin_id: int
-    startId:int
-    stopId:int
+    admin_id: str
+    startId:str
+    stopId:str
     seats:Union[List[dict],None]=None
     buses:Union[List[int],None]=None
 
