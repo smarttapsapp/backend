@@ -913,82 +913,16 @@ async def addTrain(db: Session,setting: Setting,payload: AddTrainRequest, backgr
                 trainAdmin = queries.getAdminByIdentifier(db=db,adminId=payload.admin_id)
             routes = adminQuery.getRoutesByIds(db=db,ids=payload.routes,adminId=trainAdmin.id)
             if routes:
-                schedules = [TrainScheduleModel(
-                    identifier=util.generateId(length=6),
-                    admin_id =admin.id,
-                    departureTime = schedule['departureTime'],
-                    arrivalTime = schedule['arrivalTime'],
-                    timeOfOperation = schedule['timeOfOperation'],
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),) for schedule in payload.schedules]
-                logger.info(schedules)
-                previous = adminQuery.getTrain(db=db,trainNumber=payload.trainNumber)
-                if previous and previous.admin_id == trainAdmin.id:
-                    previous.trainName = payload.trainName
-                    previous.billerId = admin.billerId
-                    previous.description = payload.description
-                    previous.schedules = schedules
-                    previous.routes = routes
-                    previous.updated_at = datetime.now()
-                else:
-                    previous = TrainModel(admin_id=trainAdmin.id,trainNumber=payload.trainNumber,trainName=payload.trainName,description=payload.description,created_at=datetime.now(),updated_at=datetime.now(),billerId=trainAdmin.billerId,schedules=schedules,routes=routes)
-                    created = queries.create(db=db, model=previous)
-                    if created:
-                        email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
-                        background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
-                        return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription="New Train added successfully")
-                    else:
-                        response.status_code = status.HTTP_400_BAD_REQUEST
-                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
-
-
-            trainRoutes = []
-            existing = adminQuery.getTrain(db=db,trainNumber=payload.trainNumber)
-            if existing and existing.admin_id == trainAdmin.id:
-                existing.billerId = trainAdmin.billerId
-                existing.trainName = payload.trainName
-                existing.description = payload.description
-                existing.updated_at = datetime.now()
-            else:
-                for route in payload.routes:
-                    startStation = adminQuery.getStationById(db=db,stationId=route['departure'])
-                    if startStation:
-                        stopStation = adminQuery.getStationById(db=db,stationId=route['arrival'])
-                        if stopStation:
-                            trainRoutes.append(BusRouteModel(identifier=util.generateId(length=6),routeName=f"{startStation.location} - {stopStation.location}",sourceStation_id=startStation.id,destinationStation_id=stopStation.id,mode=startStation.mode,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now(),baseprice="0"))
-                
-
-            routes = adminQuery.getRoutesByIds(db=db,ids=payload.routes,adminId=adminId)
-            if routes:
-                schedules =  adminQuery.getSchedulesByIds(db=db,ids=payload.schedules,adminId=None)
-                if schedules:
-                    seatsClass = adminQuery.getSeatsByIds(db=db,ids=payload.seats,adminId=adminId)
-                    if seatsClass:
-                        previous = adminQuery.getTrain(db=db,trainNumber=payload.trainNumber)
-                        if previous and previous.admin_id == adminId:
-                            previous.trainName = payload.trainName
-                            previous.seats = seatsClass
-                            previous.billerId = admin.billerId
-                            previous.description = payload.description
-                            previous.schedules = schedules
-                            previous.routes = routes
-                            previous.updated_at = datetime.now()
-                        else:
-                            previous = TrainModel(admin_id=admin.id,trainNumber=payload.trainNumber,trainName=payload.trainName,description=payload.description,created_at=datetime.now(),updated_at=datetime.now(),billerId=admin.billerId,schedules=schedules,routes=routes,seats=seatsClass)
-                        created = queries.create(db=db, model=previous)
-                        if created:
-                            email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
-                            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
-                            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
-                        else:
-                            response.status_code = status.HTTP_400_BAD_REQUEST
-                            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
-                    else:
-                        response.status_code = status.HTTP_400_BAD_REQUEST
-                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOSEAT)
+                schedules = [TrainScheduleModel(identifier=util.generateId(length=6),admin_id =admin.id,departureTime = schedule['departureTime'],arrivalTime = schedule['arrivalTime'],timeOfOperation = schedule['timeOfOperation'],created_at=datetime.now(),updated_at=datetime.now(),) for schedule in payload.schedules]
+                previous = TrainModel(admin_id=trainAdmin.id,trainNumber=payload.trainNumber,trainName=payload.trainName,description=payload.description,created_at=datetime.now(),updated_at=datetime.now(),billerId=trainAdmin.billerId,schedules=schedules,routes=routes)
+                created = queries.create(db=db, model=previous)
+                if created:
+                    email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                    background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
+                    return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription="New Train added successfully")
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
-                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOSCHEDULE)
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
                 return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOROUTE)
@@ -999,28 +933,87 @@ async def addTrain(db: Session,setting: Setting,payload: AddTrainRequest, backgr
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
-async def updateTrain(db: Session,setting: Setting,payload: AddRoleRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+async def editTrain(db: Session,setting: Setting,payload: AddTrainRequest,background_task: BackgroundTasks,request: Request,response: Response,admin: AdminModel):
     try:
-        logger.info(f"started creating new admin role @ {datetime.now()}")
-        role = adminQuery.getRole(db=db,roleId=payload.tag)
-        if role:
-            role.name = payload.name
-            role.tag =AdminRoleEnum(payload.tag)
-            role.updated_at=datetime.now()
-            created = queries.create(db=db, model=role)
-            if created:
-                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
-                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
-                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
-        else:
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
-    except Exception as ex:
-        logger.error(str(ex))
+        logger.info(f"Started updating train {payload.trainNumber} by {admin.email} at {datetime.now()}")
+        if admin.role.tag not in [AdminRoleEnum.TRAINPROVIDER, AdminRoleEnum.ADMIN, AdminRoleEnum.SUPERADMIN]:
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            return BaseResponse(statusCode=str(status.HTTP_401_UNAUTHORIZED), statusDescription=UNAUTHORISED)
+        trainAdmin = admin
+        if admin.role.tag in [AdminRoleEnum.ADMIN, AdminRoleEnum.SUPERADMIN]:
+            trainAdmin = queries.getAdminByIdentifier(db=db, adminId=payload.admin_id)
+        # Check for existing train
+        existing = adminQuery.getTrain(db=db, trainNumber=payload.trainNumber)
+        if not existing:
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return BaseResponse(statusCode=str(status.HTTP_404_NOT_FOUND), statusDescription="Train not found")
+        if existing.admin_id != trainAdmin.id:
+            response.status_code = status.HTTP_403_FORBIDDEN
+            return BaseResponse(statusCode=str(status.HTTP_403_FORBIDDEN), statusDescription="Access denied")
+        existing_schedules_map = {s.identifier: s for s in existing.schedules}
+        updated_schedule_models = []
+        for schedule_data in payload.schedules:
+            schedule_identifier = schedule_data.get("identifier")
+            if schedule_identifier and schedule_identifier in existing_schedules_map:
+                #  Update existing schedule
+                schedule_obj = existing_schedules_map[schedule_identifier]
+                schedule_obj.departureTime = schedule_data["departureTime"]
+                schedule_obj.arrivalTime = schedule_data["arrivalTime"]
+                schedule_obj.timeOfOperation = schedule_data["timeOfOperation"]
+                schedule_obj.updated_at = datetime.now()
+                updated_schedule_models.append(schedule_obj)
+            else:
+                #  Add new schedule
+                new_schedule = TrainScheduleModel(
+                    identifier=schedule_identifier or util.generateId(length=6),
+                    train_id=existing.id,
+                    admin_id=admin.id,
+                    departureTime=schedule_data["departureTime"],
+                    arrivalTime=schedule_data["arrivalTime"],
+                    timeOfOperation=schedule_data["timeOfOperation"],
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                )
+                queries.create(db=db,model=new_schedule)
+                updated_schedule_models.append(new_schedule)
+        # Update routes
+        routes = adminQuery.getRoutesByIds(db=db, ids=payload.routes, adminId=trainAdmin.id)
+        existing.trainName = payload.trainName
+        existing.description = payload.description
+        existing.schedules = updated_schedule_models
+        existing.routes = routes
+        existing.updated_at = datetime.now()
+
+        # Save changes
+        updated = queries.create(db=db, model=existing)
+        if updated:
+            email_body = util.templates.TemplateResponse(
+                "onboarding.html",
+                {"request": request, "user": admin},
+            )
+            background_task.add_task(
+                util.mailer,
+                str(email_body.body, "utf-8"),
+                setting=setting,
+                subject="Train Updated",
+                toAddress=admin.email,
+            )
+            return BaseResponse(
+                statusCode=str(status.HTTP_200_OK),
+                statusDescription="Train updated successfully",
+            )
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription="Failed to update train",
+        )
+    except Exception as ex:
+        logger.error(f"Error updating train: {str(ex)}")
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=SYSTEMBUSY,
+        )
 async def deleteTrain(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,roleId: int):
     try:
         logger.info(f"started deleting role {roleId} @ {datetime.now()}")
@@ -1077,9 +1070,6 @@ async def addRoute(db: Session,setting: Setting,payload: AddRouteRequest, backgr
                         else:
                             response.status_code = status.HTTP_400_BAD_REQUEST
                             return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
-                    #else:
-                    #    response.status_code = status.HTTP_400_BAD_REQUEST
-                    #    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOROUTE)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ENDSTATIONERR)
@@ -1093,24 +1083,72 @@ async def addRoute(db: Session,setting: Setting,payload: AddRouteRequest, backgr
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
-async def updateRoute(db: Session,setting: Setting,payload: AddRoleRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+async def updateRoute(db: Session,setting: Setting,payload: AddRouteRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
     try:
-        logger.info(f"started creating new admin role @ {datetime.now()}")
-        role = adminQuery.getRole(db=db,roleId=payload.tag)
-        if role:
-            role.name = payload.name
-            role.tag =AdminRoleEnum(payload.tag)
-            role.updated_at=datetime.now()
-            created = queries.create(db=db, model=role)
-            if created:
-                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
-                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
-                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
-        else:
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+        logger.info(f"Started updating route {payload.identifier} by {admin.email} at {datetime.now()}")
+        if admin.role.tag not in [AdminRoleEnum.TRAINPROVIDER, AdminRoleEnum.ADMIN, AdminRoleEnum.SUPERADMIN]:
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            return BaseResponse(statusCode=str(status.HTTP_401_UNAUTHORIZED), statusDescription=UNAUTHORISED)
+        trainAdmin = admin
+        if admin.role.tag in [AdminRoleEnum.ADMIN, AdminRoleEnum.SUPERADMIN]:
+            trainAdmin = queries.getAdminByIdentifier(db=db, adminId=payload.admin_id)
+        # Check for existing route
+        startStation = adminQuery.getStationById(db=db,stationId=payload.startId)
+        if not startStation:
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return BaseResponse(statusCode=str(status.HTTP_404_NOT_FOUND), statusDescription=STARTSTATIONERR)
+        stopStation = adminQuery.getStationById(db=db,stationId=payload.stopId)
+        if not stopStation:
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return BaseResponse(statusCode=str(status.HTTP_404_NOT_FOUND), statusDescription=ENDSTATIONERR)
+        existing = queries.getRouteByIdentier(db=db, routeId=payload.identifier)
+        if not existing:
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return BaseResponse(statusCode=str(status.HTTP_404_NOT_FOUND), statusDescription=NOROUTE)
+        if existing.admin_id != trainAdmin.id:
+            response.status_code = status.HTTP_403_FORBIDDEN
+            return BaseResponse(statusCode=str(status.HTTP_403_FORBIDDEN), statusDescription=UNAUTHORISED)
+        existing_prices_map = {s.id: s for s in existing.prices}
+        updated_price_models = []
+        for seat in payload.prices:
+            priceId = seat.get("id")
+            if priceId and priceId in existing_prices_map:
+                obj = existing_prices_map[priceId]
+                obj.price = seat["price"]
+                obj.classType = seat["classType"]
+                obj.updated_at = datetime.now()
+                updated_price_models.append(obj)
+            else:
+                #  Add new price
+                newPrice = PricingModel(price = int(seat['price'])*100,classType = seat['classType'],availabilityStatus = "available",per_km_rate="0",created_at=datetime.now(),updated_at=datetime.now(),)
+                queries.create(db=db,model=newPrice)
+                updated_price_models.append(newPrice)
+        existing.prices = updated_price_models
+        existing.destinationStation_id = stopStation.id
+        existing.sourceStation_id = startStation.id
+        existing.updated_at = datetime.now()
+        updated = queries.create(db=db, model=existing)
+        if updated:
+            email_body = util.templates.TemplateResponse(
+                "onboarding.html",
+                {"request": request, "user": admin},
+            )
+            background_task.add_task(
+                util.mailer,
+                str(email_body.body, "utf-8"),
+                setting=setting,
+                subject="Route Updated",
+                toAddress=admin.email,
+            )
+            return BaseResponse(
+                statusCode=str(status.HTTP_200_OK),
+                statusDescription="Route updated successfully",
+            )
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription="Failed to update Route",
+        )
     except Exception as ex:
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST

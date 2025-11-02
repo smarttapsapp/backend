@@ -675,12 +675,6 @@ class LoanStatusModel(Base):
     description = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-class TrainScheduleModel(Base):
-    __tablename__ = 'train_schedule'
-    
-    id = Column(Integer, primary_key=True)
-    train_id = Column(Integer, ForeignKey('trains.id'), nullable=False)
-    schedule_id = Column(Integer, ForeignKey('schedules.id'), nullable=False)
 class ScheduleSeatModel(Base):
     __tablename__ = 'seat_schedule'
     
@@ -761,7 +755,6 @@ bus_route = Table('bus_route',
     Column('bus_id', Integer, ForeignKey('buses.id' ,ondelete="CASCADE"), primary_key=True),
     Column('bus_routes_id', Integer, ForeignKey('bus_routes.id',ondelete="CASCADE"), primary_key=True)
 )
-
 class BusRouteModel(Base):
     __tablename__ = 'bus_routes'
     

@@ -36,11 +36,12 @@ class RoutesResponse(BaseResponse):
     data: Union[List[Route],None] = None
 
 class AddRouteRequest(RouteBase):
+    identifier: Union[str, None] = None
     id: Optional[int]=None
     admin_id: str
     startId:str
     stopId:str
-    seats:Union[List[dict],None]=None
+    prices:Union[List[dict],None]=None
     buses:Union[List[int],None]=None
 
 class RouteResponse(BaseResponse):

@@ -7,6 +7,7 @@ from schemas.seat import Seat
 from schemas.admin import AdminMini
 from schemas.schedule import Schedule
 #from schemas.route import Route
+from schemas.train_route import TrainRoute
 
 
 class TrainBase(BaseModel):
@@ -23,6 +24,7 @@ class TrainBase(BaseModel):
 
 class Train(TrainBase):
     schedules: Union[List[Schedule],None] = None
+    routes:Union[List[TrainRoute],None] = None
     id: Optional[int]
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()

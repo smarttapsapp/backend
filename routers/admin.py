@@ -512,22 +512,13 @@ async def addRoute(
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.addRoute(
-            payload=payload,
-                db=db,
-                setting=setting,
-                request=request,
-                response=response,
-                admin=admin,
-                background_task=background_task
-            )
+        if payload.identifier:
+            return await adminservice.updateRoute(payload=payload,db=db,setting=setting,request=request,response=response,admin=admin,background_task=background_task)
+        return await adminservice.addRoute(payload=payload,db=db,setting=setting,request=request,response=response,admin=admin,background_task=background_task)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(
-            statusCode=str(status.HTTP_400_BAD_REQUEST),
-            statusDescription=str(ex),
-        )
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.post("/route/{id}/edit", 
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["route"])
@@ -1142,15 +1133,9 @@ async def addTrain(
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.addTrain(
-                db=db,
-                setting=setting,
-            payload=payload,
-                request=request,
-                response=response,
-                admin=admin,
-                background_task=background_task
-            )
+        if payload.id:
+            return await adminservice.editTrain(db=db,setting=setting,payload=payload,request=request,response=response,admin=admin,background_task=background_task)
+        return await adminservice.addTrain(db=db,setting=setting,payload=payload,request=request,response=response,admin=admin,background_task=background_task)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
