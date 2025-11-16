@@ -21,7 +21,7 @@ class Route(RouteBase):
     destinationStation: Union[Station, None] = None
     identifier: Union[str, None] = None
     provider:AdminMini
-    baseprice: Union[str, None] = None
+    baseprice: Union[str, None] = 0
     #trains:Union[List[Train],None] = []
     #prices:Union[List[Seat],None] = []
     created_at: Union[datetime, None] = datetime.now()
