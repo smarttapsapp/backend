@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc,or_
 from typing import List
 from sqlalchemy.sql import select,update,case
 from models.model import *
@@ -87,12 +87,15 @@ def getAdmin(db: Session,adminId:int=None):
 # trains
 def getTrains(db: Session,adminId:int=None):
     if adminId:
-        return db.query(TrainModel).filter(TrainModel.admin_id ==adminId).order_by(desc(TrainModel.created_at)).all()
-    return db.query(TrainModel).order_by(desc(TrainModel.created_at)).all()
+        return db.query(TrainModel).filter(TrainModel.admin_id ==adminId,TrainModel.isdelete == False).order_by(desc(TrainModel.created_at)).all()
+    return db.query(TrainModel).filter(TrainModel.isdelete == False).order_by(desc(TrainModel.created_at)).all()
 def getTrain(db: Session,trainNumber:str):
     return db.query(TrainModel).filter(TrainModel.trainNumber==trainNumber).first()
-def deleteTrain(db: Session,id:int):
-    return db.query(TrainModel).filter(TrainModel.id ==id).delete()
+def deleteTrain(db: Session,id:str):
+    return db.query(TrainModel).filter(or_(TrainModel.id == id, TrainModel.identifier == id)).delete()
+def deleteTrainSchedules(db: Session,ids:list[str]):
+    logger.info(f"Deleting train schedules with IDs: {ids}")
+    return db.query(TrainScheduleModel).filter(TrainScheduleModel.identifier.in_(ids)).delete()
 def countTrains(db: Session):
     return db.query(TrainModel).count()
 def getTrainsByBusiness(db: Session,adminId:int=None):
@@ -100,8 +103,8 @@ def getTrainsByBusiness(db: Session,adminId:int=None):
 #buses
 def getBuses(db: Session,adminId:int=None):
     if adminId:
-        return db.query(BusModel).filter(BusModel.admin_id ==adminId).order_by(desc(BusModel.created_at)).all()
-    return db.query(BusModel).order_by(desc(BusModel.created_at)).all()
+        return db.query(BusModel).filter(BusModel.admin_id ==adminId,BusModel.isdelete == False).order_by(desc(BusModel.created_at)).all()
+    return db.query(BusModel).filter(BusModel.isdelete == False).order_by(desc(BusModel.created_at)).all()
 def getBus(db: Session,busNumber:str):
     return db.query(BusModel).filter(BusModel.bus_number == busNumber).first()
 def getBusesByIds(db:Session,ids:list[int],adminId:int=None):
@@ -117,8 +120,8 @@ def getBusesByBusiness(db: Session,parkId:int=None):
 # stations
 def getstations(db: Session,adminId:int=None):
     if adminId:
-        return db.query(StationModel).filter(StationModel.admin_id ==adminId).order_by(desc(StationModel.created_at)).all()
-    return db.query(StationModel).all()
+        return db.query(StationModel).filter(StationModel.admin_id ==adminId,StationModel.isdelete == False).order_by(desc(StationModel.created_at)).all()
+    return db.query(StationModel).filter(StationModel.isdelete == False).order_by(desc(StationModel.created_at)).all()
 def getStationById(db: Session,stationId:str):
     return db.query(StationModel).filter(StationModel.identifier == stationId).first()
 def deleteStation(db: Session ,stationId:int):
@@ -126,19 +129,18 @@ def deleteStation(db: Session ,stationId:int):
 # routes
 def getRoutes(db: Session,adminId:int=None):
     if adminId:
-        return db.query(TrainRouteModel).filter(TrainRouteModel.admin_id ==adminId).order_by(desc(TrainRouteModel.created_at)).all()
-    return db.query(TrainRouteModel).all()
+        return db.query(TrainRouteModel).filter(TrainRouteModel.admin_id ==adminId,TrainRouteModel.isdelete == False).order_by(desc(TrainRouteModel.created_at)).all()
+    return db.query(TrainRouteModel).filter(TrainRouteModel.isdelete == False).order_by(desc(TrainRouteModel.created_at)).all()
 def getRouteById(db: Session,routeId:int):
     return db.query(TrainRouteModel).filter(TrainRouteModel.id == routeId).first()
 def getRouteByStartStopStation(db: Session,start:int,stop:int,adminId:int):
     return db.query(TrainRouteModel).filter(TrainRouteModel.admin_id == adminId).filter(TrainRouteModel.sourceStation_id == start).filter(TrainRouteModel.destinationStation_id == stop).first()
 def getRouteByStartStopIdentifier(db: Session,start:str,stop:str,adminId:int):
     return db.query(TrainRouteModel).filter(TrainRouteModel.admin_id == adminId).filter(TrainRouteModel.sourceStation_id == start).filter(TrainRouteModel.destinationStation_id == stop).first()
-
 def getRoutesByIds(db:Session,ids:list[str],adminId:int=None):
     if adminId:
-        return db.query(TrainRouteModel).filter(TrainRouteModel.admin_id ==adminId).filter(TrainRouteModel.identifier.in_(ids)).all()
-    return db.query(TrainRouteModel).filter(TrainRouteModel.identifier.in_(ids)).all()
+        return db.query(TrainRouteModel).filter(TrainRouteModel.admin_id ==adminId,TrainRouteModel.isdelete == False).filter(TrainRouteModel.identifier.in_(ids)).all()
+    return db.query(TrainRouteModel).filter(TrainRouteModel.identifier.in_(ids)).filter(TrainRouteModel.isdelete == False).order_by(desc(TrainRouteModel.created_at)).all()
 def deleteRoute(db: Session ,routeId:str):
     return db.query(TrainRouteModel).filter(TrainRouteModel.identifier == routeId).delete()
 # schedules

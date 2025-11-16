@@ -1,12 +1,10 @@
 from typing import Optional, Union,List
 from datetime import datetime
-from sqlalchemy import func
 from pydantic import BaseModel
 from schemas.response import BaseResponse
-from schemas.train import Train
-from schemas.seat import SeatBase,Seat
 from schemas.station import StationBase,Station
 from schemas.admin import AdminMini
+from pydantic import BaseModel,EmailStr,validator,field_validator,model_validator
 
 
 class RouteBase(BaseModel):
@@ -23,10 +21,15 @@ class Route(RouteBase):
     destinationStation: Union[Station, None] = None
     identifier: Union[str, None] = None
     provider:AdminMini
-    trains:Union[List[Train],None] = []
-    prices:Union[List[Seat],None] = []
+    baseprice: Union[str, None] = None
+    #trains:Union[List[Train],None] = []
+    #prices:Union[List[Seat],None] = []
     created_at: Union[datetime, None] = datetime.now()
     updated_at: Union[datetime, None] = datetime.now()
+    @model_validator(mode="after")
+    def final_clean(self):
+        self.baseprice = str(int(int(self.baseprice)/100))
+        return self
 
     class Config:
         from_attributes = True

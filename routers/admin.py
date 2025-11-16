@@ -457,16 +457,18 @@ async def deleteStation(
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
 ):
     try:
         return await adminservice.deleteStation(
-            roleId=id,
+            stationId=id,
                 db=db,
                 request=request,
                 response=response,
                 admin=admin,
+                setting=setting,
                 background_task=background_task
             )
     except Exception as ex:
@@ -556,6 +558,7 @@ async def deleteRoute(
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
 ):
@@ -566,6 +569,7 @@ async def deleteRoute(
                 request=request,
                 response=response,
                 admin=admin,
+                setting=setting,
                 background_task=background_task
             )
     except Exception as ex:
@@ -1014,15 +1018,9 @@ async def addBus(
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.addBus(
-            payload=payload,
-                db=db,
-                setting=setting,
-                request=request,
-                response=response,
-                admin=admin,
-                background_task=background_task
-            )
+        if payload.id:
+            return await adminservice.editBus(db=db,setting=setting,payload=payload,request=request,response=response,admin=admin,background_task=background_task)
+        return await adminservice.addBus(db=db,setting=setting,payload=payload,request=request,response=response,admin=admin,background_task=background_task)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -1172,32 +1170,34 @@ async def updateTrain(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-@router.delete("/train/{id}/delete", 
+@router.delete("/train/{trainNumber}/delete", 
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["train"])
-async def deleteTrain(
-    id:int,
+async def delete_train(
+    trainNumber:str,
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
 ):
     try:
-        return await adminservice.deleteRole(
-            roleId=id,
+        return await adminservice.deleteTrain(
                 db=db,
                 request=request,
                 response=response,
                 admin=admin,
-                background_task=background_task
+                setting=setting,
+                background_task=background_task,
+                trainNumber=trainNumber
             )
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
-            statusDescription=str(ex),
+            statusDescription=SYSTEMBUSY,
         )
 @router.get("/notifications", 
     response_model=NotificationsResponse,

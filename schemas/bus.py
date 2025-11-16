@@ -1,9 +1,9 @@
 from typing import Optional, Union,List
 from datetime import datetime
 from sqlalchemy import func
-from pydantic import BaseModel,validator
+from pydantic import BaseModel,validator,model_validator
 from schemas.response import BaseResponse
-#from schemas.bus_route import BusRoute
+from schemas.route import Route
 from schemas.admin import AdminMini
 from schemas.bus_schedule import BusSchedule
 
@@ -24,15 +24,22 @@ class BusBase(BaseModel):
     busImage: Union[str, None] = None
     description: Union[str, None] = None
     base_price: Union[str, None] = None
+    admin_id: Optional[int]
     class Config:
         from_attributes = True
         populate_by_name = True
 class Bus(BusBase):
     id: Optional[int]=None
     #provider: Optional[Provider]=None
+    routes: Optional[List[Route]] = []
     schedules: Optional[List[BusSchedule]] = []
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
+
+    @model_validator(mode="after")
+    def final_clean(self):
+        self.base_price = str(int(int(self.base_price)/100))
+        return self
     class Config:
         from_attributes = True
         populate_by_name = True
@@ -54,10 +61,16 @@ class MiniBus(BaseModel):
     billerId: Optional[str]=None
     identifier: Union[str, None] = None
     schedules: Optional[List[BusSchedule]] = []
+    @model_validator(mode="after")
+    def final_clean(self):
+        self.base_price = str(int(int(self.base_price)/100))
+        return self
     class Config:
         from_attributes = True
         populate_by_name = True
 class AddBusRequest(BusBase):
+    id: Optional[int]=None
+    identifier: Optional[int]=None
     #busschedules:List[int]
     schedules:List[dict]
     routes:List[dict]

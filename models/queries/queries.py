@@ -164,12 +164,12 @@ def getTrainProvider(db: Session):
     return db.query(AdminModel).join(AdminModel.role).filter(RoleModel.tag == AdminRoleEnum.TRAINPROVIDER).order_by(desc(AdminModel.created_at)).all()
 def query_train_routes_by_provider(db: Session,adminId:int):
     return db.query(TrainRouteModel).filter(TrainRouteModel.admin_id==adminId).filter(TrainRouteModel.mode==MovableEnum.TRAIN.value).order_by(desc(TrainRouteModel.created_at)).all()
-def getstations(db: Session):
-    return db.query(StationModel).all()
+def getstationsOld(db: Session):
+    return db.query(StationModel).filter(StationModel.isdelete == False).order_by(desc(StationModel.created_at)).all()
 def getstations(db: Session,mode:MovableEnum,adminId:int=None):
     if adminId:
-        return db.query(StationModel).filter(StationModel.admin_id == adminId).filter(StationModel.mode == mode.value).all()
-    return db.query(StationModel).filter(StationModel.mode == mode.value).all()
+        return db.query(StationModel).filter(StationModel.admin_id == adminId,StationModel.isdelete == False).filter(StationModel.mode == mode.value).all()
+    return db.query(StationModel).filter(StationModel.mode == mode.value).filter(StationModel.isdelete == False).order_by(desc(StationModel.created_at)).all()
 def getStationById(db: Session,stationId:str):
     return db.query(StationModel).filter(StationModel.identifier == stationId).first()
 def deleteStation(db: Session ,stationId:int):
@@ -180,8 +180,8 @@ def deleteStation(db: Session ,stationId:int):
     return False
 def getRoutes(db: Session,adminId:int=None):
     if adminId:
-        return db.query(TrainRouteModel).filter(TrainRouteModel.admin_id ==adminId).order_by(desc(TrainRouteModel.created_at)).all()
-    return db.query(TrainRouteModel).order_by(desc(TrainRouteModel.created_at)).all()
+        return db.query(TrainRouteModel).filter(TrainRouteModel.admin_id ==adminId,TrainRouteModel.isdelete == False).order_by(desc(TrainRouteModel.created_at)).all()
+    return db.query(TrainRouteModel).filter(TrainRouteModel.isdelete == False).order_by(desc(TrainRouteModel.created_at)).all()
 def getRouteByIdentier(db: Session,routeId:str):
     return db.query(TrainRouteModel).filter(TrainRouteModel.identifier == routeId).first()
 def deleteRoute(db: Session ,routeId:int):
@@ -195,7 +195,7 @@ def query_stations(db: Session,mode:str):
 def queryRouteByIdAndMode(db: Session,routeId:int,mode:str):
     return db.query(TrainRouteModel).filter(TrainRouteModel.id == routeId).filter(TrainRouteModel.mode == mode).first()
 def query_routes(db: Session,mode:str):
-    return db.query(TrainRouteModel).filter(TrainRouteModel.mode == mode).all()
+    return db.query(TrainRouteModel).filter(TrainRouteModel.mode == mode).filter(TrainRouteModel.isdelete == False).order_by(desc(TrainRouteModel.created_at)).all()
 def query_routes_by_stations(db: Session,departure:str,arrival:str,mode:str):
     SourceStation = aliased(StationModel)
     DestinationStation = aliased(StationModel)
@@ -204,6 +204,7 @@ def query_routes_by_stations(db: Session,departure:str,arrival:str,mode:str):
         .join(SourceStation, TrainRouteModel.sourceStation)
         .join(DestinationStation, TrainRouteModel.destinationStation)
         .filter(TrainRouteModel.mode == mode)
+        .filter(TrainRouteModel.isdelete == False)
         .filter(func.lower(SourceStation.stationName).like(f"%{departure.lower()}%"))
         .filter(func.lower(DestinationStation.stationName).like(f"%{arrival.lower()}%"))
         .all()
@@ -215,6 +216,7 @@ def getTrainRoutesByStations(db: Session,departure:str,arrival:str,mode:str):
         db.query(TrainRouteModel)
         .join(SourceStation, TrainRouteModel.sourceStation)
         .join(DestinationStation, TrainRouteModel.destinationStation)
+        .filter(TrainRouteModel.isdelete == False)
         .filter(func.lower(SourceStation.stationName).like(f"%{departure.lower()}%"))
         .filter(func.lower(DestinationStation.stationName).like(f"%{arrival.lower()}%"))
         .all()
@@ -227,14 +229,15 @@ def getBusRoutesByStations(db: Session,departure:str,arrival:str,mode:str):
         .join(SourceStation, BusRouteModel.sourceStation)
         .join(DestinationStation, BusRouteModel.destinationStation)
         .filter(BusRouteModel.mode == mode)
+        .filter(BusRouteModel.isdelete == False)
         .filter(func.lower(SourceStation.stationName).like(f"%{departure.lower()}%"))
         .filter(func.lower(DestinationStation.stationName).like(f"%{arrival.lower()}%"))
         .all()
     )
 def getBusRoutes(db: Session,adminId:int=None):
     if adminId:
-        return db.query(BusRouteModel).filter(BusRouteModel.admin_id ==adminId).order_by(desc(BusRouteModel.created_at)).all()
-    return db.query(BusRouteModel).order_by(desc(BusRouteModel.created_at)).all()
+        return db.query(BusRouteModel).filter(BusRouteModel.admin_id ==adminId,BusRouteModel.isdelete == False).order_by(desc(BusRouteModel.created_at)).all()
+    return db.query(BusRouteModel).filter(BusRouteModel.isdelete == False).order_by(desc(BusRouteModel.created_at)).all()
 def getBusRouteById(db: Session,routeId:int):
     return db.query(BusRouteModel).filter(BusRouteModel.id == routeId).first()
 def getBusRouteByIdentifier(db: Session,routeId:str):
@@ -243,8 +246,8 @@ def getBusRouteByStartStopStation(db: Session,start:int,stop:int,adminId:int):
     return db.query(BusRouteModel).filter(BusRouteModel.admin_id == adminId).filter(BusRouteModel.sourceStation_id == start).filter(BusRouteModel.destinationStation_id == stop).first()
 def getBusRoutesByIds(db:Session,ids:list[int],adminId:int=None):
     if adminId:
-        return db.query(BusRouteModel).filter(BusRouteModel.admin_id ==adminId).filter(BusRouteModel.identifier.in_(ids)).all()
-    return db.query(BusRouteModel).filter(BusRouteModel.identifier.in_(ids)).all()
+        return db.query(BusRouteModel).filter(BusRouteModel.admin_id ==adminId,BusRouteModel.isdelete == False).filter(BusRouteModel.identifier.in_(ids)).all()
+    return db.query(BusRouteModel).filter(BusRouteModel.identifier.in_(ids)).filter(BusRouteModel.isdelete == False).order_by(desc(BusRouteModel.created_at)).all()
 
 def busById(db: Session,busId:int):
     return db.query(BusModel).filter(BusModel.id == busId).first()

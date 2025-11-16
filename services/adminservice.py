@@ -1,6 +1,7 @@
 
 import logging
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from models.model import *
 from models.queries import authQuery,queries,adminQuery
 from datetime import datetime,timedelta
@@ -702,11 +703,11 @@ async def addBus(db: Session,setting: Setting,payload: AddBusRequest, background
                     if startStation:
                         stopStation = adminQuery.getStationById(db=db,stationId=route['arrival'])
                         if stopStation:
-                            busRoutes.append(BusRouteModel(identifier=util.generateId(length=6),routeName=f"{startStation.location} {stopStation.location}",sourceStation_id=startStation.id,destinationStation_id=stopStation.id,mode=startStation.mode,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now(),baseprice=int(route['price'])*100))
+                            busRoutes.append(BusRouteModel(identifier=util.generateId(length=6),routeName=f"{startStation.location} {stopStation.location}",sourceStation_id=startStation.id,destinationStation_id=stopStation.id,mode=startStation.mode,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now(),isdelete=False,baseprice=int(route['price'])*100))
                 if busRoutes:
-                    schedules = [BusScheduleModel(identifier=util.generateId(length=6),admin_id =admin.id,price = int(schedule['price'])*100,departureTime = schedule['departureTime'],arrivalTime = schedule['arrivalTime'],timeOfOperation = schedule['timeOfOperation'],created_at=datetime.now(),updated_at=datetime.now(),) for schedule in payload.schedules]
+                    schedules = [BusScheduleModel(identifier=util.generateId(length=6),admin_id =admin.id,price = int(schedule['price'])*100,departureTime = schedule['departureTime'],arrivalTime = schedule['arrivalTime'],timeOfOperation = schedule['timeOfOperation'],created_at=datetime.now(),updated_at=datetime.now(),isdelete=False,) for schedule in payload.schedules]
                     logger.info(schedules)
-                    previous = BusModel(identifier=util.generateId(length=6),admin_id=admin.id,name=payload.name,bus_number=payload.bus_number,description=payload.description,tv=payload.tv,camera=payload.camera,airCondition=payload.airCondition,base_price=int(payload.base_price)*100,availabilityStatus=True,created_at=datetime.now(),updated_at=datetime.now(),billerId=admin.billerId,schedules=schedules,routes=busRoutes)
+                    previous = BusModel(identifier=util.generateId(length=6),admin_id=admin.id,name=payload.name,bus_number=payload.bus_number,description=payload.description,tv=payload.tv,camera=payload.camera,airCondition=payload.airCondition,base_price=int(payload.base_price)*100,availabilityStatus=True,created_at=datetime.now(),updated_at=datetime.now(),billerId=admin.billerId,isdelete=False,schedules=schedules,routes=busRoutes)
                     created = queries.create(db=db, model=previous)
                     if created:
                         email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
@@ -725,38 +726,154 @@ async def addBus(db: Session,setting: Setting,payload: AddBusRequest, background
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)   
-async def updateBus(db: Session,setting: Setting,payload: AddBusRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+async def editBus(db: Session,setting: Setting,payload: AddBusRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
     try:
-        logger.info(f"started creating new admin role @ {datetime.now()}")
-        role = adminQuery.getRole(db=db,roleId=payload.tag)
-        if role:
-            role.name = payload.name
-            role.tag =AdminRoleEnum(payload.tag)
-            role.updated_at=datetime.now()
-            created = queries.create(db=db, model=role)
-            if created:
-                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
-                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
-                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+        logger.info(f"Started updating bus {payload.bus_number} by {admin.email} at {datetime.now()}")
+        if admin.role.tag not in [AdminRoleEnum.BUSPROVIDER, AdminRoleEnum.ADMIN, AdminRoleEnum.SUPERADMIN]:
             response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
-        else:
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST), statusDescription=UNAUTHORISED)
+        loggedInAdmin = admin
+        if admin.role.tag in [AdminRoleEnum.ADMIN, AdminRoleEnum.SUPERADMIN]:
+            loggedInAdmin = queries.getAdminByIdentifier(db=db, adminId=payload.admin_id)
+        # Check for existing bus
+        existing = adminQuery.getBus(db=db,busNumber=payload.bus_number)
+        if not existing:
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return BaseResponse(statusCode=str(status.HTTP_404_NOT_FOUND), statusDescription="Bus not found")
+        if existing.admin_id != loggedInAdmin.id:
+            response.status_code = status.HTTP_403_FORBIDDEN
+            return BaseResponse(statusCode=str(status.HTTP_403_FORBIDDEN), statusDescription="Access denied")
+        existing_schedules_map = {s.identifier: s for s in existing.schedules}
+        existing_routes_map = {s.identifier: s for s in existing.routes}
+        logger.info(f"Existing schedules map: {existing_schedules_map.items()}")
+        logger.info(f"Existing Routes map: {existing_routes_map.items()}")
+        logger.info(f"Payload schedules: {existing_schedules_map.keys()}")
+        schedule_to_delete = [identifier for identifier in existing_schedules_map.keys() if identifier not in [s.get("identifier") for s in payload.schedules or []]]
+        routes_to_delete = [identifier for identifier in existing_routes_map.keys() if identifier not in [s.get("identifier") for s in payload.routes or []]]
+        logger.info(f"Schedule identifiers to delete: {schedule_to_delete}")
+        logger.info(f"Routes identifiers to delete: {routes_to_delete}")
+        updated_schedule_models = []
+        if  payload.schedules:
+            logger.info(f"Processing {len(payload.schedules)} schedules from payload")
+            for schedule_data in payload.schedules:
+                schedule_identifier = schedule_data.get("identifier")
+                if schedule_identifier and schedule_identifier in existing_schedules_map:
+                    #  Update existing schedule
+                    schedule_obj = existing_schedules_map[schedule_identifier]
+                    schedule_obj.departureTime = schedule_data["departureTime"]
+                    schedule_obj.arrivalTime = schedule_data["arrivalTime"]
+                    schedule_obj.timeOfOperation = schedule_data["timeOfOperation"]
+                    schedule_obj.price = int(schedule_data["price"])*100
+                    schedule_obj.updated_at = datetime.now()
+                    updated_schedule_models.append(schedule_obj)
+                else:
+                    #  Add new schedule
+                    new_schedule = BusScheduleModel(
+                        identifier=schedule_identifier or util.generateId(length=6),
+                        bus_id=existing.id,
+                        admin_id=admin.id,
+                        price = int(schedule_data["price"])*100,
+                        departureTime=schedule_data["departureTime"],
+                        arrivalTime=schedule_data["arrivalTime"],
+                        timeOfOperation=schedule_data["timeOfOperation"],
+                        created_at=datetime.now(),
+                        updated_at=datetime.now(),
+                    )
+                    queries.create(db=db,model=new_schedule)
+                    updated_schedule_models.append(new_schedule)
+        logger.info(f"Updated schedules: {updated_schedule_models}")
+        updated_routes = []
+        if  payload.routes:
+            logger.info(f"Processing {len(payload.routes)} routes from payload")
+            for route in payload.routes:
+                identifier = route.get("identifier")
+                logger.info(f"{identifier} for processing")
+                if identifier and identifier in existing_routes_map:
+                    #  Update existing schedule
+                    route_obj = existing_routes_map[identifier]
+                    route_obj.baseprice=int(route['price'])*100
+                    route_obj.updated_at = datetime.now()
+                    updated_routes.append(route_obj)
+                else:
+                    startStation = adminQuery.getStationById(db=db,stationId=route['departure'])
+                    if startStation:
+                        stopStation = adminQuery.getStationById(db=db,stationId=route['arrival'])
+                        if stopStation:
+                            newRoute = BusRouteModel(
+                                identifier=util.generateId(length=6),
+                                bus_id=existing.id,
+                                routeName=f"{startStation.location} {stopStation.location}",
+                                sourceStation_id=startStation.id,
+                                destinationStation_id=stopStation.id,
+                                mode=startStation.mode,
+                                admin_id=admin.id,
+                                created_at=datetime.now(),
+                                updated_at=datetime.now(),
+                                isdelete=False,
+                                baseprice=int(route['price'])*100)
+                            queries.create(db=db,model=newRoute)
+                            updated_routes.append(newRoute)
+        logger.info(f"Updated routes: {updated_routes}")
+        existing.name = payload.name
+        existing.airCondition = payload.airCondition
+        existing.tv = payload.tv
+        existing.base_price = int(payload.base_price)*100
+        existing.camera = payload.camera
+        existing.description = payload.description
+        if updated_schedule_models:
+            existing.schedules = updated_schedule_models
+        if updated_routes:
+            existing.routes = updated_routes
+        existing.updated_at = datetime.now()
+        updated = adminQuery.create(db=db, model=existing)
+        if updated:
+            email_body = util.templates.TemplateResponse(
+                "onboarding.html",
+                {"request": request, "user": admin},
+            )
+            background_task.add_task(
+                util.mailer,
+                str(email_body.body, "utf-8"),
+                setting=setting,
+                subject="Bus Updated",
+                toAddress=admin.email,
+            )
+            return BaseResponse(
+                statusCode=str(status.HTTP_200_OK),
+                statusDescription="Bus updated successfully",
+            )
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription="Failed to update bus",
+        )
     except Exception as ex:
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
-async def deleteBus(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,busId: int):
+async def deleteBus(db: Session,setting: Setting, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,busNumber: str):
     try:
-        logger.info(f"started deleting bus {busId} @ {datetime.now()}")
-        role = queries.deleteBus(db=db,busId=busId)
-        if role:
-            response.status_code = status.HTTP_200_OK
-            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
-        else:
+        logger.info(f"started deleting bus {busNumber} @ {datetime.now()}")
+        if admin.role.tag not in [AdminRoleEnum.BUSPROVIDER, AdminRoleEnum.ADMIN, AdminRoleEnum.SUPERADMIN]:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+        bus = adminQuery.getBus(db=db, busNumber=busNumber)
+        if not bus:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+        if admin.role.tag in [AdminRoleEnum.BUSPROVIDER] and bus.admin_id != admin.id:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+        bus.isdelete = True
+        bus.updated_at = datetime.now()
+        created = queries.create(db=db, model=bus)
+        if created:
+            email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="Delete Bus",toAddress=admin.email,)
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription="Bus deleted successfully")
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
     except Exception as ex:
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -908,13 +1025,13 @@ async def addTrain(db: Session,setting: Setting,payload: AddTrainRequest, backgr
     try:
         logger.info(f"started creating new train by {admin.email} at {datetime.now()}")
         if admin.role.tag in [AdminRoleEnum.TRAINPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
-            trainAdmin = admin
+            loggedInAdmin = admin
             if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
-                trainAdmin = queries.getAdminByIdentifier(db=db,adminId=payload.admin_id)
-            routes = adminQuery.getRoutesByIds(db=db,ids=payload.routes,adminId=trainAdmin.id)
+                loggedInAdmin = queries.getAdminByIdentifier(db=db,adminId=payload.admin_id)
+            routes = adminQuery.getRoutesByIds(db=db,ids=payload.routes,adminId=loggedInAdmin.id)
             if routes:
                 schedules = [TrainScheduleModel(identifier=util.generateId(length=6),admin_id =admin.id,departureTime = schedule['departureTime'],arrivalTime = schedule['arrivalTime'],timeOfOperation = schedule['timeOfOperation'],created_at=datetime.now(),updated_at=datetime.now(),) for schedule in payload.schedules]
-                previous = TrainModel(admin_id=trainAdmin.id,trainNumber=payload.trainNumber,trainName=payload.trainName,description=payload.description,created_at=datetime.now(),updated_at=datetime.now(),billerId=trainAdmin.billerId,schedules=schedules,routes=routes)
+                previous = TrainModel(identifier=util.generateId(length=6),admin_id=loggedInAdmin.id,trainNumber=payload.trainNumber,trainName=payload.trainName,description=payload.description,created_at=datetime.now(),updated_at=datetime.now(),isdelete=False,billerId=loggedInAdmin.billerId,schedules=schedules,routes=routes)
                 created = queries.create(db=db, model=previous)
                 if created:
                     email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
@@ -939,48 +1056,59 @@ async def editTrain(db: Session,setting: Setting,payload: AddTrainRequest,backgr
         if admin.role.tag not in [AdminRoleEnum.TRAINPROVIDER, AdminRoleEnum.ADMIN, AdminRoleEnum.SUPERADMIN]:
             response.status_code = status.HTTP_401_UNAUTHORIZED
             return BaseResponse(statusCode=str(status.HTTP_401_UNAUTHORIZED), statusDescription=UNAUTHORISED)
-        trainAdmin = admin
+        loggedInAdmin = admin
         if admin.role.tag in [AdminRoleEnum.ADMIN, AdminRoleEnum.SUPERADMIN]:
-            trainAdmin = queries.getAdminByIdentifier(db=db, adminId=payload.admin_id)
+            loggedInAdmin = queries.getAdminByIdentifier(db=db, adminId=payload.admin_id)
         # Check for existing train
         existing = adminQuery.getTrain(db=db, trainNumber=payload.trainNumber)
         if not existing:
             response.status_code = status.HTTP_404_NOT_FOUND
             return BaseResponse(statusCode=str(status.HTTP_404_NOT_FOUND), statusDescription="Train not found")
-        if existing.admin_id != trainAdmin.id:
+        if existing.admin_id != loggedInAdmin.id:
             response.status_code = status.HTTP_403_FORBIDDEN
             return BaseResponse(statusCode=str(status.HTTP_403_FORBIDDEN), statusDescription="Access denied")
         existing_schedules_map = {s.identifier: s for s in existing.schedules}
+        logger.info(f"Existing schedules map: {existing_schedules_map.items()}")
+        logger.info(f"Payload schedules: {existing_schedules_map.keys()}")
+        obj_delete = [identifier for identifier in existing_schedules_map.keys() if identifier not in [s.get("identifier") for s in payload.schedules or []]]
+        logger.info(f"Schedule identifiers to delete: {obj_delete}")
         updated_schedule_models = []
-        for schedule_data in payload.schedules:
-            schedule_identifier = schedule_data.get("identifier")
-            if schedule_identifier and schedule_identifier in existing_schedules_map:
-                #  Update existing schedule
-                schedule_obj = existing_schedules_map[schedule_identifier]
-                schedule_obj.departureTime = schedule_data["departureTime"]
-                schedule_obj.arrivalTime = schedule_data["arrivalTime"]
-                schedule_obj.timeOfOperation = schedule_data["timeOfOperation"]
-                schedule_obj.updated_at = datetime.now()
-                updated_schedule_models.append(schedule_obj)
-            else:
-                #  Add new schedule
-                new_schedule = TrainScheduleModel(
-                    identifier=schedule_identifier or util.generateId(length=6),
-                    train_id=existing.id,
-                    admin_id=admin.id,
-                    departureTime=schedule_data["departureTime"],
-                    arrivalTime=schedule_data["arrivalTime"],
-                    timeOfOperation=schedule_data["timeOfOperation"],
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
-                )
-                queries.create(db=db,model=new_schedule)
-                updated_schedule_models.append(new_schedule)
+        deleted_schedule_models = []
+        if  payload.schedules:
+            logger.info(f"Processing {len(payload.schedules)} schedules from payload")
+            for schedule_data in payload.schedules:
+                schedule_identifier = schedule_data.get("identifier")
+                if schedule_identifier and schedule_identifier in existing_schedules_map:
+                    #  Update existing schedule
+                    schedule_obj = existing_schedules_map[schedule_identifier]
+                    schedule_obj.departureTime = schedule_data["departureTime"]
+                    schedule_obj.arrivalTime = schedule_data["arrivalTime"]
+                    schedule_obj.timeOfOperation = schedule_data["timeOfOperation"]
+                    schedule_obj.updated_at = datetime.now()
+                    updated_schedule_models.append(schedule_obj)
+                else:
+                    #  Add new schedule
+                    new_schedule = TrainScheduleModel(
+                        identifier=schedule_identifier or util.generateId(length=6),
+                        train_id=existing.id,
+                        admin_id=admin.id,
+                        departureTime=schedule_data["departureTime"],
+                        arrivalTime=schedule_data["arrivalTime"],
+                        timeOfOperation=schedule_data["timeOfOperation"],
+                        created_at=datetime.now(),
+                        updated_at=datetime.now(),
+                    )
+                    queries.create(db=db,model=new_schedule)
+                    updated_schedule_models.append(new_schedule)
+        logger.info(f"Updated schedules: {updated_schedule_models}")
         # Update routes
-        routes = adminQuery.getRoutesByIds(db=db, ids=payload.routes, adminId=trainAdmin.id)
+        routes = adminQuery.getRoutesByIds(db=db, ids=payload.routes, adminId=loggedInAdmin.id)
         existing.trainName = payload.trainName
         existing.description = payload.description
-        existing.schedules = updated_schedule_models
+        if updated_schedule_models:
+            existing.schedules = updated_schedule_models
+        adminQuery.deleteTrainSchedules(db=db,ids=obj_delete)
+        db.commit()
         existing.routes = routes
         existing.updated_at = datetime.now()
 
@@ -1014,16 +1142,34 @@ async def editTrain(db: Session,setting: Setting,payload: AddTrainRequest,backgr
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=SYSTEMBUSY,
         )
-async def deleteTrain(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,roleId: int):
+async def deleteTrain(db: Session,setting: Setting,background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,trainNumber:str):
     try:
-        logger.info(f"started deleting role {roleId} @ {datetime.now()}")
-        role = queries.deleteRole(db=db,roleId=roleId)
-        if role:
-            response.status_code = status.HTTP_200_OK
-            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
-        else:
+        logger.info(f"started deleting role {trainNumber} @ {datetime.now()}")
+        if admin.role.tag not in [AdminRoleEnum.TRAINPROVIDER, AdminRoleEnum.ADMIN, AdminRoleEnum.SUPERADMIN]:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+        train = adminQuery.getTrain(db=db, trainNumber=trainNumber)
+        if not train:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+        if admin.role.tag in [AdminRoleEnum.TRAINPROVIDER] and train.admin_id != admin.id:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+        train.isdelete = True
+        train.updated_at = datetime.now()
+        created = queries.create(db=db, model=train)
+        if created:
+            email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription="Train deleted successfully")
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+    except IntegrityError as e:
+        logger.error(str(e))
+        db.rollback()
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="This train cannot be deleted because passengers have already booked tickets on it.")
     except Exception as ex:
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -1061,7 +1207,7 @@ async def addRoute(db: Session,setting: Setting,payload: AddRouteRequest, backgr
                             previous.updated_at = datetime.now()
                         else:
                             seatsm = [PricingModel(price = int(seat['price'])*100,classType = seat['classType'],availabilityStatus = "available",per_km_rate="0",created_at=datetime.now(),updated_at=datetime.now(),) for seat in payload.seats]
-                            previous = TrainRouteModel(identifier=util.generateId(length=6),sourceStation_id=startStation.id,destinationStation_id=stopStation.id,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now(),prices=seatsm)
+                            previous = TrainRouteModel(identifier=util.generateId(length=6),sourceStation_id=startStation.id,destinationStation_id=stopStation.id,admin_id=admin.id,created_at=datetime.now(),updated_at=datetime.now(),isdelete=False,prices=seatsm)
                         created = adminQuery.create(db=db, model=previous)
                         if created:
                             email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
@@ -1089,9 +1235,9 @@ async def updateRoute(db: Session,setting: Setting,payload: AddRouteRequest, bac
         if admin.role.tag not in [AdminRoleEnum.TRAINPROVIDER, AdminRoleEnum.ADMIN, AdminRoleEnum.SUPERADMIN]:
             response.status_code = status.HTTP_401_UNAUTHORIZED
             return BaseResponse(statusCode=str(status.HTTP_401_UNAUTHORIZED), statusDescription=UNAUTHORISED)
-        trainAdmin = admin
+        loggedInAdmin = admin
         if admin.role.tag in [AdminRoleEnum.ADMIN, AdminRoleEnum.SUPERADMIN]:
-            trainAdmin = queries.getAdminByIdentifier(db=db, adminId=payload.admin_id)
+            loggedInAdmin = queries.getAdminByIdentifier(db=db, adminId=payload.admin_id)
         # Check for existing route
         startStation = adminQuery.getStationById(db=db,stationId=payload.startId)
         if not startStation:
@@ -1105,7 +1251,7 @@ async def updateRoute(db: Session,setting: Setting,payload: AddRouteRequest, bac
         if not existing:
             response.status_code = status.HTTP_404_NOT_FOUND
             return BaseResponse(statusCode=str(status.HTTP_404_NOT_FOUND), statusDescription=NOROUTE)
-        if existing.admin_id != trainAdmin.id:
+        if existing.admin_id != loggedInAdmin.id:
             response.status_code = status.HTTP_403_FORBIDDEN
             return BaseResponse(statusCode=str(status.HTTP_403_FORBIDDEN), statusDescription=UNAUTHORISED)
         existing_prices_map = {s.id: s for s in existing.prices}
@@ -1153,16 +1299,29 @@ async def updateRoute(db: Session,setting: Setting,payload: AddRouteRequest, bac
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
-async def deleteRoute(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,routeId: int):
+async def deleteRoute(db: Session,setting: Setting, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,routeId: int):
     try:
         logger.info(f"started deleting route {routeId} @ {datetime.now()}")
-        role = queries.deleteRoute(db=db,routeId=routeId)
-        if role:
-            response.status_code = status.HTTP_200_OK
-            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
-        else:
+        if admin.role.tag not in [AdminRoleEnum.TRAINPROVIDER, AdminRoleEnum.ADMIN, AdminRoleEnum.SUPERADMIN]:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+        route = queries.getRouteByIdentier(db=db, routeId=routeId)
+        if not route:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+        if admin.role.tag in [AdminRoleEnum.TRAINPROVIDER] and route.admin_id != admin.id:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+        route.isdelete = True
+        route.updated_at = datetime.now()
+        created = queries.create(db=db, model=route)
+        if created:
+            email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="Delete Route",toAddress=admin.email,)
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription="Route deleted successfully")
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
     except Exception as ex:
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -1211,13 +1370,13 @@ async def addStation(db: Session,setting: Setting,payload: AddStationRequest, ba
                                     policy = "",
                                     status = True,
                                     long = geo[1],
-                                    lat =geo[0],
+                                    lat =geo[0],isdelete=False,
                                     mode= TicketModeEnum(payload.mode) )
                 created = queries.create(db=db,model=existing)
                 if created:
                     email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
-                    background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
-                    return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                    background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Station",toAddress=admin.email,)
+                    return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription="Added/Updated Station successfully")
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
@@ -1253,16 +1412,29 @@ async def updateStation(db: Session,setting: Setting,payload: AddRoleRequest, ba
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
-async def deleteStation(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,roleId: int):
+async def deleteStation(db: Session,setting: Setting, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,stationId: int):
     try:
-        logger.info(f"started deleting station {roleId} @ {datetime.now()}")
-        role = queries.deleteStation(db=db,stationId=roleId)
-        if role:
-            response.status_code = status.HTTP_200_OK
-            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
-        else:
+        logger.info(f"started deleting station {stationId} @ {datetime.now()}")
+        if admin.role.tag not in [AdminRoleEnum.TRAINPROVIDER, AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.ADMIN, AdminRoleEnum.SUPERADMIN]:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+        station = queries.getStationById(db=db, stationId=stationId)
+        if not station:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+        if admin.role.tag in [AdminRoleEnum.TRAINPROVIDER,AdminRoleEnum.BUSPROVIDER,] and station.admin_id != admin.id:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+        station.isdelete = True
+        station.updated_at = datetime.now()
+        created = queries.create(db=db, model=station)
+        if created:
+            email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="Delete Station",toAddress=admin.email,)
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription="Station deleted successfully")
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
     except Exception as ex:
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST

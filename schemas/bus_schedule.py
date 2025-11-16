@@ -1,7 +1,7 @@
 from typing import Optional, Union,List
 from datetime import datetime
 from sqlalchemy import func
-from pydantic import BaseModel
+from pydantic import BaseModel,model_validator
 from schemas.response import BaseResponse
 
 
@@ -18,6 +18,10 @@ class BusScheduleBase(BaseModel):
 class BusSchedule(BusScheduleBase):    
     daysOfOperation: Union[str, None] = None
     id: Optional[int]
+    @model_validator(mode="after")
+    def final_clean(self):
+        self.price = str(int(int(self.price)/100))
+        return self
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 
