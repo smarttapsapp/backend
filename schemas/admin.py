@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field,validator,EmailStr
 from typing import Optional, Union, List
 from schemas.otp import OTP
+from utils import util
 from schemas.account import Account
 from datetime import datetime
 from schemas.response import BaseResponse
@@ -25,7 +26,11 @@ class AdminCreate(AdminBase):
 class Admin(AdminBase):
     status: bool
     role: Role
+    cashout_enabled: Optional[bool]=False
     identifier: Optional[str]=None
+    cashout_account: Union[str,None]=None
+    cashout_limit: Union[str,None]="0"
+    cashout_bank: Union[str,None]=None
     billerId: Optional[str]=None
     id: int
 
@@ -42,6 +47,10 @@ class AdminProfile(AdminBase):
     status: bool
     id: int
     tag: str
+    cashout_enabled: Optional[bool]=False
+    cashout_account: Union[str,None]=None
+    cashout_bank: Union[str,None]=None
+    cashout_limit: Union[str,None] = "0"
     identifier: Optional[str]=None
     wallet: Optional[Account]=None 
     @classmethod
@@ -53,6 +62,10 @@ class AdminProfile(AdminBase):
             phonenumber=obj.phonenumber,
             status=obj.status,
             email=obj.email,
+            cashout_enabled=obj.cashout_enabled,
+            cashout_account=obj.cashout_account,
+            cashout_bank=obj.cashout_bank,
+            cashout_limit=obj.cashout_limit,
             identifier=obj.identifier,
             wallet=obj.wallet,
             tag=obj.role.tag,
@@ -68,7 +81,6 @@ class CreateAdminRequest(AdminBase):
 class AdminLoginRequest(BaseModel):
     username: EmailStr
     password: str  
-
 class ForgetPasswordRequest(BaseModel):
     email: EmailStr
 class ChangePasswordRequest(BaseModel):
@@ -81,5 +93,24 @@ class AdminResponse(BaseResponse):
     data: Admin = None
 class ProvidersResponse(BaseResponse):
     data: Union[List[Provider],None] = None
+class AddCashoutAccountRequest(BaseModel):
+    bankCode:str=Field(pattern="^[0-9]+$", max_length=5, min_length=3)
+    accountNumber:str=Field(pattern="^[0-9]+$", max_length=10, min_length=10)
+    password:str
+class CashoutLimitRequest(BaseModel):
+    amount:str=Field(gt=49.99,pattern="^[0-9]+$")
+    password:str
+class CashoutWithdrawalRequest(BaseModel):
+    amount:str=Field(gt=49.99,pattern="^[0-9]+$")
+    password:str
+    desc:Optional[str] = None
+class CashoutConfirmationRequest(BaseModel):
+    otp:str=Field(pattern="^[0-9]+$", max_length=6, min_length=6)
+    requestType:str
+    @validator("requestType")
+    def requestType_validator(cls, value):
+        if value not in ["WITHDRAWAL","ADD_ACCOUNT","LIMIT_CHANGE"]:
+            raise ValueError("Invalid request type")
+        return value
 #class AdminRoutesResponse(BaseResponse):
 #    data: Union[List[AdminTransport],None] = []

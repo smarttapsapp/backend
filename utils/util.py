@@ -206,6 +206,8 @@ def mask_email(email: str) -> str:
     return re.sub(r'^[^@]+', masked, email)
 def generateId(length: int = 12) -> str:
     return ''.join(secrets.choice('0123456789') for _ in range(length))
+def sanitize_input(text: str) -> str:
+    return re.sub(r'[^\w-]', '', text)
 def generateOTP():
     return str(randint(100000, 999999))
 def generateBillerId():

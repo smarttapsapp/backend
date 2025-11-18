@@ -1929,8 +1929,8 @@ async def getBanks(
 @router.post("/cashout/recipient",
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["cashout"])
-async def cashout_recipient(
-    payload: AddCashoutRequest,
+async def cashout_add_recipient(
+    payload: AddCashoutAccountRequest,
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
@@ -1939,24 +1939,21 @@ async def cashout_recipient(
     background_task: BackgroundTasks,
 ):
     try:
-        return await paymentservice.addCashoutRecipient(
+        return await adminservice.verifyCashoutAccount(
                 payload=payload,
-                request=request,
                 response=response,
                 setting=setting,
-                db=db,
-                user=admin,
-                background_task=background_task,
+                admin=admin,
             )
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-@router.post("/cashout/request",
+@router.post("/cashout/withdraw",
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["cashout"])
-async def cashout_request(
-    payload: CashoutRequest,
+async def cashout_withdrawal_request(
+    payload: CashoutWithdrawalRequest,
     request: Request,
     response: Response,
     user: Annotated[CustomerModel, Depends(validateAdmin)],
@@ -1966,7 +1963,67 @@ async def cashout_request(
 ):
     try:
         if user:
-            return await paymentservice.addCashout(
+            return await adminservice.addCashout(
+                payload=payload,
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                user=user,
+                background_task=background_task,
+            )
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.post("/cashout/limit",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["cashout"])
+async def cashout_limit_increase(
+    payload: CashoutLimitRequest,
+    request: Request,
+    response: Response,
+    user: Annotated[CustomerModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        if user:
+            return await adminservice.addCashout(
+                payload=payload,
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                user=user,
+                background_task=background_task,
+            )
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.post("/cashout/confirmation-check",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["cashout"])
+async def cashout_limit_increase(
+    payload: CashoutConfirmationRequest,
+    request: Request,
+    response: Response,
+    user: Annotated[CustomerModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        if user:
+            return await adminservice.addCashout(
                 payload=payload,
                 request=request,
                 response=response,

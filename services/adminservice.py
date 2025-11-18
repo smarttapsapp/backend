@@ -21,6 +21,7 @@ from schemas.schedule import *
 from schemas.payment import *
 from schemas.route import RoutesResponse,AddRouteRequest
 from schemas.bus_route import BusRoutesResponse,AddBusRouteRequest
+from services.notificationservice import notifyUser
 from schemas.ticket import TicketsResponse
 from schemas.bus import BusesResponse,AddBusRequest
 from schemas.park import ParksResponse
@@ -1570,3 +1571,208 @@ async def listOfSupportTickets(response: Response,db: Session,admin: AdminModel,
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return SupportTicketsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+# cashout account
+async def verifyCashoutAccount(
+        payload:AddCashoutAccountRequest,
+        response: Response,
+        setting: Setting,
+        admin: AdminModel,
+):
+        try:
+            logger.info(f"Started cashout account verification process recipient {admin.firstname} {admin.lastname} for {admin.email}")
+            headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
+            result = util.http(f"{setting.paystack_url}bank/resolve?account_number={payload.accountNumber}&bank_code={payload.bankCode}",headers=headers)
+            if result.status_code == 200:
+                paystackResponse = result.json()
+                if paystackResponse and paystackResponse["status"] is True:
+                    recipientData = paystackResponse.get("data", {})
+                    if recipientData:
+                        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=recipientData)
+                else:
+                    logger.info(f"Failed to verify cashout account recipient {admin.firstname} {admin.lastname} for {admin.email}")
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse['message'],)
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse['message'],)
+            else:
+                logger.info(f"Failed to verify cashout account recipient {admin.firstname} {admin.lastname} for {admin.email}")
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=result.json().get('message',"Connection problem"),)
+        except Exception as ex:
+            logger.info(ex)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def addCashoutRecipient(
+        payload:AddCashoutRequest,
+        request: Request,
+        response: Response,
+        setting: Setting,
+        db: Session,
+        admin: AdminModel,
+        background_task:BackgroundTasks
+):
+        try:
+            logger.info(f"Started adding cashout recipient {admin.firstname} {admin.lastname} for {admin.email}")
+            if admin.cashout_enabled:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Cashout account already exist",)
+            else:
+                headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
+                params ={ "type": "nuban","name":f"{admin.firstname} {admin.lastname}","account_number": payload.accountNumber,"bank_code": payload.bankCode, "currency": "NGN" }
+                result = util.http(f"{setting.paystack_url}transferrecipient",params=params,headers=headers)
+                if result.status_code == 201:
+                    paystackResponse = result.json()
+                    if paystackResponse and paystackResponse["status"] is True:
+                        recipientData = paystackResponse.get("data", {})
+                        if recipientData:
+                            admin.wallet.cashout_enabled = True
+                            admin.wallet.cashout_account = payload.accountNumber
+                            admin.wallet.cashout_code = recipientData.get("recipient_code")
+                            admin.wallet.cashout_bank = payload.bankCode
+                            admin.wallet.updated_at = datetime.now()
+                            updatedUser = queries.create(db=db,model=admin)
+                            if updatedUser:
+                                background_task.add_task(notifyUser,db=db,title=f"Cashout Recipient Added", message=f"Cashout recipient {admin.firstname}{admin.lastname} added successfully",userId=admin.id, setting=setting)
+                                email_debit = util.templates.TemplateResponse("cashout_setup.html",{"request": request, "user": admin,"recipient":recipientData},)
+                                background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Cashout Recipient Added",toAddress=admin.email)
+                                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                    else:
+                        logger.info(f"Failed to add cashout recipient {admin.firstname} {admin.lastname} for {admin.email}")
+                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse['message'],)
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse['message'],)
+                else:
+                    logger.info(f"Failed to add cashout recipient {admin.firstname} {admin.lastname} for {admin.email}")
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=result.json()['message'],)
+        except Exception as ex:
+            logger.info(ex)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def addCashout(
+        payload:CashoutRequest,
+        request: Request,
+        response: Response,
+        setting: Setting,
+        db: Session,
+        admin: AdminModel,
+        background_task:BackgroundTasks
+):
+        try:
+            logger.info(f"Started adding cashout request of {payload.amount} for {admin.firstname} {admin.lastname} for {admin.email}")
+            if admin.account_type == AccountEnum.MERCHANT:
+                if admin.cashout_enabled and admin.cashout_code and admin.cashout_account and admin.cashout_bank:
+                    cashoutPd = queries.getProductTypeBYname(db=db,name="cashout")
+                    if cashoutPd:
+                        if int(admin.wallet.availableBalance) >= int(payload.amount):
+                            logger.info(f"balance is sufficient {admin.wallet.availableBalance}  @ {datetime.now()}")
+                            dailyCashout = 0
+                            dailyLimit = queries.getDailyCashoutTransactionsByUser(db=db,productId=cashoutPd.id,userId=admin.id)
+                            if dailyLimit:
+                                dailyCashout = dailyLimit
+                            trnxId = f"CASH-{util.generateId()}"
+                            logger.info(f"cash out is below user limit {admin.cashout_limit}  @ {datetime.now()}")
+                            logger.info(f"cash out is below user limit {dailyCashout}  @ {datetime.now()}")
+                            newBalance = int(admin.wallet.availableBalance) - int(payload.amount)
+                            admin.wallet.availableBalance = newBalance
+                            admin.wallet.payments.append(PaymentModel(
+                                    wallet_id = admin.wallet.id,
+                                    user_id =admin.id,
+                                    amount = payload.amount,
+                                    payment_type =PaymentEnum.DEBIT,
+                                    reference = trnxId,
+                                    event = "charge.processing",
+                                    status = "started",
+                                    channel = ChannelEnum.WEB,
+                                    statusCode = TransactionCodeEnum.PROCESSING,
+                                    statusDescription = TransactionStatusEnum.PROCESSING,
+                                    recipient=admin.cashout_account,
+                                    statusMessage = f"Cashout to {admin.cashout_account} {admin.cashout_bank}",
+                                    balanceBefore = admin.wallet.availableBalance,
+                                    balanceAfter = newBalance,
+                                    product_id=cashoutPd.product_id,
+                                    product_type_id=cashoutPd.id,  # Assuming product_id is 1 for cashout
+                                    cashout = CashOutModel(
+                                        admin_id = admin.id,
+                                        source= 'balance',
+                                        amount= payload.amount,
+                                        recipient= admin.cashout_code,
+                                        withdrawalStatus = WithrawalStatusEnum.WAITING,
+                                        statusCode = TransactionCodeEnum.PROCESSING,
+                                        statusDescription = TransactionStatusEnum.PROCESSING,
+                                        reference = trnxId,
+                                        reason = payload.desc,
+                                        created_at = datetime.now(),
+                                        updated_at =  datetime.now()
+                                    ),
+                                    created_at =datetime.now(),
+                                    updated_at = datetime.now()
+                                )
+                            )
+                            updatedUser = adminQuery.create(db=db,model=admin)
+                            if updatedUser:
+                                payment = adminQuery.getPaymentByReference(db=db,reference=trnxId)
+                                if payment:
+                                    if int(admin.cashout_limit) >= int(dailyCashout):
+                                        logger.info(f"Start processing cashout records ............... @ {datetime.now()}")
+                                        headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
+                                        params ={"source": payment.cashout.source,"amount": payment.cashout.amount,"reference":payment.reference,"recipient": payment.cashout.recipient,"reason": payment.cashout.reason }
+                                        result = util.http(f"{setting.paystack_url}transfer",params=params,headers=headers)
+                                        paystackResponse = result.json()
+                                        if result.status_code == 200:
+                                            if paystackResponse and paystackResponse["status"] is True:
+                                                recipientData = paystackResponse.get("data", {})
+                                                payment.statusCode = TransactionCodeEnum.SUCCESS
+                                                payment.statusDescription = TransactionStatusEnum.SUCCESS
+                                                payment.status = "success"
+                                                payment.event = "charge.success"
+                                                payment.cashout.withdrawalStatus = WithrawalStatusEnum.COMPLETED,
+                                                payment.cashout.statusCode = TransactionCodeEnum.SUCCESS,
+                                                payment.cashout.statusDescription = TransactionStatusEnum.SUCCESS,
+                                        else:
+                                            payment.statusCode = TransactionCodeEnum.FAILED
+                                            payment.statusDescription = TransactionStatusEnum.FAILED
+                                            payment.status = "failed"
+                                            payment.event = "charge.failed"
+                                            payment.cashout.withdrawalStatus = WithrawalStatusEnum.FAILED,
+                                            payment.cashout.statusCode = TransactionCodeEnum.FAILED,
+                                            payment.cashout.statusDescription = TransactionStatusEnum.FAILED,
+                                    else:
+                                        logger.info(f"cashout daily limit exceeded at {datetime.now()}")
+                                        payment.statusCode = TransactionCodeEnum.PROCESSING
+                                        payment.statusDescription = TransactionStatusEnum.PROCESSING
+                                        #payment.cashout.statusCode = TransactionCodeEnum.PROCESSING,
+                                        #payment.cashout.statusDescription = TransactionStatusEnum.PROCESSING,
+                                        #payment.cashout.withdrawalStatus = WithrawalStatusEnum.WAITING,
+                                    saved = adminQuery.create(db=db,model=payment)
+                                    background_task.add_task(notifyUser,db=db,title=f"Cashout Notification", message=payment.statusDescription,userId=admin.id, setting=setting)
+                                        #email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"payment":createCashoutRecord},)
+                                        #background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Cashout Notification",toAddress=user.email)
+                                    return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":payment.reference})
+                                else:
+                                    logger.info(f"Cashout not enabled for {admin.firstname} {admin.lastname} for {admin.email} @ {datetime.now()}")
+                                    response.status_code = status.HTTP_400_BAD_REQUEST 
+                                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Payment not found Error")
+                            else:
+                                logger.info(f"Unable to process cashout for {admin.firstname} {admin.lastname} for {admin.email} @ {datetime.now()}")
+                                response.status_code = status.HTTP_400_BAD_REQUEST 
+                                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Unable to process cashout")
+                        else:
+                            logger.info(f"Insufficient balance for {admin.email} to cashout @ {datetime.now()}")
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INSUFFICIENTFUND)
+                    else:
+                        logger.info(f"cash service is not configured @ {datetime.now()}")
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Cashout Error")
+                else:
+                    logger.info(f"Cashout not enabled for {admin.firstname} {admin.lastname} for {admin.email} @ {datetime.now()}")
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Cashout not enabled or invalid recipient details")
+            else:
+                logger.info(f" {admin.email} is not eligible for cashout transactions @ {datetime.now()}")
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Cashout not enabled or invalid recipient details")
+        except Exception as ex:
+            logger.info(ex)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
