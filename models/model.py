@@ -302,8 +302,8 @@ class OTPModel(Base):
     otp = Column(String(6))
     servicename = Column(String(255))
     status = Column(Enum(OTPStatusEnum), nullable=False, default=OTPStatusEnum.OPEN)
-    user_id = Column(Integer, ForeignKey("customers.id"))
-    #user = relationship("CustomerModel", back_populates="otps")
+    user_id = Column(Integer, ForeignKey("customers.id"),nullable=True)
+    admin_id = Column(Integer, ForeignKey("admins.id"),nullable=True)
     created_at = Column(DateTime, default=func.now())
     expired_at = Column(
         DateTime,
@@ -356,6 +356,8 @@ class CashOutModel(Base):
     source= Column(String(50),default='balance')
     amount= Column(String(20),default='0')
     recipient= Column(String(50),nullable=False)
+    approved= Column(String(50),nullable=True)
+    rejected= Column(String(50),nullable=True)
     withdrawalStatus =  Column(Enum(WithrawalStatusEnum), nullable=False, default=WithrawalStatusEnum.WAITING)
     statusCode =  Column(Enum(TransactionCodeEnum), nullable=False, default=TransactionCodeEnum.PROCESSING)
     statusDescription =  Column(Enum(TransactionStatusEnum), nullable=False, default=TransactionStatusEnum.PROCESSING)

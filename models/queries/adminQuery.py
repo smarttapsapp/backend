@@ -4,7 +4,7 @@ from typing import List
 from sqlalchemy.sql import select,update,case
 from models.model import *
 import logging
-from datetime import datetime
+from datetime import datetime,date
 
 logger = logging.getLogger(__name__)
 def getBillerByBillerId(db: Session, billerId: str):
@@ -291,3 +291,15 @@ def getPackagesById(db: Session,productTypeId:int):
     return db.query(PackageModel).filter(PackageModel.product_type_id == productTypeId).filter(PackageModel.status == True).order_by(desc(PackageModel.created_at)).all()
 def deletePackage(db: Session ,id:int):
     return db.query(PackageModel).filter(PackageModel.id == id).delete()
+def getLatestOTP(db: Session,adminId:int,serviceName:str):
+    return db.query(OTPModel).filter(OTPModel.admin_id == adminId, OTPModel.servicename == serviceName).order_by(desc(OTPModel.created_at)).first()
+def getOTPValue(db: Session,adminId:int,serviceName:str,otp:str):
+    return db.query(OTPModel).filter(OTPModel.admin_id == adminId, OTPModel.servicename == serviceName,OTPModel.otp == otp).order_by(desc(OTPModel.created_at)).first()
+def totalCashoutTransactionsDaily(db: Session,adminId:int):
+    logger.info(f"Started getting daily cashout total for admin {adminId} @ {str(datetime.now())}")
+    return db.query(func.sum(CashOutModel.amount)).filter(
+    CashOutModel.admin_id == adminId,
+    cast(CashOutModel.created_at, Date) == date.today()
+).scalar()or 0
+def getPaymentByReference(db: Session, reference: str):
+    return db.query(PaymentModel).filter(PaymentModel.reference == reference).first()

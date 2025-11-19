@@ -1,0 +1,13 @@
+<!-- Include the footer  -->
+{% include 'include/header.html' %}
+
+<h2>Hello {{ user.firstname }} {{ user.lastname }},</h2>
+
+<p>Your cashout withdrawal of {{amount}} was successful.</p>
+
+<div class="otp">New Balance: {{balance}}</div>
+
+<p>If this is not initiated by you. Please contact support.</p>
+
+<!-- Include the footer  -->
+{% include 'include/footer.html' %}

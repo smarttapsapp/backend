@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field,validator,EmailStr
-from typing import Optional, Union, List
+from typing import Optional, Union, List,Annotated
 from schemas.otp import OTP
 from utils import util
 from schemas.account import Account
@@ -97,14 +97,18 @@ class AddCashoutAccountRequest(BaseModel):
     bankCode:str=Field(pattern="^[0-9]+$", max_length=5, min_length=3)
     accountNumber:str=Field(pattern="^[0-9]+$", max_length=10, min_length=10)
     password:str
+    accountName:Optional[str]=None
 class CashoutLimitRequest(BaseModel):
-    amount:str=Field(gt=49.99,pattern="^[0-9]+$")
+    amount:Annotated[int, Field(gt=50)]
     password:str
 class CashoutWithdrawalRequest(BaseModel):
-    amount:str=Field(gt=49.99,pattern="^[0-9]+$")
+    amount:Annotated[int, Field(gt=50)]
     password:str
     desc:Optional[str] = None
 class CashoutConfirmationRequest(BaseModel):
+    amount:Annotated[int, Field(gt=50)]
+    password:str
+    desc:Optional[str] = None
     otp:str=Field(pattern="^[0-9]+$", max_length=6, min_length=6)
     requestType:str
     @validator("requestType")
