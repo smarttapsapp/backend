@@ -1095,16 +1095,14 @@ def adminPayments(request: Request,response: Response,setting: Setting,db: Sessi
             f"started querying payments from {startDate} to {endDate}"
         )
         if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
-            return PaymentsResponse(
-                statusCode= str(status.HTTP_200_OK),
-                statusDescription=SUCCESS,
-                data=queries.getAllPaymentsHistories(db=db,startDate=startDate,endDate=endDate)
-            )
+            payments=queries.getAllPaymentsHistories(db=db,startDate=startDate,endDate=endDate)
         else:
-            return PaymentsResponse(
+            payments=queries.getAllPaymentsHistories(db=db,adminId=admin.id,startDate=startDate,endDate=endDate)
+        return PaymentsResponse(
                 statusCode= str(status.HTTP_200_OK),
                 statusDescription=SUCCESS,
-                data=queries.getAllPaymentsHistories(db=db,adminId=admin.id,startDate=startDate,endDate=endDate)
+                data=[Payment.from_orm(payment).model_dump() for payment in payments]
+                
             )
     except Exception as ex:
         logger.info(ex)

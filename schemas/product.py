@@ -19,9 +19,6 @@ class ProductBase(BaseModel):
     customerField: Union[str, None] = None
     status: Union[bool, None] = False
 
-class ProductRequest(ProductBase):
-    user: Union[List[str], None] = None
-
 class Product(ProductBase):
     enabledInline: Union[bool, None] = False
     id: Optional[int]

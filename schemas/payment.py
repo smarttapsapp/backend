@@ -1,7 +1,7 @@
 from typing import Optional, Union,List,Dict
 from datetime import datetime
 from sqlalchemy import func
-from pydantic import BaseModel,validator
+from pydantic import BaseModel,validator,Field
 from schemas.response import BaseResponse
 from schemas.request import PINRequest
 from schemas.product import Product,ProductOut
@@ -14,20 +14,16 @@ class PaymentBase(BaseModel):
     payment_type:str
     reference: str
     event: str
-    class Config:
-        from_attributes = True
-        populate_by_name = True
-class PaymentRequest(PaymentBase):
-    user: Union[List[str], None] = None
 class Payment(PaymentBase):
     id: Optional[int]
     statusMessage: Union[str, None] = None
     statusCode: Union[str, None] = None
     channel: Union[str, None] = None
     status: Union[str, None] = None
-    name: str="AIRTIME"
-    created_at: Union[datetime, None] = datetime.now()
-    updated_at: Union[datetime, None] = datetime.now()
+    product: str
+    service: str
+    created_at: Optional[datetime] = Field(default_factory=datetime.now)
+    updated_at: Optional[datetime] = Field(default_factory=datetime.now)
     @classmethod
     def from_orm(cls, obj):
         return cls(
@@ -41,13 +37,14 @@ class Payment(PaymentBase):
             statusCode=obj.statusCode,
             channel=obj.channel,
             status=obj.status,
-            name=obj.product.name if obj.product else '',
+            product=obj.product.name if obj.product else 'Payment',
+            service=obj.productType.billerName if obj.productType else 'General',
             created_at=obj.created_at,
             updated_at=obj.updated_at,
         )
     class Config:
         from_attributes = True
-        #populate_by_name = True
+        populate_by_name = True
 
 class Transaction(PaymentBase):
     statusMessage: Union[str, None] = None

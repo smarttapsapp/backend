@@ -1908,6 +1908,54 @@ async def delete_package(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+# cashout
+@router.get("/cashouts", 
+    response_model=CashoutsResponse,
+    response_model_exclude_unset=True)
+async def get_cashouts(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    startDate: str = Query(default=util.get_first_day_of_month()),
+    endDate: Optional[str] = Query(str(date.today())),
+):
+    try:
+        if admin:
+            if startDate and endDate:
+                start = datetime.strptime(startDate, "%Y-%m-%d")
+                end = datetime.strptime(endDate, "%Y-%m-%d")
+                if end < start:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return PaymentsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
+            return paymentservice.listOfCashout(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                admin=admin,
+                startDate=startDate,
+                endDate=endDate)
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return CashoutsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/cashout-analytics", 
+    response_model=CashoutsResponse,
+    response_model_exclude_unset=True,tags=["analytics"])
+async def get_cashout_analytics(
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        return await adminservice.cashOutsAnalytics(response=response,db=db,admin=admin)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return CashoutsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.get("/banks",
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["cashout"])
@@ -2133,20 +2181,6 @@ async def get_providers(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return AdminsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-@router.get("/payment-analytics", 
-    response_model=PaymentsResponse,
-    response_model_exclude_unset=True,tags=["analytics"])
-async def get_payment_analytics(
-    response: Response,
-    admin: Annotated[AdminModel, Depends(validateAdmin)],
-    db: Annotated[Session, Depends(get_db)],
-):
-    try:
-        return await adminservice.paymentsAnalytics(response=response,db=db,admin=admin)
-    except Exception as ex:
-        logger.error(ex)
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return AdminsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.get("/ticket-analytics", 
     response_model=TicketsResponse,
     response_model_exclude_unset=True,tags=["analytics"])
@@ -2161,20 +2195,6 @@ async def get_ticket_analytics(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-@router.get("/cashout-analytics", 
-    response_model=CashoutsResponse,
-    response_model_exclude_unset=True,tags=["analytics"])
-async def get_cashout_analytics(
-    response: Response,
-    admin: Annotated[AdminModel, Depends(validateAdmin)],
-    db: Annotated[Session, Depends(get_db)],
-):
-    try:
-        return await adminservice.cashOutsAnalytics(response=response,db=db,admin=admin)
-    except Exception as ex:
-        logger.error(ex)
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return CashoutsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 #Support Tiocket
 @router.get("/support-tickets", 
     response_model=SupportTicketsResponse,
@@ -2261,3 +2281,51 @@ async def deleteSeat(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+# payments 
+@router.get("/payments", 
+    response_model=PaymentsResponse,
+    response_model_exclude_unset=True,name="get customer payemnt")
+async def get_Admin_payments(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    startDate: str = Query(default=util.get_first_day_of_month()),
+    endDate: Optional[str] = Query(str(date.today())),
+):
+    try:
+        if admin:
+            if startDate and endDate:
+                start = datetime.strptime(startDate, "%Y-%m-%d")
+                end = datetime.strptime(endDate, "%Y-%m-%d")
+                if end < start:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return PaymentsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
+            return paymentservice.adminPayments(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                admin=admin,
+                startDate=startDate,
+                endDate=endDate)
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return PaymentsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/payment-analytics", 
+    response_model=PaymentsResponse,
+    response_model_exclude_unset=True,tags=["analytics"])
+async def get_payment_analytics(
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        return await adminservice.paymentsAnalytics(response=response,db=db,admin=admin)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return AdminsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

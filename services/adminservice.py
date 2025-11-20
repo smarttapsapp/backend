@@ -78,7 +78,7 @@ async def authenticate_user(
                     statusCode= str(status.HTTP_200_OK),
                     statusDescription= SUCCESS,
                     data={
-                        "user":Admin.from_orm(user),
+                        "user":Admin.model_validate(user),
                         "idToken":authToken[0],
                         "expiresIn":authToken[1]
                     },
@@ -137,10 +137,14 @@ async def createUserAccount(db: Session,setting: Setting,payload: CreateAdminReq
                     password=util.get_password_hash(password),
                     role_id=role.id,
                     status=True,
+                    cashout_enabled=False,
+                    cashout_limit=10000000,
                     billerId = util.generateBillerId(),
                     created_at=datetime.now(),
                     updated_at=datetime.now(),
-                    wallet=AccountModel(walletAccount=util.formatPhoneShort(payload.phonenumber),accountStatus=AccountStatusEnum.ACTIVE,availableBalance=0,created_at=datetime.now(),updated_at=datetime.now()),
+                    wallet=AccountModel(walletAccount=util.formatPhoneShort(payload.phonenumber),accountStatus=AccountStatusEnum.ACTIVE,availableBalance=0,created_at=datetime.now(),updated_at=datetime.now(),
+                    cashout_enabled=False,
+                    cashout_limit=10000000),
                     preference =UserNotificationPreference(
                 receive_via_email = True,
                 receive_in_app = True,
@@ -1581,7 +1585,7 @@ async def verifyCashoutAccount(
         try:
             logger.info(f"Started cashout account verification process recipient {admin.firstname} {admin.lastname} for {admin.email}")
             headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
-            result = util.http(f"{setting.paystack_url}bank/resolve?account_number={payload.accountNumber}&bank_code=001",headers=headers)
+            result = util.http(f"{setting.paystack_url}bank/resolve?account_number={payload.accountNumber}&bank_code={payload.bankCode}",headers=headers)
             if result.status_code == 200:
                 paystackResponse = result.json()
                 if paystackResponse and paystackResponse["status"] is True:
@@ -1773,7 +1777,7 @@ async def cashoutConfirmationCheck(payload:CashoutConfirmationRequest,request: R
                                             payment_type =PaymentEnum.DEBIT,
                                             reference = trnxId,
                                             event = "charge.processing",
-                                            status = "started",
+                                            status = "processing",
                                             channel = ChannelEnum.WEB,
                                             statusCode = TransactionCodeEnum.PROCESSING,
                                             statusDescription = TransactionStatusEnum.PROCESSING,
@@ -1787,7 +1791,7 @@ async def cashoutConfirmationCheck(payload:CashoutConfirmationRequest,request: R
                                                 admin_id = admin.id,
                                                 source= 'balance',
                                                 amount= int(payload.amount)*100,
-                                                recipient= admin.cashout_code,
+                                                recipient= admin.cashout_account,
                                                 withdrawalStatus = WithrawalStatusEnum.WAITING,
                                                 statusCode = TransactionCodeEnum.PROCESSING,
                                                 statusDescription = TransactionStatusEnum.PROCESSING,
@@ -1823,6 +1827,8 @@ async def cashoutConfirmationCheck(payload:CashoutConfirmationRequest,request: R
                                             if paystackResponse and paystackResponse["status"] is True:
                                                 transferData = paystackResponse.get("data", {})
                                                 if transferData:
+                                                    latestPayment.event = "charge.success",
+                                                    latestPayment.status = "success",
                                                     latestPayment.cashout.withdrawalStatus = WithrawalStatusEnum.COMPLETED
                                                     latestPayment.cashout.statusCode = TransactionCodeEnum.SUCCESS
                                                     latestPayment.cashout.approved = f"{admin.firstname} {admin.lastname}"
@@ -1870,7 +1876,6 @@ async def cashoutConfirmationCheck(payload:CashoutConfirmationRequest,request: R
             logger.info(ex)
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-
 async def addCashout(
         payload:CashoutRequest,
         request: Request,
