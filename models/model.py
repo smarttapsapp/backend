@@ -362,6 +362,7 @@ class CashOutModel(Base):
     statusCode =  Column(Enum(TransactionCodeEnum), nullable=False, default=TransactionCodeEnum.PROCESSING)
     statusDescription =  Column(Enum(TransactionStatusEnum), nullable=False, default=TransactionStatusEnum.PROCESSING)
     reference = Column(String(100),nullable=False,unique=True, default=lambda: str(uuid.uuid4()),)
+    transfer_code = Column(String(100),nullable=True)
     reason = Column(String(220),nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())

@@ -45,7 +45,6 @@ class Payment(PaymentBase):
     class Config:
         from_attributes = True
         populate_by_name = True
-
 class Transaction(PaymentBase):
     statusMessage: Union[str, None] = None
     statusCode: Union[str, None] = None

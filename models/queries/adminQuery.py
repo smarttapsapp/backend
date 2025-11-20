@@ -303,3 +303,7 @@ def totalCashoutTransactionsDaily(db: Session,adminId:int):
 ).scalar()or 0
 def getPaymentByReference(db: Session, reference: str):
     return db.query(PaymentModel).filter(PaymentModel.reference == reference).first()
+def getCashoutById(db: Session, cashoutId: int):
+    return db.query(CashOutModel).filter(CashOutModel.id == cashoutId).first()
+def getPaymentByCashoutId(db: Session, cashoutId: int):
+    return db.query(PaymentModel).filter(PaymentModel.cashout_id == cashoutId).first()

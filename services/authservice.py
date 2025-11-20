@@ -355,6 +355,10 @@ async def deviceUnlockFinal(request: Request,device:Device,db:Session,response:R
             logger.info(f"device unlock without valid token")
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNABLE)
+    except util.jwt.ExpiredSignatureError:
+        logger.error("Token has expired")
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Session expired",)  
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
