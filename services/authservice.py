@@ -65,7 +65,7 @@ async def createUserAccount(db: Session,setting: Setting,payload: CustomerReques
             if latestOtp.expired_at > datetime.now():
                 authToken = util.create_access_token(setting=setting,credentials={"username": customer.email,"password": latestOtp.otp},exp=60)
                 if authToken:
-                    email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": customer,"otp":latestOtp},)
+                    email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": customer,"otp":latestOtp.otp},)
                     background_task.add_task(
                     util.mailer,
                     str(email_body.body, "utf-8"),
