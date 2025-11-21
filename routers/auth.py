@@ -40,7 +40,7 @@ async def create_customer(
     background_task: BackgroundTasks,
 ):
     try:
-        return authservice.createAccount(
+        return await authservice.createAccount(
             request=request,
             response=response,
             setting=setting,

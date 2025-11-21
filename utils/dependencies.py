@@ -117,9 +117,9 @@ async def validateTransactionPIN(
             raise util.UnicornException(status=status.HTTP_401_UNAUTHORIZED,error={"statusCode": str(status.HTTP_401_UNAUTHORIZED),"statusDescription": DEVICEMISMATCH,},)
         print(user.account_status)
         if user.account_status != AccountStatusEnum.ACTIVE:
-            raise util.UnicornException(status=status.HTTP_401_UNAUTHORIZED,error={"statusCode": str(status.HTTP_401_UNAUTHORIZED),"statusDescription": "Inactive account",},)
+            raise util.UnicornException(status=status.HTTP_400_BAD_REQUEST,error={"statusCode": str(status.HTTP_400_BAD_REQUEST),"statusDescription": "Inactive account",},)
         if not util.verify_password(payload.pin, user.pin):
-            raise util.UnicornException(status=status.HTTP_401_UNAUTHORIZED,error={"statusCode": str(status.HTTP_401_UNAUTHORIZED),"statusDescription": INVALIDPIN,},)
+            raise util.UnicornException(status=status.HTTP_400_BAD_REQUEST,error={"statusCode": str(status.HTTP_400_BAD_REQUEST),"statusDescription": INVALIDPIN,},)
         #selectedWallet = next((acct for acct in user.wallets if acct.nuban == payload.senderAccount), None)
         #if selectedWallet is None:
         #    raise util.UnicornException(status=status.HTTP_404_NOT_FOUND,error={"statusCode":str(status.HTTP_404_NOT_FOUND), "statusDescription": INVALIDACCOUNT},)

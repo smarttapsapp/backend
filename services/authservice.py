@@ -19,7 +19,7 @@ from fastapi import (
 
 logger = logging.getLogger(__name__)
 
-def createAccount(
+async def createAccount(
         request: Request,
         response: Response,
         setting: Setting,
@@ -28,18 +28,27 @@ def createAccount(
         background_task: BackgroundTasks,):
     try:
         user = authQuery.userByEmailOrPhone(db=db,email=payload.email,phonenumber=payload.phonenumber)
-        if user and user.account_status != AccountStatusEnum.REG:
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=ALREADYEXIST,)
-        elif user and user.account_status == AccountStatusEnum.REG:
-            return createUserAccount(db=db,setting=setting,payload=payload,background_task=background_task,request=request,response=response,customer=user)
+        if user:
+            if user.email == payload.email:
+                if util.formatPhone(user.phonenumber) == util.formatPhone(payload.phonenumber):
+                    if user.account_status == AccountStatusEnum.REG:
+                        return await createUserAccount(db=db,setting=setting,payload=payload,background_task=background_task,request=request,response=response,customer=user)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=ALREADYEXIST,)
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Device already register with another account",)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Device already register with another account",)
         else:
-            return createUserAccount(db=db,setting=setting,payload=payload,background_task=background_task,request=request,response=response)
+            return await createUserAccount(db=db,setting=setting,payload=payload,background_task=background_task,request=request,response=response)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-def createUserAccount(db: Session,setting: Setting,payload: CustomerRequest, background_task: BackgroundTasks, request: Request,response: Response,customer:CustomerModel=None):
+async def createUserAccount(db: Session,setting: Setting,payload: CustomerRequest, background_task: BackgroundTasks, request: Request,response: Response,customer:CustomerModel=None):
     if customer:
         logger.info(f"Started resending verification for user {payload.email} {customer.account_status}")
         customer.firstname = payload.firstname
@@ -64,9 +73,9 @@ def createUserAccount(db: Session,setting: Setting,payload: CustomerRequest, bac
                     subject=f"Verification",
                     toAddress=customer.email,)
                     return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=f"Please enter the OTP sent to {util.mask_email(customer.email)} to complete your registration",data={"token":authToken[0],"expires":authToken[1]})
-            return generateAndSendOTP(request=request,db=db,response=response,setting=setting,customer=customer,background_task=background_task)
+            return await generateAndSendOTP(request=request,db=db,response=response,setting=setting,customer=customer,background_task=background_task)
         else:
-            return generateAndSendOTP(request=request,db=db,response=response,setting=setting,customer=customer,background_task=background_task)
+            return await generateAndSendOTP(request=request,db=db,response=response,setting=setting,customer=customer,background_task=background_task)
     else:
         user = CustomerModel(
             identifier=util.generateId(length=6),
@@ -79,8 +88,8 @@ def createUserAccount(db: Session,setting: Setting,payload: CustomerRequest, bac
             )
         createdAccount = authQuery.create_account(db=db, user=user)
         if createdAccount:
-            return generateAndSendOTP(request=request,db=db,setting=setting,background_task=background_task,response=response,customer=createdAccount)
-def generateAndSendOTP(request: Request,db: Session,setting: Setting,background_task:BackgroundTasks,response: Response,customer:CustomerModel):
+            return await generateAndSendOTP(request=request,db=db,setting=setting,background_task=background_task,response=response,customer=createdAccount)
+async def generateAndSendOTP(request: Request,db: Session,setting: Setting,background_task:BackgroundTasks,response: Response,customer:CustomerModel):
     newOtp = authQuery.create_otp(db=db,otp=OTPModel(otp=util.generateOTP(), servicename="openAccount", user_id=customer.id,
                 created_at=datetime.now(),expired_at=(datetime.now() + timedelta(minutes=15)),updated_at=datetime.now(),))
     if newOtp:
