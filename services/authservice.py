@@ -303,7 +303,7 @@ async def deviceUnlockInitiate(
                     background_task.add_task(
                     util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=f"Unlock Device Verification",toAddress=account.email,)
                     authToken = util.create_access_token(setting=setting,credentials={"username":account.phonenumber,"password": password,},exp=15,)
-                    return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"token":authToken[0],"expire":authToken[1],"message":f"Please enter the OTP sent to {account.phonenumber[0:4]}xxxxxx{account.phonenumber[-2:]} to unlock your device"},)
+                    return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"token":authToken[0],"expire":authToken[1],"message":f"Please enter the OTP sent to {util.mask_email(account.email)} to unlock your device"},)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)

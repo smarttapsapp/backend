@@ -228,15 +228,13 @@ async def payments(request: Request,response: Response,setting: Setting,db: Sess
             f"started querying payments from {startDate} to {endDate} for {transactionType}"
         )
         if transactionType:
-            return PaymentsResponse(
-                statusCode= str(status.HTTP_200_OK),
-                statusDescription=SUCCESS,
-                data=queries.getPaymentHistoriesByTransaction(db=db,userId=user.id,startDate=startDate,endDate=endDate,transType=transactionType)
-            )
+            payments = queries.getPaymentHistoriesByTransaction(db=db,userId=user.id,startDate=startDate,endDate=endDate,transType=transactionType)
+        else:
+            payments = queries.getPaymentHistories(db=db,userId=user.id,startDate=startDate,endDate=endDate)
         return PaymentsResponse(
                 statusCode= str(status.HTTP_200_OK),
                 statusDescription=SUCCESS,
-                data=queries.getPaymentHistories(db=db,userId=user.id,startDate=startDate,endDate=endDate)
+                data=[Payment.from_orm(payment).model_dump() for payment in payments]
             )
     except Exception as ex:
         logger.info(ex)
