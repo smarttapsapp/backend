@@ -11,7 +11,7 @@ from schemas.package import *
 from schemas.product_type import *
 from schemas.admin import ProvidersResponse
 from schemas.station import StationsResponse
-from schemas.route import RoutesResponse,RouteResponse
+from schemas.route import RoutesResponse,RouteResponse,TrainRoutesResponse,TrainRouteResponse
 from schemas.bus_route import BusRoutesResponse,BusRouteResponse
 from fastapi import Response,Request,status
 from models.queries import productQuery,queries
@@ -69,7 +69,7 @@ def searchTrainRoutes(response: Response,db: Session,user: Customer,departure: s
             logger.info(f"Searching for {mode} route from {departure} to {arrival}")
             route = queries.getTrainRoutesByStations(db=db,departure=departure,arrival=arrival,mode=mode)
             if route:
-                return RoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=route)
+                return TrainRoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=route)
         if longitude and latitude:
             data = queries.getAvailableTrainRoutes(db=db,latitude=float(latitude),longitude=float(longitude),radius_km=20)
             #datad = queries.getAdminRoutes(db=db,role=AdminRoleEnum.BUSPROVIDER,latitude=float(latitude),longitude=float(longitude),radius_km=5)
@@ -78,14 +78,11 @@ def searchTrainRoutes(response: Response,db: Session,user: Customer,departure: s
             #    admin.routes = [route for route in admin.routes if admin.routes and util.is_within_radius(lat1=float(route.sourceStation.lat),lon1=float(route.sourceStation.long),lat2=float(latitude),lon2=float(longitude),radius_km=50)]
             #    data.append(admin)
             #logger.info(data)
-            if data:
-                return RoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=data)
-        data = productQuery.query_train_routes(db=db,departure=departure,arrival=arrival,seatType=seatType,takeOffTime=operationTime)
-        return RoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=data)
+            return TrainRoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=data)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return RoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+        return TrainRoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 def searchTrainByRoute(routeId:int,mode:str,request: Request,response: Response,setting: Setting,db: Session,user: Customer):
     try:
         logger.info(f"Started searching for train from route {routeId} mode {mode}") 
