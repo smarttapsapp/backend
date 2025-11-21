@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings,SettingsConfigDict
 
 
 class SettingBase(BaseModel):
+    app_name: Union[str, None] = None
     access_token_expire_minutes: int
     secret_key:  Union[str, None] = None
     algorithm:  Union[str, None] = None
@@ -22,6 +23,9 @@ class SettingBase(BaseModel):
     gl_payable:  Union[str, None] = None
     paystack_url:  Union[str, None] = None
     paystack_token:  Union[str, None] = None
+    opay_url:  Union[str, None] = None
+    opay_token:  Union[str, None] = None
+    opay_merchantid:  Union[str, None] = None
 
 
 class SettingRequest(SettingBase):

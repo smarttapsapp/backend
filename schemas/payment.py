@@ -88,6 +88,7 @@ class PaymentResponse(BaseResponse):
     data: Transaction = None
 class FundRequest(BaseModel):
     amount:str
+    merchant:str
 class AutoFundRequest(BaseModel):
     amount:str
     thresholdAmount:str

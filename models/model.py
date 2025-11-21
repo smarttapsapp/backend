@@ -142,6 +142,8 @@ class ChannelEnum(PythonEnum):
     MOBILE = "MOBILE"
     WEB = "WEB"
     PAYSTACK="PAYSTACK"
+    OPAY="OPAY"
+    FLUTTERWAVE="FLUTTERWAVE"
     WALLET="WALLET"
     CARD="CARD"
     NFC="NFC"
@@ -565,6 +567,9 @@ class SettingsModel(Base):
     focus_code = Column(String(8), default="0093")
     paystack_url = Column(String(250), nullable=True)
     paystack_token = Column(String(250), nullable=True)
+    opay_url = Column(String(250), nullable=True)
+    opay_token = Column(String(250), nullable=True)
+    opay_merchantid = Column(String(250), nullable=True)
     gl_cust = Column(String(25), nullable=True)
     cust_gl = Column(String(25), nullable=True)
     gl_inflow= Column(String(25), nullable=True)

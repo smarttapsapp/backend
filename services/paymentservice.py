@@ -76,12 +76,11 @@ def toggleFundThreshold(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-def fundViaPaystack(
+async def fundPurse(
         user:Customer,
-        request: Request,
         db: Session,
         response: Response,
-        setting: Setting,amount:str):
+        setting: Setting,payload:FundRequest):
     try:
         product = queries.getBillByVas(db=db,vasType="payment")
         if product:
@@ -90,45 +89,24 @@ def fundViaPaystack(
                 payment = PaymentModel(
                     wallet_id = user.wallet.id,
                     user_id = user.id,
-                    amount = amount,
-                    channel = ChannelEnum.PAYSTACK,
+                    amount = payload.amount,
+                    channel = ChannelEnum.OPAY if payload.merchant.lower() == "opay" else ChannelEnum.PAYSTACK,
                     product_type_id = creditProductType.id,
                     product_id=product.id,
+                    reference=f"OPAY-{util.generateId()}",
+                    statusCode = TransactionCodeEnum.PENDING,
+                    statusDescription = TransactionStatusEnum.PENDING,
                     recipient=user.wallet.walletAccount,
                     payment_type = PaymentEnum.CREDIT,
                     created_at = datetime.now(),
                     updated_at= datetime.now(),
                 )
                 createdPayment = paymentQuery.create_payment(db=db,payment=payment)
-                appResponse = None
                 if createdPayment:
-                    headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
-                    params = {"email": user.email,"amount": amount}
-                    result = util.http(f"{setting.paystack_url}transaction/initialize",params=params,headers=headers)
-                    if result.status_code == 200:
-                        paystackResponse = result.json()
-                        if paystackResponse and paystackResponse["status"] is True:
-                            createdPayment.reference = paystackResponse["data"]["reference"]
-                            createdPayment.access_code = paystackResponse["data"]["access_code"]
-                            createdPayment.statusCode = TransactionCodeEnum.PROCESSING
-                            createdPayment.statusDescription = TransactionStatusEnum.PROCESSING
-                            createdPayment.statusMessage = paystackResponse["message"]
-                            appResponse = BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=paystackResponse["message"],data=paystackResponse["data"])
-                        else:
-                            response.status_code = status.HTTP_400_BAD_REQUEST
-                            createdPayment.statusCode = str(status.HTTP_400_BAD_REQUEST)
-                            createdPayment.statusMessage = paystackResponse["message"]
-                            appResponse = BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse["message"])
+                    if createdPayment.channel == ChannelEnum.OPAY:
+                        return await paywithopay(user=user,db=db,response=response,setting=setting,payload=payload,payment=createdPayment)
                     else:
-                        response.status_code = status.HTTP_400_BAD_REQUEST
-                        createdPayment.statusCode = str(status.HTTP_400_BAD_REQUEST)
-                        createdPayment.statusMessage = "Failed"
-                        appResponse = BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed")
-                    createdPayment.event = "initialize"
-                    updatePayment = paymentQuery.create_payment(db=db,payment=createdPayment)
-                    if updatePayment:
-                        return appResponse
-                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed")
+                        return await paywithpaystack(user=user,db=db,response=response,setting=setting,payload=payload,payment=createdPayment)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
@@ -138,6 +116,103 @@ def fundViaPaystack(
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def paywithopay(
+        user:Customer,
+        db: Session,
+        response: Response,
+        setting: Setting,payload:FundRequest,payment:PaymentModel):
+    try:
+        headers =  {'Authorization': f'Bearer {setting.opay_token}','MerchantId':setting.opay_merchantid,'content-type': 'application/json'}
+        params = {
+                "country": "NG",
+                "reference": payment.reference,
+                "amount": {
+                    "total": payload.amount,
+                    "currency": "NGN"
+                },
+                "displayName":setting.app_name,
+                "customerVisitSource": "IOS",
+                "evokeOpay":True,
+                "expireAt":300,
+                "sn":"PE462xxxxxxxx",
+                "userInfo":{
+                        "userEmail":user.email,
+                        "userId":user.username,
+                        "userMobile":util.formatPhoneShort(user.phonenumber),
+                        "userName":f"{user.firstname} {user.lastname}"
+                },
+                "product":{
+                    "description":"description",
+                    "name":"name"
+                },
+            }
+        result = util.http(f"{setting.opay_url}international/cashier/create",params=params,headers=headers)
+        if result.status_code == 200:
+            opayResponse = result.json()
+            if opayResponse and opayResponse["code"] == "00000":
+                payment.transactionreference = opayResponse["data"]["orderNo"]
+                payment.access_code = opayResponse["data"]["orderNo"]
+                payment.statusCode = TransactionCodeEnum.PROCESSING
+                payment.statusDescription = TransactionStatusEnum.PROCESSING
+                payment.statusMessage = opayResponse["message"]
+                data = {"authorization_url":opayResponse["data"]["cashierUrl"],"access_code":opayResponse["data"]["orderNo"],"reference":opayResponse["data"]["reference"]}
+                appResponse = BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=opayResponse["message"],data=data)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                payment.statusCode = str(status.HTTP_400_BAD_REQUEST)
+                payment.statusMessage = opayResponse["message"]
+                appResponse = BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=opayResponse["message"])
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            payment.statusCode = str(status.HTTP_400_BAD_REQUEST)
+            payment.statusMessage = "Failed"
+            appResponse = BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed")
+        payment.event = "initialize"
+        updatePayment = paymentQuery.create_payment(db=db,payment=payment)
+        if updatePayment:
+            return appResponse
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed")
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def paywithpaystack(
+        user:Customer,
+        db: Session,
+        response: Response,
+        setting: Setting,payload:FundRequest,payment:PaymentModel):
+    try:
+        headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
+        params = {"email": user.email,"amount": payload.amount}
+        result = util.http(f"{setting.paystack_url}transaction/initialize",params=params,headers=headers)
+        if result.status_code == 200:
+            paystackResponse = result.json()
+            if paystackResponse and paystackResponse["status"] is True:
+                payment.reference = paystackResponse["data"]["reference"]
+                payment.access_code = paystackResponse["data"]["access_code"]
+                payment.statusCode = TransactionCodeEnum.PROCESSING
+                payment.statusDescription = TransactionStatusEnum.PROCESSING
+                payment.statusMessage = paystackResponse["message"]
+                appResponse = BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=paystackResponse["message"],data=paystackResponse["data"])
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                payment.statusCode = str(status.HTTP_400_BAD_REQUEST)
+                payment.statusMessage = paystackResponse["message"]
+                appResponse = BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse["message"])
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            payment.statusCode = str(status.HTTP_400_BAD_REQUEST)
+            payment.statusMessage = "Failed"
+            appResponse = BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed")
+        payment.event = "initialize"
+        updatePayment = paymentQuery.create_payment(db=db,payment=payment)
+        if updatePayment:
+            return appResponse
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed")
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
