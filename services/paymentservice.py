@@ -280,7 +280,8 @@ async def paystackNotification(
                                 updated_at=datetime.now(),
                             )
                             addCard = paymentQuery.create_card(db=db,card=createCard)
-                        background_task.add_task(notifyUser,db=db,title=f"Fund Notification", message=updatedPayment.statusMessage,userId=payment.user_id, setting=setting)
+                        msg = f"Your purse has been funded with ₦{util.kobo_to_naira(int(updatedPayment.amount)):,.2f} successfully."
+                        background_task.add_task(notifyUser,db=db,title=f"Fund Notification", message=msg,userId=payment.user_id, setting=setting)
                         return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,)
                     else:
                         return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=PENDING,)
@@ -343,7 +344,8 @@ async def opayNotification(
                                             balanceAfter =headOffice.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now()))
                             updatedHeadOfficeCredit = queries.create(db=db,model=headOffice)
                             if updatedHeadOfficeCredit:
-                                background_task.add_task(notifyUser,db=db,title=f"Fund Notification", message=updatedPayment.statusMessage,userId=payment.user_id, setting=setting)
+                                msg = f"Your purse has been funded with ₦{util.kobo_to_naira(int(paymentPayload['amount'])):,.2f} successfully."
+                                background_task.add_task(notifyUser,db=db,title=f"Fund Notification", message=msg,userId=payment.user_id, setting=setting)
                                 return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,)
                             else:
                                 return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=PENDING,)

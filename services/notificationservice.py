@@ -88,7 +88,7 @@ def notifyUser(
         customer = queries.customer(db=db,userId=userId)
         if customer:
             if customer.preference:
-                if customer.preference.email:
+                if customer.preference.receive_via_email:
                     email_body = util.templates.TemplateResponse(
                         "notification.html",
                         {"request": None, "user": customer, "message": message},
@@ -99,7 +99,7 @@ def notifyUser(
                         subject=title,
                         toAddress=customer.email,
                     )
-                if customer.preference.sms:
+                if customer.preference.receive_via_sms:
                     util.send_sms_message(
                         setting=setting,
                         toPhoneNumber=customer.phonenumber,
