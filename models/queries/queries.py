@@ -267,8 +267,8 @@ def getPaymentHistoriesByTransaction(db: Session,userId:int,startDate:str,endDat
     if startDate and endDate:
         start = datetime.strptime(startDate, "%Y-%m-%d").date()
         end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
-        return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.payment_type == transType).filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
-    return db.query(PaymentModel).filter(PaymentModel.payment_type == transType).filter(PaymentModel.user_id == userId).order_by(desc(PaymentModel.created_at)).all()
+        return db.query(PaymentModel).filter(PaymentModel.user_id == userId,PaymentModel.event != "initialize").filter(PaymentModel.payment_type == transType).filter(PaymentModel.created_at.between(start,end)).order_by(desc(PaymentModel.created_at)).all()
+    return db.query(PaymentModel).filter(PaymentModel.payment_type == transType).filter(PaymentModel.user_id == userId,PaymentModel.event != "initialize").order_by(desc(PaymentModel.created_at)).all()
 def getAllPaymentsHistories(db: Session,startDate:str,endDate:str,adminId:str=None):
     logger.info(f'started querying payment for {startDate} {endDate} {adminId}')
     if startDate and endDate:

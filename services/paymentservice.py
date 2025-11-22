@@ -200,12 +200,12 @@ async def paywithpaystack(
                 appResponse = BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=paystackResponse["message"],data=paystackResponse["data"])
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
-                payment.statusCode = str(status.HTTP_400_BAD_REQUEST)
+                payment.statusCode = TransactionCodeEnum.FAILED
                 payment.statusMessage = paystackResponse["message"]
                 appResponse = BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse["message"])
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
-            payment.statusCode = str(status.HTTP_400_BAD_REQUEST)
+            payment.statusCode =  TransactionCodeEnum.FAILED
             payment.statusMessage = "Failed"
             appResponse = BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed")
         payment.event = "initialize"
@@ -217,7 +217,7 @@ async def paywithpaystack(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-async def fundNotificationViaPaystack(
+async def paystackNotification(
     request: Request,
     db: Session,
     setting: Setting,
@@ -287,6 +287,84 @@ async def fundNotificationViaPaystack(
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Unable to add fund",)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Config Error",)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def opayNotification(
+    request: Request,
+    db: Session,
+    setting: Setting,
+    response: Response,
+    background_task: BackgroundTasks,):
+    try:
+        json_data = await request.json()
+        logger.info(f"incoming payment from opay {str(json_data)}")
+        headOffice = queries.getHeadofficeAccount(db=db)
+        if headOffice:
+            paymentPayload = json_data.get('payload',None)
+            if json_data.get('type',None) == 'transaction-status' and paymentPayload:
+                payment = paymentQuery.getPaymentByReference(db=db,reference=paymentPayload["reference"])
+                if str(paymentPayload["status"]).upper() == 'SUCCESS':
+                    if payment and payment.event != 'charge.success':
+                        payment.event = 'charge.success'
+                        payment.channel = ChannelEnum.OPAY
+                        payment.payment_date = paymentPayload["updated_at"]
+                        payment.status = paymentPayload["status"]
+                        payment.fee = paymentPayload["fee"]
+                        payment.paystack_id = paymentPayload["transactionId"]
+                        payment.statusCode = TransactionCodeEnum.SUCCESS
+                        payment.statusDescription = TransactionStatusEnum.SUCCESS
+                        payment.statusMessage = TransactionStatusEnum.SUCCESS.value
+                        payment.balanceBefore = payment.wallet.availableBalance
+                        payment.balanceAfter = str(int(payment.wallet.availableBalance)+int(paymentPayload["amount"]))
+                        payment.wallet.availableBalance = str(int(payment.wallet.availableBalance)+int(paymentPayload["amount"]))
+                        payment.updated_at = datetime.now()
+                        payment.wallet.updated_at = datetime.now()
+                        payment.code = setting.gl_outflow
+                        payment.user.hasAuthToken = False
+                        updatedPayment = paymentQuery.create_payment(db=db,payment=payment)
+                        if updatedPayment:
+                            headOffice.wallet.availableBalance = str(int(headOffice.wallet.availableBalance)+int(paymentPayload["amount"]))
+                            headOffice.updated_at = datetime.now()
+                            headOffice.wallet.updated_at = datetime.now()
+                            headOffice.wallet.payments.append(PaymentModel(wallet_id=headOffice.wallet.id,admin_id=headOffice.id,amount = int(paymentPayload["amount"]),
+                                            payment_type =PaymentEnum.CREDIT,reference =f"FUND-{util.generateId()}",code=setting.gl_inflow,
+                                            transactionreference=payment.reference,event = "charge.success",status = "success",channel =ChannelEnum.OPAY,
+                                            fee = paymentPayload["fee"],statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,
+                                            product_type_id = payment.product_type_id,product_id=payment.product_id,recipient=headOffice.wallet.walletAccount,
+                                            statusMessage = payment.statusMessage,balanceBefore =headOffice.wallet.availableBalance,
+                                            balanceAfter =headOffice.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now()))
+                            updatedHeadOfficeCredit = queries.create(db=db,model=headOffice)
+                            if updatedHeadOfficeCredit:
+                                background_task.add_task(notifyUser,db=db,title=f"Fund Notification", message=updatedPayment.statusMessage,userId=payment.user_id, setting=setting)
+                                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,)
+                            else:
+                                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=PENDING,)
+                        else:
+                            return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=PENDING,)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Payment not found or already processed",)
+                else:
+                    payment.event = 'charge.failed'
+                    payment.channel = ChannelEnum.OPAY
+                    payment.payment_date = paymentPayload["updated_at"]
+                    payment.status = paymentPayload["status"]
+                    payment.fee = paymentPayload["fee"]
+                    payment.paystack_id = paymentPayload["transactionId"]
+                    payment.statusCode = TransactionCodeEnum.FAILED
+                    payment.statusDescription = TransactionStatusEnum.FAILED
+                    payment.statusMessage = TransactionStatusEnum.FAILED.value
+                    paymentQuery.create_payment(db=db,payment=payment)
+                    response.status_code = status.HTTP_200_OK
+                    return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=TransactionStatusEnum.FAILED.value,)
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
                 return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

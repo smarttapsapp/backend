@@ -156,7 +156,7 @@ async def fund_wallet_threshold(
 @router.post("/notification",
     response_model=BaseResponse,
     response_model_exclude_unset=True,)
-async def fund_notifications(
+async def paystack_notifications(
     request: Request,
     response: Response,
     setting: Annotated[Setting, Depends(getSystemSetting)],
@@ -164,13 +164,32 @@ async def fund_notifications(
     background_task: BackgroundTasks,
 ):
     try:
-        return await paymentservice.fundNotificationViaPaystack(request=request,db=db,response=response,setting=setting,background_task=background_task)
+        return await paymentservice.paystackNotification(request=request,db=db,response=response,setting=setting,background_task=background_task)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
+        )
+@router.post("/notification/opay",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,)
+async def opay_notifications(
+    request: Request,
+    response: Response,
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await paymentservice.opayNotification(request=request,db=db,response=response,setting=setting,background_task=background_task)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=SYSTEMBUSY,
         )
 # payments
 @router.get("/transactions", 
