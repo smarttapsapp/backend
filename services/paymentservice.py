@@ -93,6 +93,7 @@ async def fundPurse(
                     channel = ChannelEnum.OPAY if payload.merchant.lower() == "opay" else ChannelEnum.PAYSTACK,
                     product_type_id = creditProductType.id,
                     product_id=product.id,
+                    event = "initialize",
                     reference=f"OPAY-{util.generateId()}",
                     statusCode = TransactionCodeEnum.PENDING,
                     statusDescription = TransactionStatusEnum.PENDING,
@@ -168,7 +169,6 @@ async def paywithopay(user:Customer,db: Session,response: Response,setting: Sett
             payment.statusCode = str(status.HTTP_400_BAD_REQUEST)
             payment.statusMessage = "Failed"
             appResponse = BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed")
-        payment.event = "initialize"
         updatePayment = paymentQuery.create_payment(db=db,payment=payment)
         if updatePayment:
             return appResponse
