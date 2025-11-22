@@ -124,6 +124,7 @@ async def paywithopay(
         user:Customer,
         db: Session,
         response: Response,
+        request: Request,
         setting: Setting,payload:FundRequest,payment:PaymentModel):
     try:
         headers =  {'Authorization': f'Bearer {setting.opay_token}','MerchantId':setting.opay_merchantid,'content-type': 'application/json'}
@@ -134,6 +135,7 @@ async def paywithopay(
                     "total": payload.amount,
                     "currency": "NGN"
                 },
+                "returnUrl": f"{setting.app_url}payment/notification/opay",
                 "displayName":setting.app_name,
                 "customerVisitSource": "IOS",
                 "evokeOpay":True,

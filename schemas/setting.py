@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings,SettingsConfigDict
 
 class SettingBase(BaseModel):
     app_name: Union[str, None] = None
+    app_url: Union[str, None] = None
     access_token_expire_minutes: int
     secret_key:  Union[str, None] = None
     algorithm:  Union[str, None] = None

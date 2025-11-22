@@ -540,6 +540,7 @@ class SettingsModel(Base):
     __tablename__ = "settings"
     id = Column(Integer, primary_key=True, index=True)
     app_name = Column(String(255), default="SMART TAP API")
+    app_url = Column(String(250), default="https://api.smarttaps.org/api/v1/")
     channel_name = Column(String(50), default="smart_tap")
     debug = Column(Boolean, default=True)
     db_url = Column(String(100), default="")
