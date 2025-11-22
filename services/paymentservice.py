@@ -120,12 +120,7 @@ async def fundPurse(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-async def paywithopay(
-        user:Customer,
-        db: Session,
-        response: Response,
-        request: Request,
-        setting: Setting,payload:FundRequest,payment:PaymentModel):
+async def paywithopay(user:Customer,db: Session,response: Response,setting: Setting,payload:FundRequest,payment:PaymentModel):
     try:
         headers =  {'Authorization': f'Bearer {setting.opay_token}','MerchantId':setting.opay_merchantid,'content-type': 'application/json'}
         params = {
