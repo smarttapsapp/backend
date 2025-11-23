@@ -15,9 +15,7 @@ def listAllCustomers(db: Session,startDate:str,endDate:str,userId:str=None):
         end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
         if userId:
             return db.query(CustomerModel).filter(CustomerModel.user_id == userId).filter(CustomerModel.created_at.between(start,end)).order_by(desc(CustomerModel.created_at)).all()
-        return db.query(CustomerModel).filter(CustomerModel.created_at.between(start,end)).order_by(desc(CustomerModel.created_at)).all()
-    
-
+        return db.query(CustomerModel).filter(CustomerModel.created_at.between(start,end)).order_by(desc(CustomerModel.created_at)).all()    
 def updateUserBvn(db: Session, userId: int,bvn:str):
     stmt = (update(CustomerModel)
             .where(CustomerModel.id == userId)

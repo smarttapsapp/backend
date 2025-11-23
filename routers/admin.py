@@ -18,6 +18,7 @@ from utils.dependencies import (
 )
 from utils.database import get_db
 from services import adminservice,glAccountingService,productservice,paymentservice
+from schemas.customer import *
 from schemas.admin import *
 from schemas.cashout import *
 from schemas.role import *
@@ -27,7 +28,7 @@ from schemas.bus_route import BusRoutesResponse,AddBusRouteRequest
 from schemas.train import *
 from schemas.bus import BusesResponse,AddBusRequest
 from schemas.park import ParksResponse
-from schemas.ticket import TicketsResponse
+from schemas.ticket import TicketsResponse,TicketResponse
 from schemas.notification import NotificationsResponse
 from schemas.schedule import *
 from schemas.commission import *
@@ -801,6 +802,21 @@ async def get_ticket(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/ticket/{id}", 
+    response_model=TicketResponse,
+    response_model_exclude_unset=True,tags=["ticket"])
+async def get_ticket_details(
+    id:int,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        return await adminservice.getTicketDetail(ticketId=id,response=response,db=db,admin=admin)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return TicketResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 #parks
 @router.get("/parks", 
     response_model=ParksResponse,
@@ -1832,7 +1848,7 @@ async def delete_biller(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-# billers
+# packages
 @router.get("/packages/{billerId}", 
     response_model=PackagesResponse,
     response_model_exclude_unset=True,tags=["package"])
@@ -2355,3 +2371,110 @@ async def get_payment_analytics(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return AdminsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+# customers
+@router.get("/customers", 
+    response_model=CustomersResponse,
+    response_model_exclude_unset=True,tags=["customer"],name="get customer payemnt")
+async def get_customers(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    startDate: str = Query(default=util.get_first_day_of_month()),
+    endDate: Optional[str] = Query(str(date.today())),
+):
+    try:
+        if admin:
+            if startDate and endDate:
+                start = datetime.strptime(startDate, "%Y-%m-%d")
+                end = datetime.strptime(endDate, "%Y-%m-%d")
+                if end < start:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return CustomersResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
+            return await adminservice.listOfCustomer(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                admin=admin,
+                startDate=startDate,
+                endDate=endDate)
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return CustomersResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/customer/{id}", 
+    response_model=CustomerResponse,
+    response_model_exclude_unset=True,tags=["customer"])
+async def get_customer_details(
+    id:int,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        return await adminservice.getCustomerDetail(customerId=id,response=response,db=db,admin=admin)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return CustomerResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/customer/{id}/resetpassword", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["customer"])
+async def reset_customer_password(
+    id:int,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await adminservice.resetCustomerAccountPassword(
+            customerId=id,
+            request=request,
+                response=response,
+                db=db,
+                admin=admin,
+                setting=setting,
+                background_task=background_task,
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.get("/customer/{id}/disable-account", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["customer"])
+async def disable_customer_account(
+    id:int,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await adminservice.toggleCustomerAccountStatus(
+            customerId=id,
+            request=request,
+                response=response,
+                db=db,
+                admin=admin,
+                setting=setting,
+                background_task=background_task,
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )

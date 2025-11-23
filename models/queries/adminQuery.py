@@ -307,3 +307,9 @@ def getCashoutById(db: Session, cashoutId: int):
     return db.query(CashOutModel).filter(CashOutModel.id == cashoutId).first()
 def getPaymentByCashoutId(db: Session, cashoutId: int):
     return db.query(PaymentModel).filter(PaymentModel.cashout_id == cashoutId).first()
+# get customer details
+def getCustomerById(db: Session, customerId: int):
+    return db.query(CustomerModel).filter(CustomerModel.id == customerId).first()
+# get ticket details
+def getTicketById(db: Session, ticketId: int):
+    return db.query(TicketModel).filter(TicketModel.id == ticketId).first()

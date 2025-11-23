@@ -3,7 +3,7 @@ import logging
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from models.model import *
-from models.queries import authQuery,queries,adminQuery
+from models.queries import authQuery,queries,adminQuery,customerQuery
 from datetime import datetime,timedelta
 from schemas import otp
 from utils import util
@@ -22,7 +22,7 @@ from schemas.payment import *
 from schemas.route import RoutesResponse,AddRouteRequest
 from schemas.bus_route import BusRoutesResponse,AddBusRouteRequest
 from services.notificationservice import notifyUser
-from schemas.ticket import TicketsResponse
+from schemas.ticket import TicketsResponse,TicketResponse
 from schemas.bus import BusesResponse,AddBusRequest
 from schemas.park import ParksResponse
 from schemas.train import *
@@ -1466,6 +1466,24 @@ async def listOfTickets(request: Request,response: Response,setting: Setting,db:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TicketsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def getTicketDetail(ticketId: int,response: Response,db: Session,admin: AdminModel):
+    try:
+        logger.info(
+            f"started querying ticket for ID {ticketId} at {datetime.now()}"
+        )
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
+            ticket = adminQuery.getTicketById(db=db,ticketId=ticketId)
+            if ticket:
+                return TicketResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=ticket)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED,)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+
 # notifications
 async def listOfNotifications(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
     try:
@@ -2007,7 +2025,139 @@ async def getCashoutDetail(cashoutId: int,response: Response,db: Session,admin: 
                             "payment":Payment.from_orm(cashoutPayment).model_dump() if cashoutPayment else None
 
                         })
-            return BaseResponse(statusCode= str(status.HTTP_200_OK),statusDescription=FAILED,)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED,)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return CashoutsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+# admin service
+async def listOfCustomer(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
+    try:
+        logger.info(
+            f"started querying customers from {startDate} to {endDate}"
+        )
+        if admin.role.tag == AdminRoleEnum.BUSINESS:
+            return CustomersResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=customerQuery.listAllCustomers(db=db,userId=admin.id,startDate=startDate,endDate=endDate)
+            )
+        else:
+            return CustomersResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=customerQuery.listAllCustomers(db=db,startDate=startDate,endDate=endDate)
+            )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return CustomersResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def getCustomerDetail(customerId: int,response: Response,db: Session,admin: AdminModel):
+    try:
+        logger.info(
+            f"started querying customer for ID {customerId} at {datetime.now()}"
+        )
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
+            customer = adminQuery.getCustomerById(db=db,customerId=customerId)
+            if customer:
+                return CustomerResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=customer)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED,)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def resetCustomerAccountPassword(customerId: int,request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,background_task: BackgroundTasks):
+    try:
+        logger.info(
+            f"started reset password for {customerId} at {datetime.now()}"
+        )
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.SUPPORT,AdminRoleEnum.SUPERADMIN]:
+            customer = adminQuery.getCustomerById(db=db,customerId=customerId)
+            if customer:
+                if customer.account_status == AccountStatusEnum.ACTIVE:
+                    newPassword = util.generateOTP()
+                    logger.info(f"new password is {newPassword}")
+                    customer.password = util.get_password_hash(newPassword)
+                    customer.updated_at = datetime.now()
+                    updatedCustomer = adminQuery.create(db=db,model=customer)
+                    if updatedCustomer:
+                        email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": customer,"otp":newPassword},)
+                        background_task.add_task(
+                        util.mailer,
+                        str(email_body.body, "utf-8"),
+                        setting=setting,
+                        subject=f"Password Reset",
+                        toAddress=customer.email,)
+                        background_task.add_task(notifyUser,db=db,title=f"Password Reset", message=f"Your password request has been completed successfully",userId=customer.id, setting=setting)
+                        return BaseResponse(statusCode= str(status.HTTP_200_OK),statusDescription="Password has been sent to customer",)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription="You cannot reset password for inactive customer",)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED,)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def toggleCustomerAccountStatus(customerId: int,request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,background_task: BackgroundTasks):
+    try:
+        logger.info(
+            f"started rejection for cashout payments from {cashoutId} at {datetime.now()}"
+        )
+        if admin.role.tag in [AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN]:
+            cashout = adminQuery.getCashoutById(db=db,cashoutId=cashoutId)
+            if cashout and cashout.withdrawalStatus == WithrawalStatusEnum.WAITING:
+                cashout.withdrawalStatus = WithrawalStatusEnum.REJECTED
+                cashout.statusCode = TransactionCodeEnum.FAILED
+                cashout.statusDescription = TransactionStatusEnum.FAILED
+                cashout.updated_at = datetime.now()
+                cashout.rejected = f"{admin.firstname} {admin.lastname}"
+                updatedCashout = adminQuery.create(db=db,model=cashout)
+                if updatedCashout:
+                    payment = adminQuery.getPaymentByCashoutId(db=db,cashoutId=cashout.id)
+                    if payment:
+                        newBalance = int(payment.wallet.availableBalance) + int(payment.amount)
+                        payment.wallet.availableBalance = newBalance
+                        payment.wallet.updated_at = datetime.now()
+                        payment.status = "rejected"
+                        payment.statusCode = TransactionCodeEnum.FAILED
+                        payment.statusDescription = TransactionStatusEnum.FAILED
+                        payment.updated_at = datetime.now()
+                        updatedPayment = adminQuery.create(db=db,model=payment)
+                        if updatedPayment:
+                            background_task.add_task(notifyUser,db=db,title=f"Cashout Withdrawal Rejected", message=f"Cashout withdrawal of {payment.amount/100} rejected successfully",userId=payment.admin_id, setting=setting)
+                            return CashoutsResponse(
+                                statusCode= str(status.HTTP_200_OK),
+                                statusDescription="Cashout rejected successfully",
+                            )
+                        else:
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return CashoutsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return CashoutsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return CashoutsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return CashoutsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription="Cashout not eligible for rejection",)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return CashoutsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED,)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST

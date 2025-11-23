@@ -5,6 +5,7 @@ from pydantic import BaseModel,EmailStr,validator,Field
 from schemas.response import BaseResponse
 from schemas.request import PINRequest
 from schemas.account import Account
+from schemas.device import Device
 from utils import util
 
 
@@ -42,6 +43,37 @@ class Customer(CustomerBase):
     autoFund: Union[bool, None] = False
     profile_picture: Union[str, None] = None
     wallet:Union[Account,None] = None
+    id: Optional[int]
+    created_at: Union[datetime, None] = func.now()
+    updated_at: Union[datetime, None] = func.now()
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+class CustomerDetails(CustomerBase):
+    nin: Union[str, None] = None
+    bvn: Union[str, None] = None
+    state_of_origin: Union[str, None] = None
+    lga_of_residence: Union[str, None] = None
+    residence_address: Union[str, None] = None
+    lga: Union[str, None] = None
+    profile_picture: Union[str, None] = None
+    next_of_kin_name: Union[str, None] = None
+    next_of_kin_address: Union[str, None] = None
+    next_of_kin_phone: Union[str, None] = None
+    next_of_kin_relationship: Union[str, None] = None
+    autoFundAmount: Union[float, None] = 0
+    autoFundThreshold: Union[float, None] = 0
+    point_ratings: Union[str, None] = "0"
+    account_ratings: Union[str, None] = "0"
+    account_type: Union[str, None] = "0"
+    account_status: Union[str, None] = "0"
+    date_of_birth: Union[str, None] = "0"
+    autoFund: Union[bool, None] = False
+    profile_picture: Union[str, None] = None
+    wallet:Union[Account,None] = None
+    device: Union[Device, None] = None
+    preferences: Union[dict, None] = None
     id: Optional[int]
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
@@ -95,4 +127,4 @@ class UnlockRequest(BaseModel):
 class CustomersResponse(BaseResponse):
     data: Union[List[Customer],None] = None
 class CustomerResponse(BaseResponse):
-    data: Customer = None
+    data: CustomerDetails = None

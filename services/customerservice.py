@@ -628,25 +628,3 @@ async def addSupportTicketComment(response: Response,db:Session,user:CustomerMod
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 
-# admin service
-def listOfCustomer(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
-    try:
-        logger.info(
-            f"started querying customers from {startDate} to {endDate}"
-        )
-        if admin.role.tag == AdminRoleEnum.BUSINESS:
-            return CustomersResponse(
-                statusCode= str(status.HTTP_200_OK),
-                statusDescription=SUCCESS,
-                data=customerQuery.listAllCustomers(db=db,userId=admin.id,startDate=startDate,endDate=endDate)
-            )
-        else:
-            return CustomersResponse(
-                statusCode= str(status.HTTP_200_OK),
-                statusDescription=SUCCESS,
-                data=customerQuery.listAllCustomers(db=db,startDate=startDate,endDate=endDate)
-            )
-    except Exception as ex:
-        logger.info(ex)
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return CustomersResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
