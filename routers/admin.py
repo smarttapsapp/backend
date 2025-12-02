@@ -3,8 +3,8 @@ from fastapi import (
     Depends,
     status,
     Response,
-    Query,
-    Request,
+    Query,Form,UploadFile,
+    Request,File,
     BackgroundTasks,
 )
 from schemas.response import *
@@ -180,6 +180,52 @@ async def getAdmins(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.post("/change-password",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["customer"])
+async def change_admin_password(
+    payload: ChangePasswordRequest,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    Setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await adminservice.changeAdminPassword(
+                request=request,
+                db=db,
+                response=response,
+                admin=admin,
+                setting=Setting,
+                payload=payload,
+                background_task=background_task,
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.post("/photo/update",response_model=BaseResponse,response_model_exclude_unset=True,)
+async def upload_profile_image(
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+    img: UploadFile = File(...),
+):
+    try:
+        return await adminservice.uploadProfileImage(response=response,db=db,admin=admin,setting=Setting,request=request,background_task=background_task,img=img)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=SYSTEMBUSY,
+        )
+
 # roles
 @router.get("/roles", 
     response_model=RolesResponse,

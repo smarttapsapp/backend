@@ -3,6 +3,8 @@ import logging
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from models.model import *
+from pathlib import Path
+import shutil
 from models.queries import authQuery,queries,adminQuery,customerQuery
 from datetime import datetime,timedelta
 from schemas import otp
@@ -32,7 +34,7 @@ from fastapi import (
     status,
     Response,
     Request,
-    BackgroundTasks,
+    BackgroundTasks,UploadFile
 )
 
 logger = logging.getLogger(__name__)
@@ -436,6 +438,66 @@ async def resetPasswordFinal(db:Session,response:Response,token:str,setting: Set
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def changeAdminPassword(request:Request,db:Session,response:Response,admin:AdminModel,setting: Setting,payload:ChangePasswordRequest, background_task: BackgroundTasks):
+    try:
+        if util.verify_password(payload.oldPassword,admin.password):
+            if payload.password == payload.confirmPassword:
+                admin.password = util.get_password_hash(payload.password)
+                admin.updated_at = datetime.now()
+                updatedAdmin = adminQuery.create(db=db,model=admin)
+                if updatedAdmin:
+                    email_temp = util.templates.TemplateResponse("change_password.html",{"request": request, "user": admin,},)
+                    background_task.add_task(util.mailer,str(email_temp.body, "utf-8"),setting=setting,subject="Change Password",toAddress=admin.email)
+                    response.status_code = status.HTTP_200_OK
+                    return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription="Change Password Successful",)
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Unable to complete Password Change",)
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Error! Password mismatch",)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Invalid Old Password",)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def uploadProfileImage(response: Response,db:Session,admin:AdminModel,setting:Setting,request:Request,background_task:BackgroundTasks,img: UploadFile,
+):
+    try: #
+        logger.info(
+            f"started uploading profile image for admin {admin.firstname} at {datetime.now()}"
+        )
+        logger.info(img.content_type)
+        if img.content_type.startswith("image/"):
+            UPLOAD_DIR = Path("templates/admin")
+            UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+            if admin.photo:
+                filename = Path(admin.photo).name
+                logger.info(filename)
+                file_path = UPLOAD_DIR / filename 
+                logger.info(file_path)
+                if file_path.exists():
+                    file_path.unlink()
+            file_ext = img.filename.split(".")[-1]
+            unique_name = f"{uuid.uuid4().hex}.{file_ext}"
+            file_path = UPLOAD_DIR / unique_name
+            with file_path.open("wb") as buffer:
+                shutil.copyfileobj(img.file, buffer)
+            image_url = f"profiles/{unique_name}"
+            admin.photo = image_url
+            admin.updated_at = datetime.now()
+            saved = adminQuery.create(db=db,model=admin)
+            return  BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription = SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription="Invalid Image",)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+
 #analytics
 async def analytics(
         admin:AdminModel,
@@ -1717,6 +1779,9 @@ async def cashoutWithdrawal(payload:CashoutWithdrawalRequest,response: Response,
             if not admin.cashout_enabled:
                 response.status_code = status.HTTP_400_BAD_REQUEST
                 return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Cashout account not set up",)
+            if not admin.cashout_limit:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Cashout limit not set up",)
             if int(payload.amount)*100 > int(admin.cashout_limit):
                 response.status_code = status.HTTP_400_BAD_REQUEST
                 return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Amount exceeds cashout limit",)

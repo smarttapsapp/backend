@@ -178,6 +178,7 @@ class AdminModel(Base):
     lastname = Column(String(25))
     phonenumber = Column(String(13))
     email = Column(String(255))
+    photo = Column(LONGTEXT, nullable=True)
     password = Column(String(255), nullable=True)
     cashout_enabled = Column(Boolean, default=False)
     cashout_account = Column(String(50), nullable=True)
