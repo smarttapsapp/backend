@@ -257,7 +257,7 @@ def resetPasswordFinal(request:Request,db:Session,response:Response,user:Custome
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-def login(request:Request,db: Session,response: Response,setting: Setting, payload: LoginRequest,device:Device,background_task: BackgroundTasks,):
+async def login(request:Request,db: Session,response: Response,setting: Setting, payload: LoginRequest,device:Device,background_task: BackgroundTasks,):
     user = authQuery.userByEmailOrPhone( db=db,email=payload.username,phonenumber=util.formatPhoneWithDialingCode(payload.username))
     if user:
         if user.device and user.device.imeiNo == device.imeiNo:
@@ -367,7 +367,7 @@ async def deviceUnlockFinal(request: Request,device:Device,db:Session,response:R
     except util.jwt.ExpiredSignatureError:
         logger.error("Token has expired")
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Session expired",)  
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="OTP has expired. Please request a new one",)  
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST

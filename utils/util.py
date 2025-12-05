@@ -346,6 +346,9 @@ def is_within_radius(lat1, lon1, lat2, lon2, radius_km):
     distance = R * c  # distance in km
     logger.info(f"distance {distance} and radius {radius_km}")
     return distance <= radius_km
+PASSWORD_REGEX = re.compile(
+    r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^\w\s]).{8,}$'
+)
 @lru_cache()
 def get_setting():
     return AppSetting()

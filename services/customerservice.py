@@ -389,7 +389,7 @@ async def changepin(
                     return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = FAILED,)
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = "PIN mismatch",)
+                return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = "The PIN you entered is incorrect. Please try again.",)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription ="Invalid Request",)
@@ -428,7 +428,7 @@ async def changepassword(
                     return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = FAILED,)
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = "PIN mismatch",)
+                return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = "The password you entered is incorrect. Please try again.",)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription ="Invalid Request",)
@@ -469,9 +469,9 @@ async def updateNextOfKin(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SYSTEMBUSY, )
-def upgradeAccount(db:Session,user:CustomerModel,setting:Setting,request:Request,background_task:BackgroundTasks):
+async def upgradeAccount(db:Session,user:CustomerModel,setting:Setting,request:Request,background_task:BackgroundTasks):
     try:
-        if user.bvn_verified and user.nin_verified and user.email_verified:
+        if user.bvn_verified and user.nin_verified and user.email_verified and user.is_next_of_kin:
             user.account_type = AccountEnum.MERCHANT
             user.account_ratings = AccountRatingEnum.SILVER
             updated = queries.create(db=db, model=user)

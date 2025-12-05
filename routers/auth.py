@@ -211,7 +211,7 @@ async def login(
     background_task: BackgroundTasks,
 ):
     try:
-        return authservice.login(
+        return await authservice.login(
             request=request,
             db=db,
             response=response,

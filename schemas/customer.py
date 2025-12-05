@@ -1,7 +1,7 @@
 from typing import Optional, Union,List
 from datetime import datetime
 from sqlalchemy import func
-from pydantic import BaseModel,EmailStr,validator,Field
+from pydantic import BaseModel,EmailStr,validator,Field,field_validator,model_validator
 from schemas.response import BaseResponse
 from schemas.request import PINRequest
 from schemas.account import Account
@@ -87,21 +87,42 @@ class LoginRequest(BaseModel):
     username: str
     password: str  
 class OTPRequest(BaseModel):
-    otp: str
+    otp: str= Field(pattern="^[0-9]+$", max_length=6, min_length=6)
 class CreatePINRequest(BaseModel):
-    pin: str = Field(examples=["0000"], pattern="^[0-9]+$", max_length=4, min_length=4)
-    confirmPin: str = Field(
-        examples=["0000"], pattern="^[0-9]+$", max_length=4, min_length=4
-    )
+    pin: str = Field(pattern="^[0-9]+$", max_length=4, min_length=4)
+    confirmPin: str = Field( pattern="^[0-9]+$", max_length=4, min_length=4)
+    @model_validator(mode="after")
+    def check_pin_match(self):
+        if self.pin != self.confirmPin:
+            raise ValueError("PIN mismatch")
+        return self
 class ForgetPasswordRequest(BaseModel):
     email: EmailStr
 class ResetPasswordRequest(BaseModel):
     otp: str 
     password: str 
     confirmPassword: str 
+    @field_validator("password")
+    def validate_password(cls, v):
+        if not util.PASSWORD_REGEX.match(v):
+            raise ValueError(
+                "Password must contain at least: 1 uppercase, 1 lowercase, "
+                "1 number, 1 special character, and be at least 8 characters long"
+            )
+        return v
+    @model_validator(mode="after")
+    def check_passwords_match(self):
+        if self.password != self.confirmPassword:
+            raise ValueError("Password and Confirm Password must match")
+        return self
 class ChangePINRequest(PINRequest):
-    newPin: str
-    confirmPin: str
+    newPin: str= Field(pattern="^[0-9]+$", max_length=4, min_length=4)
+    confirmPin: str= Field(pattern="^[0-9]+$", max_length=4, min_length=4)
+    @model_validator(mode="after")
+    def check_passwords_match(self):
+        if self.newPin != self.confirmPin:
+            raise ValueError("PIN and Confirm PIN must match")
+        return self
 class VerificationRequest(BaseModel):
     action:str
     nin: Optional[str]=None
@@ -115,6 +136,19 @@ class ChangePasswordRequest(BaseModel):
     oldPassword: str
     password: str
     confirmPassword: str
+    @field_validator("password")
+    def validate_password(cls, v):
+        if not util.PASSWORD_REGEX.match(v):
+            raise ValueError(
+                "Password must contain at least: 1 uppercase, 1 lowercase, "
+                "1 number, 1 special character, and be at least 8 characters long"
+            )
+        return v
+    @model_validator(mode="after")
+    def check_passwords_match(self):
+        if self.password != self.confirmPassword:
+            raise ValueError("Password and Confirm Password must match")
+        return self
 class NextOfKinRequest(BaseModel):
     fullName: str
     address: str
