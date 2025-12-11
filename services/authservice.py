@@ -292,7 +292,7 @@ async def deviceUnlockInitiate(
         account = authQuery.userByEmailOrPhone(db=db,email=payload.username,phonenumber=util.formatPhoneWithDialingCode(payload.username))
         if account:
             logger.info(f"Verify user with transaction PIN @  {datetime.now()}.....................")
-            if util.verify_password(payload.pin,account.pin):
+            if account.pin and util.verify_password(payload.pin,account.pin):
                 logger.info(f"Account is fine go and check bvn/nin @  {datetime.now()}.....................")
                 if payload.action.lower() == "unlock":
                     otp = util.generateOTP()

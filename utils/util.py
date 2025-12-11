@@ -349,6 +349,20 @@ def is_within_radius(lat1, lon1, lat2, lon2, radius_km):
 PASSWORD_REGEX = re.compile(
     r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^\w\s]).{8,}$'
 )
+def validate_strong_password(v: str) -> str:
+    if len(v) < 10:
+        raise ValueError("Password must be at least 10 characters")
+    if any(ch.isspace() for ch in v):
+        raise ValueError("Password cannot contain spaces")
+    if not any(ch.isupper() for ch in v):
+        raise ValueError("Password must contain at least one uppercase")
+    if not any(ch.islower() for ch in v):
+        raise ValueError("Password must contain at least one lowercase")
+    if not any(ch.isdigit() for ch in v):
+        raise ValueError("Password must contain at least one digit")
+    if not any(ch in "!@#$%^&*()_-+=" for ch in v):
+        raise ValueError("Password must contain at least one special character")
+    return v
 @lru_cache()
 def get_setting():
     return AppSetting()

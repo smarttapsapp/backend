@@ -82,7 +82,14 @@ class CustomerDetails(CustomerBase):
         from_attributes = True
         populate_by_name = True
 class CustomerRequest(CustomerBase):
-    pass
+    @field_validator("password")
+    def validate_password(cls, v):
+        if not util.PASSWORD_REGEX.match(v):
+            raise ValueError(
+                "Password must contain at least: 1 uppercase, 1 lowercase, "
+                "1 number, 1 special character, and be at least 8 characters long"
+            )
+        return util.validate_strong_password(v)
 class LoginRequest(BaseModel):
     username: str
     password: str  
@@ -109,7 +116,8 @@ class ResetPasswordRequest(BaseModel):
                 "Password must contain at least: 1 uppercase, 1 lowercase, "
                 "1 number, 1 special character, and be at least 8 characters long"
             )
-        return v
+        
+        return util.validate_strong_password(v)
     @model_validator(mode="after")
     def check_passwords_match(self):
         if self.password != self.confirmPassword:
@@ -143,7 +151,7 @@ class ChangePasswordRequest(BaseModel):
                 "Password must contain at least: 1 uppercase, 1 lowercase, "
                 "1 number, 1 special character, and be at least 8 characters long"
             )
-        return v
+        return util.validate_strong_password(v)
     @model_validator(mode="after")
     def check_passwords_match(self):
         if self.password != self.confirmPassword:
