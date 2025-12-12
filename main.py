@@ -42,6 +42,16 @@ mobileApp.mount("/static", StaticFiles(directory="templates"), name="static")
 @mobileApp.exception_handler(util.UnicornException)
 async def unicorn_exception_handler(request: Request, exc: util.UnicornException):
     return JSONResponse(status_code=exc.status,content=exc.name, )
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    first_error = exc.errors()[0]["msg"] if exc.errors() else "Invalid input"
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={
+            "statusCode": str(status.HTTP_400_BAD_REQUEST),
+            "statusDescription": f"{exc.errors()[0]['loc'][1]}:{first_error}",
+        },
+    )
 
 # admin API
 app.include_router(admin.router,prefix="/admin")
