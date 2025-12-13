@@ -5,6 +5,7 @@ from pydantic import BaseModel,validator,model_validator
 from schemas.response import BaseResponse
 from schemas.route import Route
 from schemas.admin import AdminMini
+from models.model import BusStatusEnum
 from schemas.bus_schedule import BusSchedule
 
 
@@ -17,6 +18,8 @@ class BusBase(BaseModel):
     airCondition: Union[bool, None] = False
     billerId: Optional[str]=None
     identifier: Union[str, None] = None
+    bus_capacity: Optional[int]=0
+    availabilityStatus:Optional[str]=BusStatusEnum.ACTIVE
     provider:Union[AdminMini, None] = None
     @validator("bus_number")
     def bus_number_validator(cls, bus_number:str):
@@ -71,9 +74,11 @@ class MiniBus(BaseModel):
 class AddBusRequest(BusBase):
     id: Optional[int]=None
     identifier: Optional[int]=None
-    #busschedules:List[int]
     schedules:List[dict]
     routes:List[dict]
+class SwapBusRequest(BaseModel):
+    id: int
+    swapBusNumber: str
 class BusesResponse(BaseResponse):
     data: Union[List[Bus],None] = None    
 class BusResponse(BaseResponse):

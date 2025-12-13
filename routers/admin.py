@@ -1751,6 +1751,36 @@ async def delete_discount(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+@router.patch("/discount/{id}/toggle", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["discount"])
+async def toggle_discount(
+    id:int,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await glAccountingService.toggleDiscount(
+            setting=setting,
+            id=id,
+            db=db,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+
 # products
 @router.get("/products", 
     response_model=ProductsResponse,

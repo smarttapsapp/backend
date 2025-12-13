@@ -10,14 +10,12 @@ from sqlalchemy import (
     Text,
     DECIMAL,func,UniqueConstraint,Date, cast,
 )
-from sqlalchemy.orm import backref, relationship
+from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.dialects.mysql import LONGTEXT
 from datetime import timedelta
 import uuid
 from utils.constant import *
-
-# from utils.database import Base
 from enum import Enum as PythonEnum
 
 Base = declarative_base()
@@ -58,6 +56,13 @@ class MovableEnum(PythonEnum):
     BUS = "bus"
     TRAIN = "train"
     AEROPLANE = "plane"
+class BusStatusEnum(PythonEnum):
+    TRANSIT = "transit"
+    BOARDING = "boarding"
+    ACTIVE = "active"
+    OPEN = "open"
+    CLOSED = "closed"
+    INACTIVE = "inactive"
 class AccountEnum(PythonEnum):
     INDIVIDUAL = "individual"
     AGENT = "agent"
@@ -513,6 +518,7 @@ class PaymentModel(Base):
     statusDescription =  Column(Enum(TransactionStatusEnum), nullable=False, default=TransactionStatusEnum.PROCESSING)
     balanceBefore = Column(String(25), default='0')
     balanceAfter = Column(String(25), default='0')
+    provider_code = Column(String(10), nullable=True)
     product_id = Column(Integer, ForeignKey('products.id'))
     product = relationship("ProductModel",  back_populates="payments")
     product_type_id = Column(Integer, ForeignKey('product_types.id'))
@@ -807,8 +813,10 @@ class BusModel(Base):
     tv = Column(Boolean, default=False)
     isdelete = Column(Boolean, default=False)
     base_price = Column(String(25), nullable=True)
-    availabilityStatus = Column(Boolean, default=False)
+    availabilityStatus = Column(Enum(BusStatusEnum), nullable=False, default=BusStatusEnum.ACTIVE)
     busImage = Column(String(255), nullable=True)
+    bus_capacity = Column(String(25),nullable=True,default="0")
+    swap_bus = Column(String(25),nullable=True)
     provider = relationship("AdminModel", back_populates="buses")
     routes = relationship('BusRouteModel',back_populates='bus',cascade="all, delete-orphan")
     schedules =  relationship("BusScheduleModel", back_populates="bus",cascade="all, delete-orphan")

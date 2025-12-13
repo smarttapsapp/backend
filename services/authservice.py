@@ -273,7 +273,7 @@ async def login(request:Request,db: Session,response: Response,setting: Setting,
                 response.status_code = status.HTTP_400_BAD_REQUEST
                 return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT)
         else:
-            response.status_code = status.HTTP_401_UNAUTHORIZED
+            response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode=str(status.HTTP_401_UNAUTHORIZED),statusDescription=DEVICEMISMATCH)
     else:
         response.status_code = status.HTTP_400_BAD_REQUEST

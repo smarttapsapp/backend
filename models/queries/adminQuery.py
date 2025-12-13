@@ -280,6 +280,8 @@ def getProductBillersById(db: Session,productId:int):
     return db.query(ProductTypeModel).filter(ProductTypeModel.product_id == productId).filter(ProductTypeModel.status == True).order_by(desc(ProductTypeModel.created_at)).all()
 def getProductBillerById(db: Session,id:int):
     return db.query(ProductTypeModel).filter(ProductTypeModel.id == id).filter(ProductTypeModel.status == True).first()
+def getProductTypeByProvider(db: Session,provider:str):
+    return db.query(ProductTypeModel).filter(ProductTypeModel.provider == provider).filter(ProductTypeModel.status == True).first()
 def deleteBiller(db: Session ,id:int):
     return db.query(ProductTypeModel).filter(ProductTypeModel.id == id).delete()
 #packages

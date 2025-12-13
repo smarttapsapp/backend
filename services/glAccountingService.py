@@ -182,6 +182,7 @@ async def debitTransaction(response:Response,setting: Setting,db: Session,biller
                     customerAccount.payments.append(PaymentModel(wallet_id = customerAccount.id,user_id =customerAccount.user_id, amount = int(amount),
                                      payment_type =PaymentEnum.DEBIT,reference =trnxId,
                                      event = "charge.success",
+                                     provider_code= biller.provider,
                                      status = "success",channel =ChannelEnum.MOBILE,providerAmount = provider_cost,statusCode = TransactionCodeEnum.PROCESSING,
                                      statusDescription = TransactionStatusEnum.PROCESSING,commissionAmount = commissionAmount,
                                      product_type_id = biller.id,product_id=biller.product_id,recipient=customerAccount.walletAccount,
@@ -195,6 +196,7 @@ async def debitTransaction(response:Response,setting: Setting,db: Session,biller
                         serviceProvider.admin.wallet.payments.append(PaymentModel(wallet_id = serviceProvider.admin.wallet.id,admin_id = serviceProvider.admin_id, amount = int(provider_cost),
                                      payment_type =PaymentEnum.CREDIT,reference =f"{str(biller.billerId[:2]).upper()}-{util.generateId()}",
                                      transactionreference=trnxId,event = "charge.success",status = "success",channel =ChannelEnum.MOBILE,
+                                     provider_code= biller.provider,
                                      statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,product_type_id = biller.id,product_id=biller.product_id,
                                      recipient=serviceProvider.admin.wallet.walletAccount,statusMessage = remark,balanceBefore = serviceProvider.admin.wallet.availableBalance,
                                      balanceAfter = serviceProvider.admin.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now()),)
@@ -206,6 +208,7 @@ async def debitTransaction(response:Response,setting: Setting,db: Session,biller
                             merchant.wallet.payments.append(PaymentModel(wallet_id=merchant.wallet.id,admin_id=merchant.id,amount = int(commissionAmount),
                                      payment_type =PaymentEnum.CREDIT,reference =f"{str(biller.billerId[:2]).upper()}-{util.generateId()}",
                                      transactionreference=trnxId,event = "charge.success",status = "success",channel =ChannelEnum.MOBILE,
+                                     provider_code= biller.provider,
                                      fee = provider_cost,statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,product_type_id = biller.id,product_id=biller.product_id,
                                      recipient=merchant.wallet.walletAccount,statusMessage = remark,balanceBefore =merchant.wallet.availableBalance,
                                      balanceAfter =merchant.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now()))
@@ -216,6 +219,7 @@ async def debitTransaction(response:Response,setting: Setting,db: Session,biller
                                 headoffice.wallet.updated_at = datetime.now()
                                 headoffice.wallet.payments.append(PaymentModel(wallet_id = headoffice.wallet.id,admin_id =headoffice.id,amount = int(netIncome),
                                      payment_type =PaymentEnum.CREDIT,reference =f"{str(biller.billerId[:2]).upper()}-{util.generateId()}",
+                                     provider_code= biller.provider,
                                      event = "charge.success",payment_date = datetime.now().date(),status = "success",channel = ChannelEnum.MOBILE,
                                      fee = provider_cost,statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,product_type_id = biller.id,product_id=biller.product_id,
                                      recipient=headoffice.wallet.walletAccount,statusMessage = remark,balanceBefore = headoffice.wallet.availableBalance,
@@ -334,11 +338,16 @@ async def debitBusTransaction(request: Request,response:Response,setting: Settin
                                         price = int(payload.amount),
                                         ticket_number = ticketId,
                                         booked_at =datetime.now(),
-                                        expired_at =datetime.now()+timedelta(days=2),
+                                        expired_at =datetime.now(),
                                         created_at =datetime.now(),
                                         updated_at = datetime.now()
                                     )
                                     createTicketRecord = adminQuery.create(db=db,model=ticket)
+                                    if createTicketRecord:
+                                        bus.bus_capacity = int(bus.bus_capacity) -1
+                                        if bus.bus_capacity == 0:
+                                            bus.availabilityStatus = BusStatusEnum.CLOSED
+                                        updatedBus = adminQuery.create(db=db,model=bus)
                                     return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":createTicketRecord.ticket_number})
                                 else:
                                     logger.info(f"Unable to credit system wallet at {datetime.now()}")
@@ -730,22 +739,54 @@ async def addDiscount(db: Session,setting: Setting,payload: AddProviderRateReque
                 logger.info(f"started updating ledger {payload.id} at {datetime.now()}")
                 existing.provider_discount_rate = payload.provider_discount_rate
                 existing.provider_discount_type = payload.provider_discount_type
-                existing.active = payload.active
                 existing.updated_at = datetime.now()
                 created = adminQuery.disableServiceProviderByProduct(db=db,productId=existing.product_type_id,active=not payload.active,model=existing)
+                if created:
+                    updated = queries.create(db=db,model=existing)
+                    if updated:
+                        email_body = util.templates.TemplateResponse("service_discount.html",{"request": request, "user": admin,},)
+                        background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=subject,toAddress=admin.email,)
+                        return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Service discount not not active")
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Service discount not not active")
             else:
-                subject = "New Service Provider Discount"
-                logger.info(f"started creating new service provider discount @ {datetime.now()}")
-                existing = ServiceRateModel(admin_id=payload.admin_id,product_type_id=payload.product_type_id,provider_discount_type=payload.provider_discount_type,provider_discount_rate=payload.provider_discount_rate,active=payload.active,gl_to_provider=payload.gl_to_provider,created_at=datetime.now(),updated_at=datetime.now(),)
-                newlycreated = queries.create(db=db,model=existing)
-                created = adminQuery.disableServiceProviderByProduct(db=db,productId=existing.product_type_id,active=not payload.active,model=newlycreated)
-            if created:
-                email_body = util.templates.TemplateResponse("service_discount.html",{"request": request, "user": admin,},)
-                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=subject,toAddress=admin.email,)
-                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
-            else:
-                response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+                provider = adminQuery.getAdmin(db=db,adminId=payload.admin_id)
+                if provider:
+                    productType = adminQuery.getProductBillerById(db=db,id=payload.product_type_id)
+                    if productType:
+                        productType.provider = provider.billerId
+                        productType.updated_at = datetime.now()
+                        subject = "New Service Provider Discount"
+                        logger.info(f"started creating new service provider discount @ {datetime.now()}")
+                        newDiscount = ServiceRateModel(admin_id=payload.admin_id,product_type_id=productType.id,provider_discount_type=payload.provider_discount_type,provider_discount_rate=payload.provider_discount_rate,active=payload.active,gl_to_provider=payload.gl_to_provider,created_at=datetime.now(),updated_at=datetime.now(),)
+                        newlycreated = queries.create(db=db,model=newDiscount)
+                        if newlycreated:
+                            updatedProduct = queries.create(db=db,model=productType)
+                            if updatedProduct:
+                                created = adminQuery.disableServiceProviderByProduct(db=db,productId=productType.id,active=not payload.active,model=newlycreated)
+                                if created:
+                                    email_body = util.templates.TemplateResponse("service_discount.html",{"request": request, "user": admin,},)
+                                    background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=subject,toAddress=admin.email,)
+                                    return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                                else:
+                                    response.status_code = status.HTTP_400_BAD_REQUEST
+                                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Service discount not not active")
+                            else:
+                                response.status_code = status.HTTP_400_BAD_REQUEST
+                                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Product update failed")
+                        else:
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Service discount not configured")
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
         else:
             response.status_code = status.HTTP_401_UNAUTHORIZED
             return BaseResponse(statusCode = str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED)
@@ -761,6 +802,49 @@ async def deleteDiscount(db: Session,response: Response, background_task: Backgr
             if existing:
                 response.status_code = status.HTTP_200_OK
                 return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def toggleDiscount(db: Session,response: Response, setting: Setting,background_task: BackgroundTasks, request: Request,admin:AdminModel,id: int):
+    try:
+        logger.info(f"started deleting Discount {id} @ {datetime.now()}")
+        subject = "Update Service Provider Discount"
+        if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ACCOUNTANT]:
+            existing = adminQuery.getServiceProviderById(db=db,id=id)
+            if existing:
+                provider = adminQuery.getAdmin(db=db,adminId=existing.admin_id)
+                if provider:
+                    productType = adminQuery.getProductBillerById(db=db,id=existing.product_type_id)
+                    if productType:
+                        if existing.active:
+                            if provider.billerId == productType.provider:
+                                response.status_code = status.HTTP_400_BAD_REQUEST
+                                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="You cannot deactivate discount currently in use")
+                            else:
+                                existing.active = not existing.active
+                                existing.updated_at = datetime.now()
+                        else:
+                            existing.active = not existing.active
+                            existing.updated_at = datetime.now()
+                        updated = queries.create(db=db,model=existing)
+                        if updated:
+                            email_body = util.templates.TemplateResponse("service_discount.html",{"request": request, "user": admin,},)
+                            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=subject,toAddress=admin.email,)
+                            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                        else:
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDBILLER)
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
         response.status_code = status.HTTP_400_BAD_REQUEST

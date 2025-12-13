@@ -813,7 +813,7 @@ async def debitBusTicket(db:Session,request:Request,response:Response,setting:Se
         if user.wallet.walletAccount == payload.walletAccount:
             bus = queries.busById(db=db,busId=payload.busId)
             if bus:
-                if bus.availabilityStatus:
+                if bus.availabilityStatus in [BusStatusEnum.BOARDING,BusStatusEnum.ACTIVE,BusStatusEnum.OPEN]:
                     product = adminQuery.getBillerByBillerId(db=db,billerId=bus.billerId)
                     if product:
                         if int(user.wallet.availableBalance) > int(payload.amount):
@@ -837,7 +837,7 @@ async def debitBusTicket(db:Session,request:Request,response:Response,setting:Se
                 else:
                     logger.info(f"Bus {payload.busId} is not available for {user.firstname}")
                     response.status_code = status.HTTP_400_BAD_REQUEST
-                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Bus not available")
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Bus currently not available at the moment")
             else:
                 logger.info(f"Invalid bus selected {payload.busId} for {user.firstname}")
                 response.status_code = status.HTTP_400_BAD_REQUEST

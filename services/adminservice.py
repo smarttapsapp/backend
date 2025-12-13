@@ -497,7 +497,6 @@ async def uploadProfileImage(response: Response,db:Session,admin:AdminModel,sett
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-
 #analytics
 async def analytics(
         admin:AdminModel,
@@ -544,7 +543,6 @@ async def analytics(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
-
 # admin service
 async def listOfAdmins(response: Response,db: Session,admin: AdminModel):
     try:
@@ -655,7 +653,6 @@ async def deleteRole(db: Session, background_task: BackgroundTasks, request: Req
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
-
 # transport service
 async def listOfParks(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
     try:
@@ -760,6 +757,7 @@ async def addBus(db: Session,setting: Setting,payload: AddBusRequest, background
                 previous.base_price = payload.base_price
                 previous.camera = payload.camera
                 previous.name = payload.name
+                previous.bus_capacity=payload.bus_capacity
                 previous.description = payload.description
                 previous.billerId = admin.billerId
                 previous.routes = busRoutes
@@ -774,7 +772,7 @@ async def addBus(db: Session,setting: Setting,payload: AddBusRequest, background
                 if busRoutes:
                     schedules = [BusScheduleModel(identifier=util.generateId(length=6),admin_id =admin.id,price = int(schedule['price'])*100,departureTime = schedule['departureTime'],arrivalTime = schedule['arrivalTime'],timeOfOperation = schedule['timeOfOperation'],created_at=datetime.now(),updated_at=datetime.now(),isdelete=False,) for schedule in payload.schedules]
                     logger.info(schedules)
-                    previous = BusModel(identifier=util.generateId(length=6),admin_id=admin.id,name=payload.name,bus_number=payload.bus_number,description=payload.description,tv=payload.tv,camera=payload.camera,airCondition=payload.airCondition,base_price=int(payload.base_price)*100,availabilityStatus=True,created_at=datetime.now(),updated_at=datetime.now(),billerId=admin.billerId,isdelete=False,schedules=schedules,routes=busRoutes)
+                    previous = BusModel(identifier=util.generateId(length=6),admin_id=admin.id,name=payload.name,bus_number=payload.bus_number,description=payload.description,tv=payload.tv,camera=payload.camera,airCondition=payload.airCondition,bus_capacity=payload.bus_capacity,base_price=int(payload.base_price)*100,availabilityStatus=BusStatusEnum.ACTIVE,created_at=datetime.now(),updated_at=datetime.now(),billerId=admin.billerId,isdelete=False,schedules=schedules,routes=busRoutes)
                     created = queries.create(db=db, model=previous)
                     if created:
                         email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
@@ -884,6 +882,8 @@ async def editBus(db: Session,setting: Setting,payload: AddBusRequest, backgroun
         existing.name = payload.name
         existing.airCondition = payload.airCondition
         existing.tv = payload.tv
+        existing.bus_capacity=payload.bus_capacity
+        existing.availabilityStatus = payload.availabilityStatus
         existing.base_price = int(payload.base_price)*100
         existing.camera = payload.camera
         existing.description = payload.description
@@ -1075,7 +1075,6 @@ async def deleteSeat(db: Session, background_task: BackgroundTasks, request: Req
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
-
 # trains
 async def listOfTrains(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
     try:
