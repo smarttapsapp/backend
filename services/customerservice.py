@@ -1,4 +1,5 @@
 
+import json
 import logging
 from sqlalchemy.orm import Session
 from models.model import *
@@ -115,9 +116,10 @@ async def submitEmailForVerification(
                 )
             createdOtp = queries.create(db=db,model=otpModel)
             if createdOtp:
+                device = json.loads(request.headers.get("device")) if request.headers.get("device") else {}
                 email_body = util.templates.TemplateResponse(
                         "otp.html",
-                        {"request": request, "user": userRecord,"otp":createdOtp},
+                        {"request": request, "device": device, "user": userRecord,"otp":createdOtp},
                     )
                 background_task.add_task(
                         util.mailer,
@@ -173,9 +175,10 @@ async def bvnverification(
                 expired_at=(datetime.now() + timedelta(minutes=5)))
             createdOtp = queries.create(db=db,model=otpModel)
             if createdOtp:
+                device = json.loads(request.headers.get("device")) if request.headers.get("device") else {}
                 email_body = util.templates.TemplateResponse(
                         "otp.html",
-                        {"request": request, "user": user,"otp":createdOtp},
+                        {"request": request, "device": device, "user": user,"otp":createdOtp},
                     )
                 background_task.add_task(
                         util.mailer,
@@ -227,7 +230,8 @@ async def ninverification(
                 expired_at=(datetime.now() + timedelta(minutes=5)))
             createdOtp = queries.create(db=db,model=otpModel)
             if createdOtp:
-                email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": userRecord,"otp":createdOtp},)
+                device = json.loads(request.headers.get("device")) if request.headers.get("device") else {}
+                email_body = util.templates.TemplateResponse("otp.html",{"request": request, "device": device, "user": userRecord,"otp":createdOtp},)
                 background_task.add_task(
                         util.mailer,
                         str(email_body.body, "utf-8"),

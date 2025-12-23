@@ -20,7 +20,9 @@
   {{otp.otp}}
 </div>
 
-<p>This OTP will expire in <strong>{{ otp.expired_at }} minutes</strong>.</p>
+<p>
+  This OTP will expire in <strong>{{ otp.expired_at - now() }} minutes</strong>.
+</p>
 
 <table class="table">
   <tr>
@@ -29,11 +31,11 @@
   </tr>
   <tr>
     <td><strong>Device</strong></td>
-    <td>{{ request.headers.get("device")["modelName"] }}</td>
+    <td>{{ device.modelName }}</td>
   </tr>
   <tr>
-    <td><strong>Time</strong></td>
-    <td>{{ now() }}</td>
+    <td><strong>Maker</strong></td>
+    <td>{{ device.manufacturer }}</td>
   </tr>
 </table>
 

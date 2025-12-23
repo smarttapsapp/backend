@@ -2145,7 +2145,7 @@ async def resetCustomerAccountPassword(customerId: int,request: Request,response
             customer = adminQuery.getCustomerById(db=db,customerId=customerId)
             if customer:
                 if customer.account_status == AccountStatusEnum.ACTIVE:
-                    newPassword = util.generateOTP()
+                    newPassword = util.generate_password()
                     logger.info(f"new password is {newPassword}")
                     customer.password = util.get_password_hash(newPassword)
                     customer.updated_at = datetime.now()
