@@ -64,14 +64,21 @@
   <body>
     <div class="container">
       <div class="header">
-        <div class="logo">{{ company_name }}</div>
+        <div class="logo">Smart Tap</div>
       </div>
 
       <div class="content">{% block content %}{% endblock %}</div>
 
       <div class="footer">
+        <!-- Logo -->
+        <img
+          src="https://smarttaps.org/wp-content/uploads/2025/06/cropped-Smarttap-official-logo.png"
+          alt="Smart Tap"
+          width="120"
+          style="margin-bottom: 10px; display: block"
+        />
         <p>This is an automated message. Please do not reply.</p>
-        <p>© {{ current_year }} {{ company_name }}. All rights reserved.</p>
+        <p>© {{ current_year }} Smart Tap. All rights reserved.</p>
       </div>
     </div>
   </body>
