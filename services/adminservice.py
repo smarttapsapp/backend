@@ -129,7 +129,7 @@ async def createUserAccount(db: Session,setting: Setting,payload: CreateAdminReq
         logger.info("started creating new admin account")
         role = adminQuery.getRole(db=db,roleId=payload.tag)
         if role:
-            password = util.generateOTP()
+            password = util.generate_password()
             logger.info(f"New admin created {payload.firstname} with password {password}")
             newAdmin = AdminModel(
                     firstname=payload.firstname,
@@ -182,7 +182,7 @@ def updateAccount(db: Session,setting: Setting,payload: CreateAdminRequest, back
         logger.info("started creating new admin account")
         role = adminQuery.getRole(db=db,roleId=payload.tag)
         if role:
-            password = util.generateOTP
+            password = util.generate_password()
             newAdmin = AdminModel(
                     firstname=payload.firstname,
                     lastname=payload.lastname,
@@ -1759,7 +1759,7 @@ async def cashoutLimitChange(payload:CashoutLimitRequest,response: Response,requ
                 updated_at=datetime.now(),)
             newOtp = adminQuery.create(db=db,model=otpModel)
             if newOtp:
-                email_otp = util.templates.TemplateResponse("otp.html",{"request": request, "user": admin,"otp":otpDigits,"service":"Cashout Limit Change"},)
+                email_otp = util.templates.TemplateResponse("otp.html",{"request": request, "user": admin,"otp":newOtp,"service":"Cashout Limit Change"},)
                 background_task.add_task(util.mailer,str(email_otp.body, "utf-8"),setting=setting,subject="OTP for Cashout Limit Change",toAddress=admin.email)
                 return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription="OTP sent to your registered email",data={"otpRequired":True})
             else:
@@ -1801,7 +1801,7 @@ async def cashoutWithdrawal(payload:CashoutWithdrawalRequest,response: Response,
                 updated_at=datetime.now(),)
             newOtp = adminQuery.create(db=db,model=otpModel)
             if newOtp:
-                email_otp = util.templates.TemplateResponse("otp.html",{"request": request, "user": admin,"otp":otpDigits,"service":"Cashout Limit Change"},)
+                email_otp = util.templates.TemplateResponse("otp.html",{"request": request, "user": admin,"otp":newOtp,"service":"Cashout Limit Change"},)
                 background_task.add_task(util.mailer,str(email_otp.body, "utf-8"),setting=setting,subject="OTP for Cashout Limit Change",toAddress=admin.email)
                 return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription="OTP sent to your registered email",data={"otpRequired":True})
             else:

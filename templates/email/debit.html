@@ -1,17 +1,36 @@
+{% extends "base.html" %}
 <!-- Include the footer  -->
-{% include 'include/header.html' %}
+{% block content %}
+<p>Hello {{user.lastname}} {{user.firstname}},</p>
 
-<p>Dear {{user.lastname}} {{user.firstname}},<br>
-   A debit transaction just occurred on your account <br>
-   <ul>
-    <li>ACCOUNT : {{user.wallet.walletAccount}}</li>
-    <li>AMOUNT : {{payment.amount}}</li>
-    <li>STATUS : {{payment.status}}</li>
-    <li>DESCRIPTION : {{payment.statusMessage}}</li>
-    <li>TRANSACTION REFERENCE : {{payment.reference}}</li>
-    <li>TRANSACTION DATE : {{payment.created_at}}</li>
-   </ul>
+<p>A debit transaction has occurred on your account.</p>
+
+<div class="amount failed">{{payment.amount}}</div>
+
+<table class="table">
+  <tr>
+    <td><strong>Account</strong></td>
+    <td>{{user.wallet.walletAccount}}</td>
+  </tr>
+  <tr>
+    <td><strong>Merchant</strong></td>
+    <td>{{ payment.reference }}</td>
+  </tr>
+  <tr>
+    <td><strong>Transaction ID</strong></td>
+    <td>{{payment.reference}}</td>
+  </tr>
+  <tr>
+    <td><strong>Date</strong></td>
+    <td>{{ payment.created_at }}</td>
+  </tr>
+  <tr>
+    <td><strong>Balance</strong></td>
+    <td>{{payment.statusMessage}}</td>
+  </tr>
+</table>
+
+<p>
+  If you do not recognize this transaction, please contact support immediately.
 </p>
-
-<!-- Include the footer  -->
-{% include 'include/footer.html' %}
+{% endblock %}

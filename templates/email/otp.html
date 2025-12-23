@@ -1,16 +1,53 @@
-<!DOCTYPE html>
-<html lang="en">
-  <!-- Include the footer  -->
-  {% include 'include/header.html' %}
+{% extends "base.html" %}
+<!-- Include the footer  -->
+{% block content %}
+<p>Hello {{user.firstname}} {{user.lastname}},</p>
 
-  <body>
-    <p>
-      Dear {{user.firstname}} {{user.lastname}},<br />
-      Kindly enter OTP {{otp}} to complete your activation or verification
-      process<br />
-    </p>
+<p>
+  Use the one-time password (OTP) below for your activation or verification.
+</p>
 
-    <!-- Include the footer  -->
-    {% include 'include/footer.html' %}
-  </body>
-</html>
+<div
+  style="
+    margin: 24px 0;
+    text-align: center;
+    font-size: 28px;
+    letter-spacing: 6px;
+    font-weight: bold;
+    color: #1a73e8;
+  "
+>
+  {{otp.otp}}
+</div>
+
+<p>This OTP will expire in <strong>{{ otp.expired_at }} minutes</strong>.</p>
+
+<table class="table">
+  <tr>
+    <td><strong>Request Type</strong></td>
+    <td>{{ purpose | title }}</td>
+  </tr>
+  <tr>
+    <td><strong>IP Address</strong></td>
+    <td>{{ request.client.host }}</td>
+  </tr>
+  <tr>
+    <td><strong>Device</strong></td>
+    <td>{{ request.headers.get("user-agent") }}</td>
+  </tr>
+  <tr>
+    <td><strong>Time</strong></td>
+    <td>{{ now() }}</td>
+  </tr>
+</table>
+
+<p style="margin-top: 16px">
+  If you did not initiate this request, please ignore this email or contact
+  support immediately.
+</p>
+
+<p style="margin-top: 12px; font-size: 13px; color: #c62828">
+  <strong>Do not share this code with anyone.</strong> Our staff will never ask
+  for your OTP.
+</p>
+{% endblock %}

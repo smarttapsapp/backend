@@ -52,7 +52,6 @@ def deleteNotification(db: Session,response:Response,userId:int,notificationId:i
         return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,)
     response.status_code = status.HTTP_400_BAD_REQUEST
     return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,)
-
 def createNotification(
         request: Request,
         response: Response,

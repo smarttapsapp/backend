@@ -117,7 +117,7 @@ async def submitEmailForVerification(
             if createdOtp:
                 email_body = util.templates.TemplateResponse(
                         "otp.html",
-                        {"request": request, "user": userRecord,"otp":createdOtp.otp},
+                        {"request": request, "user": userRecord,"otp":createdOtp},
                     )
                 background_task.add_task(
                         util.mailer,
@@ -129,7 +129,7 @@ async def submitEmailForVerification(
                 response.status_code = status.HTTP_200_OK
                 return BaseResponse(
                     statusCode =str(status.HTTP_200_OK),
-                   statusDescription = SUCCESS, )
+                   statusDescription = "An OTP has been sent to your email address for verification", )
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
                 return BaseResponse(
@@ -175,7 +175,7 @@ async def bvnverification(
             if createdOtp:
                 email_body = util.templates.TemplateResponse(
                         "otp.html",
-                        {"request": request, "user": user,"otp":createdOtp.otp},
+                        {"request": request, "user": user,"otp":createdOtp},
                     )
                 background_task.add_task(
                         util.mailer,
@@ -185,7 +185,7 @@ async def bvnverification(
                         toAddress=user.email,
                     )
                 response.status_code = status.HTTP_200_OK
-                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription = SUCCESS)
+                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription = "An OTP has been sent to your email address for verification")
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
                 return BaseResponse(
@@ -227,7 +227,7 @@ async def ninverification(
                 expired_at=(datetime.now() + timedelta(minutes=5)))
             createdOtp = queries.create(db=db,model=otpModel)
             if createdOtp:
-                email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": userRecord,"otp":to_otp},)
+                email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": userRecord,"otp":createdOtp},)
                 background_task.add_task(
                         util.mailer,
                         str(email_body.body, "utf-8"),
@@ -236,7 +236,7 @@ async def ninverification(
                         toAddress=user.email,
                     )
                 response.status_code = status.HTTP_200_OK
-                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription = SUCCESS)
+                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription = "An OTP has been sent to your email address for verification")
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
                 return BaseResponse(
@@ -290,7 +290,7 @@ async def handleOTPVerification(
                                 background_task.add_task(notifyUser,db=db,title=f"{payload.action.capitalize()} Verification", message=f"Your {payload.action.capitalize()} Verification Successful",userId=user.id, setting=setting)
                                 background_task.add_task(upgradeAccount,db=db,user=userRecord,setting=setting,request=request,background_task=background_task)
                                 email_body = util.templates.TemplateResponse(
-                                        "success.html",{"request": request, "user": userRecord,"message":f"Your {payload.action.capitalize()} Verification Successful"},
+                                        "success.html",{"request": request, "user": userRecord,"message":f"Your {payload.action} Verification was Successful"},
                                     )
                                 background_task.add_task(
                                         util.mailer,
@@ -461,7 +461,7 @@ async def updateNextOfKin(
             background_task.add_task(notifyUser,db=db,title=f"Next Of Kin Update", message=f"Your Next of Kin details was submitted successfuly.",userId=user.id, setting=setting)
             background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="Next Of Kin",toAddress=user.email,)
             response.status_code = status.HTTP_200_OK
-            return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription = SUCCESS)
+            return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription = "You have successfully updated your next of kin details.")
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = UPDATEACCTERR,)
@@ -479,7 +479,7 @@ async def upgradeAccount(db:Session,user:CustomerModel,setting:Setting,request:R
                 background_task.add_task(notifyUser,db=db,title=f"Account Upgrade", message=ACCOUNTUPGRADE,userId=user.id, setting=setting)
                 role = queries.getRoleByTag(db=db,tag=AdminRoleEnum.BUSINESS)
                 if role:
-                    password = util.generateOTP()
+                    password = util.generate_password()
                     merchant = AdminModel(
                     firstname=user.firstname,
                     lastname=user.lastname,

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>{{ subject }}</title>
+    <style>
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        background-color: #f4f6f8;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 600px;
+        margin: 24px auto;
+        background: #ffffff;
+        padding: 24px;
+        border-radius: 8px;
+      }
+      .header {
+        border-bottom: 1px solid #eaeaea;
+        padding-bottom: 12px;
+        margin-bottom: 20px;
+      }
+      .logo {
+        font-weight: bold;
+        font-size: 20px;
+        color: #1a73e8;
+      }
+      .content {
+        color: #333;
+        line-height: 1.6;
+        font-size: 14px;
+      }
+      .amount {
+        font-size: 22px;
+        font-weight: bold;
+        margin: 16px 0;
+      }
+      .success {
+        color: #2e7d32;
+      }
+      .failed {
+        color: #c62828;
+      }
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+      }
+      .table td {
+        padding: 8px 0;
+        border-bottom: 1px solid #f0f0f0;
+      }
+      .footer {
+        margin-top: 24px;
+        font-size: 12px;
+        color: #777;
+        border-top: 1px solid #eaeaea;
+        padding-top: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="logo">{{ company_name }}</div>
+      </div>
+
+      <div class="content">{% block content %}{% endblock %}</div>
+
+      <div class="footer">
+        <p>This is an automated message. Please do not reply.</p>
+        <p>© {{ current_year }} {{ company_name }}. All rights reserved.</p>
+      </div>
+    </div>
+  </body>
+</html>

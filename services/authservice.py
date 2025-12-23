@@ -65,7 +65,7 @@ async def createUserAccount(db: Session,setting: Setting,payload: CustomerReques
             if latestOtp.expired_at > datetime.now():
                 authToken = util.create_access_token(setting=setting,credentials={"username": customer.email,"password": latestOtp.otp},exp=60)
                 if authToken:
-                    email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": customer,"otp":latestOtp.otp},)
+                    email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": customer,"otp":latestOtp},)
                     background_task.add_task(
                     util.mailer,
                     str(email_body.body, "utf-8"),
@@ -95,7 +95,7 @@ async def generateAndSendOTP(request: Request,db: Session,setting: Setting,backg
     if newOtp:
         authToken = util.create_access_token(setting=setting,credentials={"username": customer.email,"password": newOtp.otp},exp=60)
         if authToken:
-            email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": customer,"otp":newOtp.otp},)
+            email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": customer,"otp":newOtp},)
             background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=f"Verification",toAddress=customer.email,)
         return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=f"Please enter the OTP sent to {util.mask_email(customer.email)} to complete your registration",data={"token":authToken[0],"expires":authToken[1] })
     else:
@@ -204,7 +204,7 @@ def resetPasswordInitiate(
             if createdOTP:
                 authToken = util.create_access_token(setting=setting,credentials={"username": user.email,"password": createdOTP.otp},exp=10)
                 if authToken:
-                    email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": user,"otp":createdOTP.otp},)
+                    email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": user,"otp":createdOTP},)
                     background_task.add_task(
                     util.mailer,
                     str(email_body.body, "utf-8"),
@@ -299,7 +299,7 @@ async def deviceUnlockInitiate(
                     password = f"{otp}|{device.imeiNo}|{device.modelName}|{device.manufacturer}"
                     newOtp = OTPModel(otp=otp,user_id=account.id,status=OTPStatusEnum.OPEN,servicename="unlockInitiate",created_at=datetime.now(),expired_at=datetime.now()+timedelta(minutes=5),updated_at=datetime.now(),)
                     createdOTP = authQuery.create_otp(db=db,otp=newOtp)
-                    email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": account,"otp":createdOTP.otp},)
+                    email_body = util.templates.TemplateResponse("otp.html",{"request": request, "user": account,"otp":createdOTP},)
                     background_task.add_task(
                     util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=f"Unlock Device Verification",toAddress=account.email,)
                     authToken = util.create_access_token(setting=setting,credentials={"username":account.phonenumber,"password": password,},exp=15,)

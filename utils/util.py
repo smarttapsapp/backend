@@ -8,6 +8,7 @@ import json
 import secrets
 import base64
 import bcrypt
+import string
 from functools import lru_cache
 from typing import Union
 from fastapi.templating import Jinja2Templates
@@ -279,6 +280,34 @@ def stringToHex(string):
         st = st + hex(ord(d))[2:]
     logger.info(st)
     return st
+def generate_password(length: int = 8) -> str:
+    if length < 8:
+        raise ValueError("Password length must be at least 8")
+
+    lowercase = string.ascii_lowercase
+    uppercase = string.ascii_uppercase
+    digits = string.digits
+    special = "!@#$%^&*()-_=+[]{}|;:,.<>?/"
+
+    # Ensure at least one from each category
+    password_chars = [
+        secrets.choice(lowercase),
+        secrets.choice(uppercase),
+        secrets.choice(digits),
+        secrets.choice(special),
+    ]
+
+    # Fill remaining length
+    all_chars = lowercase + uppercase + digits + special
+    password_chars += [
+        secrets.choice(all_chars)
+        for _ in range(length - len(password_chars))
+    ]
+
+    # Shuffle for randomness
+    secrets.SystemRandom().shuffle(password_chars)
+
+    return "".join(password_chars)
 def create_access_token(setting: Setting, credentials: dict, exp:Union[int,None]=20):
     encoded_credentials = credentials.copy()
 
