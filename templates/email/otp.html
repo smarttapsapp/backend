@@ -24,16 +24,12 @@
 
 <table class="table">
   <tr>
-    <td><strong>Request Type</strong></td>
-    <td>{{ purpose | title }}</td>
-  </tr>
-  <tr>
     <td><strong>IP Address</strong></td>
-    <td>{{ request.client.host }}</td>
+    <td>{{ request.headers.get("x-real-ip") }}</td>
   </tr>
   <tr>
     <td><strong>Device</strong></td>
-    <td>{{ request.headers.get("user-agent") }}</td>
+    <td>{{ request.headers.get("device")["modelName"] }}</td>
   </tr>
   <tr>
     <td><strong>Time</strong></td>
