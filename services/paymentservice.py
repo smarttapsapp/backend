@@ -538,29 +538,30 @@ async def debitNfc(
 ):
     biller = util.find_item(product.billers,"billerId","debit")
     if biller:
-        trnxId = f"{str(biller.billerId[:2]).upper()}-{util.generateId()}"
+        debitReference = f"{str(biller.billerId[:2]).upper()}-{payload.transactionId}"
         # debit customer
         logger.info(f"started debit for customer account {sender.walletAccount} at {datetime.now()}")
         sender.availableBalance = int(sender.availableBalance) - int(payload.amount)
         sender.updated_at = datetime.now()
         sender.payments.append(PaymentModel(
             wallet_id = sender.id,user_id =sender.user_id, amount = int(payload.amount),
-            payment_type =PaymentEnum.DEBIT,reference =trnxId,
+            payment_type =PaymentEnum.DEBIT,reference =payload.transactionId,
             event = "charge.success",status = "success",channel =ChannelEnum.NFC,providerAmount = 0,
             statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,
-            commissionAmount = 0,transactionreference=trnxId,product_type_id = biller.id,product_id=biller.product_id,
+            commissionAmount = 0,transactionreference=debitReference,product_type_id = biller.id,product_id=biller.product_id,
             recipient=sender.walletAccount,statusMessage = payload.description,balanceBefore = sender.availableBalance,
             balanceAfter = sender.availableBalance,created_at =datetime.now(),updated_at = datetime.now())),
         logger.info(f"balance after debit posted successfully is {sender.availableBalance}")
         savedSender = adminQuery.save(db=db,account=sender)
         if savedSender:
+            creditReference = f"CR-{payload.transactionId}"
             background_task.add_task(notificationservice.sendNotification,notificationType="debit",setting=setting,background_task=background_task)
             recipient.availableBalance = int(recipient.availableBalance) + int(payload.amount)
             recipient.updated_at = datetime.now()
             recipient.payments.append(PaymentModel(
                 wallet_id = recipient.id,user_id = recipient.user_id,amount = int(payload.amount),
-                payment_type =PaymentEnum.CREDIT,reference =f"{str(biller.billerId[:2]).upper()}-{util.generateId()}",
-                transactionreference=trnxId,commissionAmount = 0,fee = 0,
+                payment_type =PaymentEnum.CREDIT,reference = payload.transactionId,
+                transactionreference=creditReference,commissionAmount = 0,fee = 0,
                 event = "charge.success",status = "success",channel = ChannelEnum.NFC,
                 statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,
                 product_type_id = biller.id,product_id=biller.product_id,
@@ -571,7 +572,7 @@ async def debitNfc(
             savedRecipient = adminQuery.create(db=db,model=recipient)
             if savedRecipient:
                 background_task.add_task(notificationservice.sendNotification,notificationType="credit",setting=setting,background_task=background_task)
-                return BaseResponse(statusCode="00",statusDescription=SUCCESS,data={"transactionId":trnxId})
+                return BaseResponse(statusCode="00",statusDescription=SUCCESS,data={"transactionId":debitReference})
             logger.info(f"unable to credit recipient at {datetime.now()}")
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)
