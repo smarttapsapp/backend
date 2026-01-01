@@ -287,6 +287,8 @@ def getListOfcashout(db: Session,startDate:str,endDate:str,adminId:str=None):
         return db.query(CashOutModel).filter(CashOutModel.created_at.between(start,end)).order_by(desc(CashOutModel.created_at)).all()    
 def paymentByTransactionNumber(db:Session,mode:PaymentEnum,transactionId:str,userId=int):
     return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.reference == transactionId).filter(PaymentModel.payment_type == mode).first()
+def queryNFCPayment(db:Session,mode:PaymentEnum,transactionId:str,userId=int):
+    return db.query(PaymentModel).filter(PaymentModel.user_id == userId).filter(PaymentModel.transactionreference == transactionId).filter(PaymentModel.payment_type == mode).first()
 def ticketByTicketNumber(db:Session,mode:TicketModeEnum,ticketId:str):
     return db.query(TicketModel).filter(TicketModel.ticket_number == ticketId).filter(TicketModel.mode == mode).first()
 def getTicketHistories(db: Session,userId:int,startDate:str=None,endDate:str=None):

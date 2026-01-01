@@ -412,15 +412,15 @@ async def fund_wallet_nfc(
 async def confirm_nfc_payment(
     request: Request,
     response: Response,
-    user: Annotated[Customer, Depends(verified_user)],
+    user: Annotated[CustomerModel, Depends(verified_user)],
     setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     transactionId: Optional[str] = Query(None),
 ):
     try:
         if transactionId:
-            #time.sleep(5)  # Simulate a delay for processing
-            return await paymentservice.getSinglePayment(
+            time.sleep(3)  # Simulate a delay for processing
+            return await paymentservice.debitNfcConfirmation(
                 request=request,
                 response=response,
                 setting=setting,

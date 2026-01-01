@@ -545,10 +545,10 @@ async def debitNfc(
         sender.updated_at = datetime.now()
         sender.payments.append(PaymentModel(
             wallet_id = sender.id,user_id =sender.user_id, amount = int(payload.amount),
-            payment_type =PaymentEnum.DEBIT,reference =payload.transactionId,
+            payment_type =PaymentEnum.DEBIT,reference =debitReference,
             event = "charge.success",status = "success",channel =ChannelEnum.NFC,providerAmount = 0,
             statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,
-            commissionAmount = 0,transactionreference=debitReference,product_type_id = biller.id,product_id=biller.product_id,
+            commissionAmount = 0,transactionreference=payload.transactionId,product_type_id = biller.id,product_id=biller.product_id,
             recipient=sender.walletAccount,statusMessage = payload.description,balanceBefore = sender.availableBalance,
             balanceAfter = sender.availableBalance,created_at =datetime.now(),updated_at = datetime.now())),
         logger.info(f"balance after debit posted successfully is {sender.availableBalance}")
@@ -560,8 +560,8 @@ async def debitNfc(
             recipient.updated_at = datetime.now()
             recipient.payments.append(PaymentModel(
                 wallet_id = recipient.id,user_id = recipient.user_id,amount = int(payload.amount),
-                payment_type =PaymentEnum.CREDIT,reference = payload.transactionId,
-                transactionreference=creditReference,commissionAmount = 0,fee = 0,
+                payment_type =PaymentEnum.CREDIT,reference = creditReference,
+                transactionreference=payload.transactionId,commissionAmount = 0,fee = 0,
                 event = "charge.success",status = "success",channel = ChannelEnum.NFC,
                 statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,
                 product_type_id = biller.id,product_id=biller.product_id,
@@ -582,6 +582,36 @@ async def debitNfc(
     logger.info(f"service not configured at {datetime.now()}")
     response.status_code = status.HTTP_400_BAD_REQUEST
     return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SERVICEERROR)    
+async def debitNfcConfirmation(
+    request: Request,
+    response: Response,
+    setting: Setting,
+    db: Session,
+    user: CustomerModel,
+    transactionId: str ,
+    transactionType: str ,
+):
+    try:
+        logger.info(f"started transaction querying for {transactionId}")
+        payment = queries.queryNFCPayment(db=db,mode=PaymentEnum[transactionType.upper()],transactionId=transactionId,userId=user.id)
+        if payment:
+            return PaymentResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=Transaction.from_orm(payment)
+            )
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return PaymentResponse(
+               statusCode=str(status.HTTP_404_NOT_FOUND),
+               statusDescription=UNKNOWNTRANSACTION,
+        )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return PaymentResponse(
+               statusCode=str(status.HTTP_400_BAD_REQUEST),
+               statusDescription=SYSTEMBUSY,
+        )
 async def billerEnquiry(
         payload:BillNameEnquiryRequest,
         request: Request,

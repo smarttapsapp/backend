@@ -24,6 +24,7 @@ from schemas.payment import *
 from schemas.route import RoutesResponse,AddRouteRequest
 from schemas.bus_route import BusRoutesResponse,AddBusRouteRequest
 from services.notificationservice import notifyUser
+from services import productservice
 from schemas.ticket import TicketsResponse,TicketResponse
 from schemas.bus import BusesResponse,AddBusRequest
 from schemas.park import ParksResponse
@@ -155,6 +156,18 @@ async def createUserAccount(db: Session,setting: Setting,payload: CreateAdminReq
                 )
             createdAccount = adminQuery.create(db=db, model=newAdmin)
             if createdAccount:
+                if role.tag in [AdminRoleEnum.BUSPROVIDER, AdminRoleEnum.TRAINPROVIDER]:
+                    product = adminQuery.getProductByVas(db=db,vas="transport")
+                    if product:
+                        addproduct = AddProductTypeRequest(
+                            billerId=newAdmin.billerId,
+                            billerName=f"{newAdmin.lastname} {newAdmin.firstname}",
+                            billerType="transport",
+                            product_id=product.id,customerField="Phone Number",
+                            hasAddons=False,hasLookup=False,hasPackages=False,
+                            status=True,
+                            )
+                        await productservice.addBiller(db=db,setting=setting,payload=addproduct, background_task=background_task, request=request,response=response,admin=newAdmin)
                 email_body = util.templates.TemplateResponse(
                     "onboarding.html",
                     {"request": request, "user": newAdmin,"password":password},

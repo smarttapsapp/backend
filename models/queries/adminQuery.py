@@ -271,6 +271,8 @@ def getProducts(db: Session):
     return db.query(ProductModel).filter(ProductModel.status == True).all()
 def getProductById(db: Session,id:int):
     return db.query(ProductModel).filter(ProductModel.id == id).filter(ProductModel.status == True).first()
+def getProductByVas(db: Session,vas:int):
+    return db.query(ProductModel).filter(ProductModel.vasType == vas).filter(ProductModel.status == True).first()
 def deleteProduct(db: Session ,id:int):
     return db.query(ProductModel).filter(ProductModel.id == id).delete()
 # billers
