@@ -274,13 +274,13 @@ async def login(request:Request,db: Session,response: Response,setting: Setting,
                     return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=f"Your account is {user.account_status}")
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT)
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Username or password is incorrect")
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode=str(status.HTTP_401_UNAUTHORIZED),statusDescription=DEVICEMISMATCH)
     else:
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT)
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Username or password is incorrect")
 async def deviceUnlockInitiate(
         payload:UnlockRequest,
         device:Device,
