@@ -271,15 +271,19 @@ async def handleOTPVerification(
         )
         if payload.action:
             otpQuery = ""
+            message=""
             if payload.action.lower() == "nin":
                 user.nin_verified = True
+                message = "NIN sucessfully verified"
                 otpQuery = "ninVerification"
             if payload.action.lower() == "bvn":
                 user.bvn_verified = True
                 otpQuery = "bvnVerification"
+                message = "NIN sucessfuly verified"
             if payload.action.lower == "email":
                 user.email_verified = True
                 otpQuery = "emailVerification"
+                message = "Email sucessfully verified"
             latestOtp = queries.get_latest_otp_by_servicename(userId=user.id,servicename=otpQuery,db=db)
             if latestOtp:
                 current_datetime = datetime.now()
@@ -291,7 +295,7 @@ async def handleOTPVerification(
                             latestOtp.updated_at = current_datetime
                             createdOtp = queries.create(db=db,model=latestOtp)
                             if createdOtp:
-                                background_task.add_task(notifyUser,db=db,title=f"{payload.action.capitalize()} Verification", message=f"Your {payload.action.capitalize()} Verification Successful",userId=user.id, setting=setting)
+                                #background_task.add_task(notifyUser,db=db,title=f"{payload.action.capitalize()} Verification", message=f"Your {payload.action.capitalize()} Verification Successful",userId=user.id, setting=setting)
                                 background_task.add_task(upgradeAccount,db=db,user=userRecord,setting=setting,request=request,background_task=background_task)
                                 email_body = util.templates.TemplateResponse(
                                         "success.html",{"request": request, "user": userRecord,"message":f"Your {payload.action} Verification was Successful"},
@@ -300,13 +304,13 @@ async def handleOTPVerification(
                                         util.mailer,
                                         str(email_body.body, "utf-8"),
                                         setting=setting,
-                                        subject=f"{payload.action.capitalize()} Verification Successful",
+                                        subject=message,
                                         toAddress=user.email,
                                     )
                                 response.status_code = status.HTTP_200_OK
                                 return BaseResponse(
                                     statusCode =str(status.HTTP_200_OK),
-                                   statusDescription = SUCCESS,
+                                   statusDescription = message,
     
                                 )
                             else:
@@ -544,7 +548,7 @@ async def uploadProfileImage(response: Response,db:Session,user:CustomerModel,se
             user.profile_picture = image_url
             user.updated_at = datetime.now()
             saved = queries.create(db=db,model=user)
-            return  BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription = SUCCESS)
+            return  BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription ="Profile photo uploaded successfully")
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription="Invalid Image",)
@@ -566,7 +570,7 @@ async def listOfSupportTickets(request: Request,response: Response,setting: Sett
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return SupportTicketsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-async def openSupportTicket(response: Response,db:Session,user:CustomerModel,setting:Setting,request:Request,background_task:BackgroundTasks,payload:SupportTicketRequest,attachment: UploadFile,
+async def openSupportTicket(response: Response,db:Session,user:CustomerModel,setting:Setting,request:Request,background_task:BackgroundTasks,payload:SupportTicketRequest,attachment: UploadFile=None,
 ):
     try: #
         logger.info(
@@ -581,8 +585,7 @@ async def openSupportTicket(response: Response,db:Session,user:CustomerModel,set
                 created_at = datetime.now(),
                 updated_at = datetime.now()
             )
-        logger.info(attachment.content_type)
-        if attachment.content_type.startswith("image/"):
+        if attachment and attachment.content_type.startswith("image/"):
             UPLOAD_DIR = Path("templates/tickets")
             UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
             file_ext = attachment.filename.split(".")[-1]
@@ -602,15 +605,14 @@ async def openSupportTicket(response: Response,db:Session,user:CustomerModel,set
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-async def addSupportTicketComment(response: Response,db:Session,user:CustomerModel,setting:Setting,request:Request,background_task:BackgroundTasks,payload:SupportTicketCommentRequest,attachment: UploadFile,
+async def addSupportTicketComment(response: Response,db:Session,user:CustomerModel,setting:Setting,request:Request,background_task:BackgroundTasks,payload:SupportTicketCommentRequest,attachment: UploadFile=None,
 ):
     try: #
         logger.info(
             f"started commenting on ticket {payload.ticket_id} for {user.firstname} at {datetime.now()}"
         )
         img = None
-        logger.info(attachment.content_type)
-        if attachment.content_type.startswith("image/"):
+        if attachment and  attachment.content_type.startswith("image/"):
             UPLOAD_DIR = Path("templates/tickets")
             UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
             file_ext = attachment.filename.split(".")[-1]

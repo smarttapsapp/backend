@@ -1,6 +1,6 @@
-<!-- Include the footer  -->
-{% include 'include/header.html' %}
-
+{% extends "base.html" %}
+<!-- Include the base  -->
+{% block content %}
 <h2>Hello {{ user.firstname }} {{ user.lastname }},</h2>
 
 <p>Your cashout withdrawal of {{amount}} was successful.</p>
@@ -9,5 +9,4 @@
 
 <p>If this is not initiated by you. Please contact support.</p>
 
-<!-- Include the footer  -->
-{% include 'include/footer.html' %}
+{% endblock %}

@@ -1,10 +1,6 @@
+{% extends "base.html" %}
 <!-- Include the footer  -->
-{% include 'include/header.html' %}
-
-<p>
-  Dear {{user.lastname}} {{user.firstname}},<br /><br />
-  {{message}} <br />
-</p>
-
-<!-- Include the footer  -->
-{% include 'include/footer.html' %}
+{% block content %}
+<p>Hello {{user.firstname}} {{user.lastname}},</p>
+<p>{{message}}</p>
+{% endblock %}

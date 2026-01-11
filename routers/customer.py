@@ -406,7 +406,7 @@ async def open_support_ticket(
     Setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
-    attachment: UploadFile = File(...),
+    attachment: Optional[UploadFile] = File(None),
     subject: str = Form(...),
     description: str = Form(...),
     priority: str = Form(...),
