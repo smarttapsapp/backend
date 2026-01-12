@@ -431,7 +431,7 @@ async def support_ticket_comment(
     Setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
-    attachment: UploadFile = File(...),
+    attachment: Optional[UploadFile] = File(None),
     ticketId: str = Form(...),
     comment: str = Form(...),
 ):

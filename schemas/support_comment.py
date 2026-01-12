@@ -10,7 +10,7 @@ class SupportCommentBase(BaseModel):
 
 class SupportComment(SupportCommentBase):
     id: Optional[int] = None
-    attachment: Optional[str] = None
+    attachment: Union[str, None] = None
     ticket_id: Optional[int]
     user_id: Optional[int] = None
     admin_id: Optional[int] = None
