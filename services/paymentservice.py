@@ -1104,6 +1104,10 @@ async def addCashoutRecipient(
                     if paystackResponse and paystackResponse["status"] is True:
                         recipientData = paystackResponse.get("data", {})
                         if recipientData:
+                            user.cashout_account = recipientData["details"]["account_number"]
+                            user.cashout_bank= recipientData["details"]["bank_name"]
+                            user.cashout_enabled = True
+                            user.cashout_code = recipientData["recipient_code"]
                             user.wallet.cashout_enabled = True
                             user.wallet.cashout_account = payload.accountNumber
                             user.wallet.cashout_code = recipientData.get("recipient_code")
