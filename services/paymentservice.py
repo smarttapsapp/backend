@@ -1118,7 +1118,7 @@ async def addCashoutRecipient(
                                 background_task.add_task(notifyUser,db=db,title=f"Cashout Recipient Added", message=f"Cashout recipient {user.firstname}{user.lastname} added successfully",userId=user.id, setting=setting)
                                 email_debit = util.templates.TemplateResponse("cashout_setup.html",{"request": request, "user": user,"recipient":recipientData},)
                                 background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Cashout Recipient Added",toAddress=user.email)
-                                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                                return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESSCASHOUTRECIPIENT)
                     else:
                         logger.info(f"Failed to add cashout recipient {user.firstname} {user.lastname} for {user.email}")
                         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=paystackResponse['message'],)
