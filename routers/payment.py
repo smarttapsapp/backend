@@ -588,6 +588,27 @@ async def getBanks(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+@router.post("/cashout/verification",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["cashout"])
+async def cashout_recipient_verification(
+    payload: AddCashoutRequest,
+    response: Response,
+    user: Annotated[CustomerModel, Depends(verified_user)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+):
+    try:
+        return await paymentservice.verifyCashoutAccount(
+                payload=payload,
+                response=response,
+                setting=setting,
+                user=user,
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+
 @router.post("/cashout/recipient",
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["cashout"])
