@@ -153,6 +153,9 @@ class WalletDebitRequest(PINRequest):
     receiverAccountName: str
     description:str
     amount: float
+class VerifyCashoutRequest(BaseModel):
+    bankCode:str
+    accountNumber:str
 class AddCashoutRequest(PINRequest):
     bankCode:str
     accountNumber:str

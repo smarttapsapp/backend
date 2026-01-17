@@ -1053,7 +1053,7 @@ async def getbanks(response: Response,setting: Setting):
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 async def verifyCashoutAccount(
-        payload:AddCashoutRequest,
+        payload:VerifyCashoutRequest,
         response: Response,
         setting: Setting,
         user: CustomerModel,

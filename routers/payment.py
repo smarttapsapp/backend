@@ -592,7 +592,7 @@ async def getBanks(
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["cashout"])
 async def cashout_recipient_verification(
-    payload: AddCashoutRequest,
+    payload: VerifyCashoutRequest,
     response: Response,
     user: Annotated[CustomerModel, Depends(verified_user)],
     setting: Annotated[Setting, Depends(getSystemSetting)],
