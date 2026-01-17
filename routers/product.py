@@ -117,13 +117,12 @@ async def get_Bus_Routes(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BusRoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.get("/bus_provider/{providerId}",
-    response_model=RoutesResponse,
+    response_model=BusRoutesResponse,
     response_model_exclude_unset=True,tags=['bus'])
 async def get_Bus_ProviderRoutes(
     providerId: int,
     response: Response,
     user: Annotated[Customer, Depends(verified_user)],
-    setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
 ):
     try:
@@ -131,16 +130,15 @@ async def get_Bus_ProviderRoutes(
             return await productservice.getBusproviderRoutes(response=response,adminId=providerId,db=db)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
-            return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)
+            return BusRoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+        return BusRoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.get("/bus_provider",
     response_model=ProvidersResponse,
     response_model_exclude_unset=True,tags=['bus'])
 async def get_Bus_Providers(
-    request: Request,
     response: Response,
     user: Annotated[Customer, Depends(verified_user)],
     setting: Annotated[Setting, Depends(getSystemSetting)],

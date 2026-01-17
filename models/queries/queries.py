@@ -29,6 +29,10 @@ def getAdminRoutes(db:Session,role:AdminRoleEnum,latitude:float,longitude:float,
 )
     logger.info(distance_expr)
     return db.query(BusRouteModel).join(BusRouteModel.sourceStation).filter(distance_expr <= radius_km).distinct().all()
+def getBusRoutesByProvider(db:Session,adminId:int):
+    return db.query(BusRouteModel).filter(BusRouteModel.admin_id == adminId).distinct().all()
+def getTrainRoutesByProvider(db:Session,adminId:int):
+    return db.query(TrainRouteModel).filter(TrainRouteModel.admin_id == adminId).distinct().all()
 def getAvailableTrainRoutes(db:Session,latitude:float,longitude:float,radius_km:int):
     logger.info(f"{latitude} {longitude}")
     EARTH_RADIUS_KM = 6371
