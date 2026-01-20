@@ -38,25 +38,20 @@ def getSingleBiller(db: Session, id: int):
 async def searchMovablesRoutes(response: Response,db: Session,user: Customer,departure: str,arrival: str,mode: str,latitude:str,longitude:str):
     try:
         logger.info(f"Started searching for {mode} route by {user.firstname}")
-        #admins = queries.getAdminsByRole(db=db,role=AdminRoleEnum.BUSPROVIDER)
         data = []
+        message = None
         if departure and arrival:
             logger.info(f"Searching for {mode} route from {departure} to {arrival}")
             route = queries.getBusRoutesByStations(db=db,departure=departure,arrival=arrival,mode=mode)
             if route:
-                return BusRoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=route)
+                return BusRoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=route,message=message)
+            message = f"No {mode} route found from {departure} to {arrival}"
         if longitude and latitude:
             data = queries.getAdminRoutes(db=db,role=AdminRoleEnum.BUSPROVIDER,latitude=float(latitude),longitude=float(longitude),radius_km=20)
-            #datad = queries.getAdminRoutes(db=db,role=AdminRoleEnum.BUSPROVIDER,latitude=float(latitude),longitude=float(longitude),radius_km=5)
-            #logger.info(datad)
-            #for admin in admins:
-            #    admin.routes = [route for route in admin.routes if admin.routes and util.is_within_radius(lat1=float(route.sourceStation.lat),lon1=float(route.sourceStation.long),lat2=float(latitude),lon2=float(longitude),radius_km=50)]
-            #    data.append(admin)
-            #logger.info(data)
             if data:
-                return BusRoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=data)
+                return BusRoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=data,message=message)
         data = queries.query_routes(db=db,mode=mode)
-        return BusRoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=data)
+        return BusRoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=data,message=message)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST

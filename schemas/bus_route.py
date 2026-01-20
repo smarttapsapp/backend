@@ -43,6 +43,7 @@ class Route(BaseModel):
         populate_by_name = True
 
 class BusRoutesResponse(BaseResponse):
+    message: Union[str,None] = None
     data: Union[List[Route],None] = None
 
 class AddBusRouteRequest(BusRouteBase):
