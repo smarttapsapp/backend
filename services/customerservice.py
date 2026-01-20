@@ -391,11 +391,11 @@ async def changepin(
                         response.status_code = status.HTTP_200_OK
                         return BaseResponse(
                             statusCode =str(status.HTTP_200_OK),
-                        statusDescription = SUCCESS,
+                        statusDescription = "PIN change Successful",
                         )
                     else:
                         response.status_code = status.HTTP_400_BAD_REQUEST
-                        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = FAILED,)
+                        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = "Failed to change PIN",)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = "The PIN you entered is incorrect. Please try again.",)
@@ -434,11 +434,11 @@ async def changepassword(
                         response.status_code = status.HTTP_200_OK
                         return BaseResponse(
                             statusCode =str(status.HTTP_200_OK),
-                        statusDescription = SUCCESS,
+                        statusDescription = "Password change Successful",
                         )
                     else:
                         response.status_code = status.HTTP_400_BAD_REQUEST
-                        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = FAILED,)
+                        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = "Failed to change password",)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = "The password you entered is incorrect. Please try again.",)
