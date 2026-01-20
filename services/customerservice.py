@@ -379,28 +379,32 @@ async def changepin(
         logger.info(
             f"started chnage pin for {user.firstname}"
         )
-        if payload.newPin and payload.confirmPin:
-            if payload.newPin == payload.confirmPin:
-                user.pin = util.get_password_hash(payload.newPin)
-                userRecord = queries.create(db=db,model=user)
-                if userRecord:
-                    background_task.add_task(notifyUser,db=db,title=f"Change PIN", message=f"PIN change Successful",userId=user.id, setting=setting)
-                    email_body = util.templates.TemplateResponse("success.html",{"request": request, "user": userRecord,"message":f"PIN change Successful"},)
-                    background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=f"Change PIN",toAddress=userRecord.email,)
-                    response.status_code = status.HTTP_200_OK
-                    return BaseResponse(
-                        statusCode =str(status.HTTP_200_OK),
-                       statusDescription = SUCCESS,
-                    )
+        if util.verify_password(payload.pin,user.pin):
+            if payload.newPin and payload.confirmPin:
+                if payload.newPin == payload.confirmPin:
+                    user.pin = util.get_password_hash(payload.newPin)
+                    userRecord = queries.create(db=db,model=user)
+                    if userRecord:
+                        background_task.add_task(notifyUser,db=db,title=f"Change PIN", message=f"PIN change Successful",userId=user.id, setting=setting)
+                        email_body = util.templates.TemplateResponse("success.html",{"request": request, "user": userRecord,"message":f"PIN change Successful"},)
+                        background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=f"Change PIN",toAddress=userRecord.email,)
+                        response.status_code = status.HTTP_200_OK
+                        return BaseResponse(
+                            statusCode =str(status.HTTP_200_OK),
+                        statusDescription = SUCCESS,
+                        )
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = FAILED,)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
-                    return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = FAILED,)
+                    return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = "The PIN you entered is incorrect. Please try again.",)
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = "The PIN you entered is incorrect. Please try again.",)
+                return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription ="Confirm PIN must be same with PIN",)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription ="Invalid Request",)
+            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = "The current PIN you entered is incorrect. Please try again.",)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -418,28 +422,32 @@ async def changepassword(
         logger.info(
             f"started chnage pin for {user.firstname}"
         )
-        if payload.password and payload.confirmPassword:
-            if payload.password == payload.confirmPassword:
-                user.password = util.get_password_hash(payload.password)
-                userRecord = queries.update_user_agent_records(db=db,id=user.id,user=user)
-                if userRecord:
-                    background_task.add_task(notifyUser,db=db,title=f"Change Password", message=f"Change Password Successful",userId=user.id, setting=setting)
-                    email_body = util.templates.TemplateResponse("success.html",{"request": request, "user": userRecord,"message":f"Password change Successful"},)
-                    background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=f"Change Password",toAddress=userRecord.email,)
-                    response.status_code = status.HTTP_200_OK
-                    return BaseResponse(
-                        statusCode =str(status.HTTP_200_OK),
-                       statusDescription = SUCCESS,
-                    )
+        if util.verify_password(payload.oldPassword,user.password):
+            if payload.password and payload.confirmPassword:
+                if payload.password == payload.confirmPassword:
+                    user.password = util.get_password_hash(payload.password)
+                    userRecord = queries.update_user_agent_records(db=db,id=user.id,user=user)
+                    if userRecord:
+                        background_task.add_task(notifyUser,db=db,title=f"Change Password", message=f"Change Password Successful",userId=user.id, setting=setting)
+                        email_body = util.templates.TemplateResponse("success.html",{"request": request, "user": userRecord,"message":f"Password change Successful"},)
+                        background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=f"Change Password",toAddress=userRecord.email,)
+                        response.status_code = status.HTTP_200_OK
+                        return BaseResponse(
+                            statusCode =str(status.HTTP_200_OK),
+                        statusDescription = SUCCESS,
+                        )
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = FAILED,)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
-                    return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = FAILED,)
+                    return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = "The password you entered is incorrect. Please try again.",)
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = "The password you entered is incorrect. Please try again.",)
+                return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription ="Confirm password must be same with password",)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription ="Invalid Request",)
+            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = "The current password you entered is incorrect. Please try again.",)
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
