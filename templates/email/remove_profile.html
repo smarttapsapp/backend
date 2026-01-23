@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+<!-- Include the footer  -->
+{% block content %}
+<p>Hello {{user.firstname}} {{user.lastname}},</p>
+
+<p>
+  Your smart tap account has been removed successfully. You'll no longer have
+  access to the services associated with this account.
+</p>
+
+<table class="table">
+  <tr>
+    <td><strong>IP Address</strong></td>
+    <td>{{ request.headers.get("x-real-ip") }}</td>
+  </tr>
+  <tr>
+    <td><strong>Device</strong></td>
+    <td>{{ device.modelName }}</td>
+  </tr>
+  <tr>
+    <td><strong>Maker</strong></td>
+    <td>{{ device.manufacturer }}</td>
+  </tr>
+</table>
+
+<p style="margin-top: 16px">
+  If you did not initiate this request, please ignore this email or contact
+  support immediately.
+</p>
+{% endblock %}

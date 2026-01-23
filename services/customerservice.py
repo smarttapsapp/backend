@@ -4,7 +4,7 @@ import logging
 from sqlalchemy.orm import Session
 from models.model import *
 from pathlib import Path
-from models.queries import queries,customerQuery
+from models.queries import queries
 from datetime import datetime,timedelta
 from services.notificationservice import notifyUser
 from utils import util
@@ -23,7 +23,7 @@ from fastapi import (
 
 logger = logging.getLogger(__name__)
 
-def profile(
+async def profile(
         request: Request,
         response: Response,
         setting: Setting,
@@ -43,7 +43,7 @@ def profile(
                     statusCode=str(status.HTTP_400_BAD_REQUEST),
                     statusDescription=SYSTEMBUSY,
                 )
-def balance(
+async def balance(
         wallet:str,
         request: Request,
         response: Response,
@@ -641,4 +641,23 @@ async def addSupportTicketComment(response: Response,db:Session,user:CustomerMod
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def removeprofile(
+        request: Request,
+        response: Response,
+        setting: Setting,
+        db: Session,
+        user: CustomerModel,
+        background_task: BackgroundTasks,):
+    try:
+        user.account_status = AccountStatusEnum.DISABLED
+        userRecord = queries.create(db=db,model=user)
+        if userRecord:
+            email_body = util.templates.TemplateResponse("remove_profile.html",{"request": request,"device": user.device,"user": user,},)
+            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=f"Remove Profile",toAddress=user.email,)
+            return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription="Your smart tap account has been successfully removed.",)
+        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription="Unable to remove profile successfully",)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 

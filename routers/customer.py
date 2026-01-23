@@ -42,7 +42,7 @@ async def get_customer_profile(
 ):
     try:
         if user:
-            return customerservice.profile(
+            return await customerservice.profile(
                 request=request,
                 response=responses,
                 setting=Setting,
@@ -79,7 +79,7 @@ async def get_customer_balance(
 ):
     try:
         if user:
-            return customerservice.balance(
+            return await customerservice.balance(
                 wallet=walletAccount,
                 request=request,
                 response=response,
@@ -447,3 +447,27 @@ async def support_ticket_comment(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=SYSTEMBUSY,
         )
+@router.delete("/profile", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=['customer'])
+async def remove_profile(
+    request: Request,
+    response: Response,
+    user: Annotated[CustomerModel, Depends(validateCustomer)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await customerservice.removeprofile(
+                request=request,
+                response=response,
+                setting=setting,
+                db=db,
+                user=user,
+                background_task=background_task)
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return SupportTicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

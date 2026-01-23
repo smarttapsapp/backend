@@ -269,6 +269,9 @@ async def login(request:Request,db: Session,response: Response,setting: Setting,
                     authToken = util.create_access_token(setting=setting,credentials={"username": user.email,"password": payload.password,},exp=600)
                     logger.info(authToken)
                     return BaseResponse(statusCode= str(status.HTTP_200_OK),statusDescription= SUCCESS,data={"token":authToken[0],"expires":authToken[1]})
+                elif user.account_status == AccountStatusEnum.DISABLED:
+                    response.status_code= status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Your account has been removed. Please contact support")
                 else:
                     response.status_code= status.HTTP_400_BAD_REQUEST
                     return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=f"Your account is {user.account_status}")
