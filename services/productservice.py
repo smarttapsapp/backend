@@ -45,7 +45,8 @@ async def searchMovablesRoutes(response: Response,db: Session,user: Customer,dep
             route = queries.getBusRoutesByStations(db=db,departure=departure,arrival=arrival,mode=mode)
             if route:
                 return BusRoutesResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=route,message=message)
-            message = f"No {mode} route found from {departure} to {arrival}"
+            else:
+                message = f"No {mode} route found from {departure} to {arrival}. Enter a new route or select from options"
         if longitude and latitude:
             data = queries.getAdminRoutes(db=db,role=AdminRoleEnum.BUSPROVIDER,latitude=float(latitude),longitude=float(longitude),radius_km=20)
             if data:
