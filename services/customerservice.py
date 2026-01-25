@@ -472,9 +472,9 @@ async def updateNextOfKin(
         user.is_next_of_kin = True
         userRecord = queries.create(db=db,model=user)
         if userRecord:
-            email_body = util.templates.TemplateResponse("success.html",{"request": request, "user": userRecord,"message":f"Your Next of Kin details was submitted successfuly."},)
+            email_body = util.templates.TemplateResponse("success.html",{"request": request, "user": userRecord,"message":f"Your Next of Kin details was submitted successfully."},)
             background_task.add_task(upgradeAccount,db=db,user=userRecord,setting=setting,request=request,background_task=background_task)
-            background_task.add_task(notifyUser,db=db,title=f"Next Of Kin Update", message=f"Your Next of Kin details was submitted successfuly.",userId=user.id, setting=setting)
+            background_task.add_task(notifyUser,db=db,title=f"Next Of Kin Update", message=f"Your Next of Kin details was submitted successfully.",userId=user.id, setting=setting)
             background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="Next Of Kin",toAddress=user.email,)
             response.status_code = status.HTTP_200_OK
             return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription = "You have successfully updated your next of kin details.")

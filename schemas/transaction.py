@@ -12,9 +12,6 @@ class TransactionBase(BaseModel):
     channel: Union[str, None] = None
     transactionStatus: Union[str, None] = None
     remarks: Union[str, None] = None
-    remarks: Union[str, None] = None
-    remarks: Union[str, None] = None
-    remarks: Union[str, None] = None
 
 
 class Transaction(TransactionBase):
