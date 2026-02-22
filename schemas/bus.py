@@ -33,12 +33,10 @@ class BusBase(BaseModel):
         populate_by_name = True
 class Bus(BusBase):
     id: Optional[int]=None
-    #provider: Optional[Provider]=None
     routes: Optional[List[Route]] = []
     schedules: Optional[List[BusSchedule]] = []
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
-
     @model_validator(mode="after")
     def final_clean(self):
         self.base_price = str(int(int(self.base_price)/100))

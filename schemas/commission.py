@@ -17,7 +17,7 @@ class Commission(CommissionBase):
     product_type: Optional[ProductTypeMini]=None
     admin_id: int
     admin: Optional[AdminMini]=None
-    glcode: str
+    glcode:  Union[str, None] = None
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 
