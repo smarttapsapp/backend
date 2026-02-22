@@ -77,10 +77,11 @@ class AddBusRequest(BusBase):
     schedules:List[dict]
     routes:List[dict]
     @model_validator(mode="before")
-    def compute_kobo(self):
-        if self.base_price is not None:
-            self.base_price = str(int(self.base_price) * 100)
-        return self
+    @classmethod
+    def compute_kobo(cls, values):
+        if values.get("base_price") is not None:
+            values["base_price"] = str(int(values["base_price"]) * 100)
+        return values
 class SwapBusRequest(BaseModel):
     id: int
     swapBusNumber: str
