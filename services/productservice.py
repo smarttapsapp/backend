@@ -11,8 +11,9 @@ from schemas.package import *
 from schemas.product_type import *
 from schemas.admin import ProvidersResponse
 from schemas.station import StationsResponse
-from schemas.route import RoutesResponse,RouteResponse,TrainRoutesResponse,TrainRouteResponse
-from schemas.bus_route import BusRoutesResponse,BusRouteResponse
+from schemas.route import RoutesResponse,RouteResponse,TrainRoutesResponse
+from schemas.bus_route import BusRoutesResponse
+from services import topupboxservice
 from fastapi import Response,Request,status
 from models.queries import productQuery,queries
 from schemas.beneficiary import *
@@ -313,6 +314,43 @@ async def addBiller(db: Session,setting: Setting,payload: AddProductTypeRequest,
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def switchBillerServiceProvider(db: Session,setting: Setting,payload: SwitchProviderRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started adding/updating product type {payload.billerName} at {datetime.now()}")
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN]:
+            productType = productQuery.getProductTypeById(db=db,billerId=payload.id)
+            if productType:
+                serviceprovider = productQuery.getServiceProviderById(db=db,id=payload.provider_id)
+                if serviceprovider:
+                    discount = productQuery.getDiscountProviderProductType(db=db,providerId=serviceprovider.id,productTypeId=productType.id)
+                    if discount:
+                        subject = f"{productType.billerName} provider switching"
+                        productType.provider_id = serviceprovider.id
+                        productType.updated_at=datetime.now()
+                        created = productQuery.create(db=db, model=productType)
+                        if created:
+                            email_body = util.templates.TemplateResponse("product.html",{"request": request, "product": created,},)
+                            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=subject,toAddress=admin.email,)
+                            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                        else:
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Dicsount not configured")
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Service provider error")
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Invalid product")
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
 async def deleteBiller(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,billerId: int):
     try:
         logger.info(f"started deleting product {billerId} at {datetime.now()}")
@@ -347,6 +385,63 @@ async def listOfPackages(response: Response,db: Session,admin: AdminModel,biller
 async def addPackage(db: Session,setting: Setting,payload: AddPackageRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
     try:
         logger.info(f"started package at {datetime.now()}")
+        biller = productQuery.getProductTypeById(db=db,billerId=payload.product_type_id)
+        if biller:
+            logger.info(f"biller {biller.billerType} package at {datetime.now()}")
+            if biller.provider:
+                if biller.billerType.lower() == "data":
+                    paymentTerms = await topupboxservice.dataplans(biller=biller,serviceprovider=biller.provider)
+                    if paymentTerms and paymentTerms['statuscode'] == '200':
+                        if paymentTerms['data'] and len(paymentTerms['data']) > 0:
+                            for payment in paymentTerms['data']:
+                                existing = productQuery.getPackageByPaymentCode(db=db,code=str(payment['tarrifTypeId']))
+                                if existing:
+                                    logger.info(f"Started update for package {payment['name']} at {datetime.now()}")
+                                    existing.packageCode= payment['tarrifTypeId']
+                                    existing.amount=payment['price']
+                                    existing.billerId = biller.billerId
+                                    existing.description=payment['description']
+                                    existing.name=payment['name']
+                                    productQuery.create(db=db,model=existing)
+                                else:
+                                    logger.info(f"Started onboarding for new package {biller.billerName} {payment['name']} at {datetime.now()}")
+                                    newproduct = PackageModel(
+                                        product_type_id = biller.id,
+                                        billerId = biller.billerId,
+                                        name = payment['name'],
+                                        packageCode = payment['tarrifTypeId'],
+                                        description = payment['description'],
+                                        amount = payment['price'],
+                                        validity = None,
+                                        status = True,
+                                        updated_at = datetime.now(),
+                                        created_at = datetime.now())
+                                    productQuery.create(db=db,model=newproduct) 
+                            logger.info(f"saving all billers at {datetime.now()}")
+                            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                        else:
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription= FAILED,)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription= paymentTerms['message'],)
+                else:
+                    logger.info(f"biller not found at {datetime.now()}")
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDBILLER,)
+            else:
+                logger.info(f"biller provider not found at {datetime.now()}")
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Provider not configured",)
+        else:
+            logger.info(f"biller not found at {datetime.now()}")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDBILLER,)
+    except Exception as ex:
+        logger.info(f"An Error occurred with {ex} at {datetime.now()}")
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription= FAILED,)
+
         existing = productQuery.getPackageById(db=db,packageId=payload.id)
         if existing:
             subject = "Package Update"

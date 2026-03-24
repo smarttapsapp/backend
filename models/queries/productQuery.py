@@ -76,3 +76,11 @@ def deletePackage(db: Session ,packageId:int):
         db.commit()
         return True
     return False
+def getProductTypeByBiller(db: Session,billerId:str):
+    return db.query(ProductTypeModel).filter(ProductTypeModel.billerId == billerId).first()
+def getPackageByPaymentCode(db: Session,code:str):
+    return db.query(PackageModel).filter(PackageModel.packageCode == code).first()
+def getServiceProviderById(db: Session,id:int):
+    return db.query(AdminModel).filter(AdminModel.id == id).first()
+def getDiscountProviderProductType(db: Session,providerId:int,productTypeId:int):
+    return db.query(ServiceRateModel).filter(ServiceRateModel.admin_id == providerId,ServiceRateModel.product_type_id ==productTypeId).first()

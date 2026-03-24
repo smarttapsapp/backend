@@ -1897,6 +1897,33 @@ async def add_biller(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+@router.post("/biller/switch-provider",response_model=BaseResponse,)
+async def add_switch(
+    payload:SwitchProviderRequest,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await productservice.switchBillerServiceProvider(
+            payload=payload,
+                db=db,
+                setting=setting,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
 @router.delete("/biller/{id}/delete", 
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["biller"])

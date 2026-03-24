@@ -9,8 +9,10 @@ from schemas.role import Role
 
 
 class AdminMini(BaseModel):
-    firstname: str
-    lastname: str
+    id: Union[int,None]=0
+    companyName: Union[str,None]=None
+    firstname: Union[str,None]=None
+    lastname: Union[str,None]=None
     class Config:
         from_attributes = True
         populate_by_name = True
@@ -19,6 +21,7 @@ class AdminBase(BaseModel):
     lastname: str
     phonenumber: str
     email: str
+    companyName: Union[str,None]=None
 class AdminCreate(AdminBase):
     password: Union[str, None] = None
     created_at: datetime
@@ -38,6 +41,7 @@ class Admin(AdminBase):
         from_attributes = True
         populate_by_name = True
 class Provider(AdminBase):
+    companyName: Union[str,None]=None
     id: int
 
     class Config:

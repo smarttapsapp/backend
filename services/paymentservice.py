@@ -3,8 +3,7 @@ import logging
 from sqlalchemy.orm import Session
 from models.model import *
 from models.queries import paymentQuery,queries,adminQuery
-from datetime import datetime,timedelta
-from schemas import otp
+from datetime import datetime
 from utils import util
 from schemas.setting import Setting
 from services.notificationservice import notifyUser

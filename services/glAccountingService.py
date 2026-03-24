@@ -227,6 +227,8 @@ async def debitTransaction(response:Response,setting: Setting,db: Session,biller
                                 savedHeadoffice = adminQuery.create(db=db,model=headoffice)
                                 if savedHeadoffice:
                                     background_task.add_task(notificationservice.sendNotification,notificationType="credit",setting=setting,background_task=background_task)
+                                    background_task.add_task(notificationservice.sendNotification,notificationType="credit",setting=setting,background_task=background_task)
+
                                     return BillPaymentResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":trnxId})
                                 logger.info(f"Unable to credit system wallet at {datetime.now()}")
                                 response.status_code = status.HTTP_400_BAD_REQUEST
@@ -758,7 +760,7 @@ async def addDiscount(db: Session,setting: Setting,payload: AddProviderRateReque
                 if provider:
                     productType = adminQuery.getProductBillerById(db=db,id=payload.product_type_id)
                     if productType:
-                        productType.provider = provider.billerId
+                        productType.provider_id = provider.id
                         productType.updated_at = datetime.now()
                         subject = "New Service Provider Discount"
                         logger.info(f"started creating new service provider discount @ {datetime.now()}")

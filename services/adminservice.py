@@ -142,6 +142,7 @@ async def createUserAccount(db: Session,setting: Setting,payload: CreateAdminReq
                     status=True,
                     cashout_enabled=False,
                     cashout_limit=10000000,
+                    companyName=payload.companyName,
                     billerId = util.generateBillerId(),
                     created_at=datetime.now(),
                     updated_at=datetime.now(),

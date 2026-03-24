@@ -4,6 +4,7 @@ from sqlalchemy import func
 from pydantic import BaseModel
 from schemas.response import BaseResponse
 from schemas.package import Package
+from schemas.admin import AdminMini
 
 class ProductTypeMini(BaseModel):
     product_id:int
@@ -18,6 +19,8 @@ class ProductTypeBase(BaseModel):
     product_id:int
     billerName:str
     billerId:str
+    provider:Union[AdminMini,None]=None
+    provider_id:Union[int,None]=None
     billerType: Union[str, None] = None
     logo: Union[str, None] = None
     customerField: Union[str, None] = None
@@ -46,3 +49,7 @@ class ProductTypesResponse(BaseResponse):
     
 class ProductTypeResponse(BaseResponse):
     data: ProductType = None
+class SwitchProviderRequest(BaseModel):
+    id: int
+    provider_id: int
+    billerName:Optional[str]
