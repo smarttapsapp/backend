@@ -163,10 +163,10 @@ async def debitTransaction(response:Response,setting: Setting,db: Session,biller
                 logger.info(f"headoffice is configured at {datetime.now()}")
                 if not merchant:
                     merchant = headoffice
-                serviceProvider = adminQuery.getServiceProviderByProduct(db=db,productTypeId=biller.id)
-                if serviceProvider:
-                    logger.info(f"{serviceProvider.admin.lastname}  is configured configured at {datetime.now()}")
-                    provider_cost = amount - int(serviceProvider.provider_discount_rate) if serviceProvider.provider_discount_type == CommissionType.percentage else amount * (1 - serviceProvider.provider_discount_rate)
+                discount = adminQuery.getServiceProviderByProduct(db=db,productTypeId=biller.id)
+                if biller.provider:
+                    logger.info(f"{discount.admin.companyName}  is configured configured at {datetime.now()}")
+                    provider_cost = amount - int(discount.provider_discount_rate) if discount.provider_discount_type == CommissionType.percentage else amount * (1 - discount.provider_discount_rate)
                     netIncome = amount - provider_cost
                     merchantCommission = adminQuery.getServiceCommissionByProduct(db=db,productTypeId=biller.id,adminId=merchant.id) if merchant else None
                     logger.info(f"started checking available merchant at {datetime.now()}")
@@ -174,7 +174,7 @@ async def debitTransaction(response:Response,setting: Setting,db: Session,biller
                     if merchantCommission:
                         logger.info(f"merchant is configured at {datetime.now()}")
                         commissionAmount = netIncome - int(merchantCommission.commission_rate) if merchantCommission.commission_type == CommissionType.calculated else (netIncome *  merchantCommission.commission_rate)
-                    trnxId = f"{str(biller.billerId[:2]).upper()}-{util.generateId()}"
+                    trnxId = util.generateId()
                     # debit customer
                     customerAccount.availableBalance = int(customerAccount.availableBalance) - int(amount)
                     customerAccount.updated_at = datetime.now()
@@ -191,16 +191,16 @@ async def debitTransaction(response:Response,setting: Setting,db: Session,biller
                     savedCustomerAccount = adminQuery.save(db=db,account=customerAccount)
                     if savedCustomerAccount:
                         background_task.add_task(notificationservice.sendNotification,notificationType="debit",setting=setting,background_task=background_task)
-                        serviceProvider.admin.wallet.availableBalance = int(serviceProvider.admin.wallet.availableBalance) + int(provider_cost)
-                        serviceProvider.admin.wallet.updated_at = datetime.now()
-                        serviceProvider.admin.wallet.payments.append(PaymentModel(wallet_id = serviceProvider.admin.wallet.id,admin_id = serviceProvider.admin_id, amount = int(provider_cost),
+                        discount.admin.wallet.availableBalance = int(discount.admin.wallet.availableBalance) + int(provider_cost)
+                        discount.admin.wallet.updated_at = datetime.now()
+                        discount.admin.wallet.payments.append(PaymentModel(wallet_id = discount.admin.wallet.id,admin_id = discount.admin_id, amount = int(provider_cost),
                                      payment_type =PaymentEnum.CREDIT,reference =f"{str(biller.billerId[:2]).upper()}-{util.generateId()}",
                                      transactionreference=trnxId,event = "charge.success",status = "success",channel =ChannelEnum.MOBILE,
                                      provider_code= biller.provider,
                                      statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,product_type_id = biller.id,product_id=biller.product_id,
-                                     recipient=serviceProvider.admin.wallet.walletAccount,statusMessage = remark,balanceBefore = serviceProvider.admin.wallet.availableBalance,
-                                     balanceAfter = serviceProvider.admin.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now()),)
-                        savedServiceProvider = adminQuery.create(db=db,model=serviceProvider)
+                                     recipient=discount.admin.wallet.walletAccount,statusMessage = remark,balanceBefore = discount.admin.wallet.availableBalance,
+                                     balanceAfter = discount.admin.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now()),)
+                        savedServiceProvider = adminQuery.create(db=db,model=discount)
                         if savedServiceProvider:
                             background_task.add_task(notificationservice.sendNotification,notificationType="credit",setting=setting,background_task=background_task)
                             merchant.wallet.availableBalance = int(merchant.wallet.availableBalance) + int(commissionAmount)
@@ -228,7 +228,7 @@ async def debitTransaction(response:Response,setting: Setting,db: Session,biller
                                 if savedHeadoffice:
                                     background_task.add_task(notificationservice.sendNotification,notificationType="credit",setting=setting,background_task=background_task)
                                     background_task.add_task(notificationservice.sendNotification,notificationType="credit",setting=setting,background_task=background_task)
-
+                                    
                                     return BillPaymentResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":trnxId})
                                 logger.info(f"Unable to credit system wallet at {datetime.now()}")
                                 response.status_code = status.HTTP_400_BAD_REQUEST
@@ -244,7 +244,7 @@ async def debitTransaction(response:Response,setting: Setting,db: Session,biller
                     return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=DEBITFAILED)
                 logger.info(f"Service provider has not been configured at {datetime.now()}")
                 response.status_code = status.HTTP_400_BAD_REQUEST
-                return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDBILLER)
+                return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Product configuration error")
             logger.info(f"Please configure headoffice to start transactions at {datetime.now()}")
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SERVICEERROR)

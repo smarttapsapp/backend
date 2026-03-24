@@ -7,7 +7,7 @@ from datetime import datetime
 from utils import util
 from schemas.setting import Setting
 from services.notificationservice import notifyUser
-from services import glAccountingService
+from services import glAccountingService,topupboxservice
 from utils.constant import *
 from schemas.customer import *
 from schemas.payment import *
@@ -657,6 +657,7 @@ async def payBills(
             if biller.hasPackages:
                 package = next((x for x in biller.packages if x.packageCode == payload.packageId), None)
                 if package:
+                    # debit the customer
                     return await debitBillPayment(biller=biller,package=package,payload=payload,request=request,response=response,setting=setting,db=db,user=user,background_task=background_task)
                 else:
                     logger.info(f"Invalid package code selected {payload.packageId}")
@@ -684,42 +685,41 @@ async def debitBillPayment(
     logger.info(f"Started debit process for bill payment {payload.billerId} for amount {payload.amount}")
     if int(user.wallet.availableBalance) > int(payload.amount):
         logger.info(f"balance is sufficient {user.wallet.availableBalance}")
-        merchant = adminQuery.getAdminByCustomerId(db=db,id=user.id)
-        statusMessage = f"{biller.billerType}/{biller.billerName}/{package.packageCode if package else ''}/{payload.customerNumber}"
-        return await glAccountingService.debitTransaction(response=response,setting=setting,db=db,biller=biller,customerAccount=user.wallet,amount=int(payload.amount),background_task=background_task,remark=statusMessage,merchant=merchant)
-        newBalance = int(user.wallet.availableBalance) - int(payload.amount)
-        user.wallet.availableBalance = newBalance
-        updatedUser = paymentQuery.create(db=db,model=user)
-        if updatedUser:
-            logger.info(f"Start processing payment records ...............")
-            debit = PaymentModel(
-                wallet_id = user.wallet.id,
-                user_id =user.id,
-                amount = payload.amount,
-                recipient=payload.customerNumber,
-                payment_type =PaymentEnum.DEBIT,
-                reference =f"{biller.billerName[:3]}-{util.generateId()}",
-                event = "charge.success",
-                status = "success",
-                #payment_date = datetime.now().fromisoformat(),
-                channel = "MOBILE",
-                fee = "1000",
-                statusCode = "200",
-                statusMessage = f"{biller.billerType}/{biller.billerName}/{package.packageCode if package else ''}/{payload.customerNumber}",
-                balanceBefore = user.wallet.availableBalance,
-                balanceAfter = newBalance,
-                product_id = biller.product_id,
-                product_type_id = biller.id,
-                created_at =datetime.now(),
-                updated_at = datetime.now()
-        )
-            createDebitRecord = paymentQuery.create(db=db,model=debit)
-            if createDebitRecord:
-                background_task.add_task(notifyUser,db=db,title=f"Debit Notification", message=createDebitRecord.statusMessage,userId=user.id, setting=setting)
-                email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"payment":createDebitRecord},)
-                background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Debit Notification",toAddress=user.email)
-                logger.info(f"start credit to receiver {user.wallet.walletAccount} with balance before {user.wallet.availableBalance}")
-                return BillPaymentResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":createDebitRecord.reference})
+        # debit customer 
+        user.wallet.availableBalance = int(user.wallet.availableBalance) - int(payload.amount)
+        user.wallet.updated_at = datetime.now()
+        trnxId = util.generateId()
+        logger.info(f"started saving debit for customer at {datetime.now()}")
+        user.wallet.payments.append(
+            PaymentModel(
+                wallet_id = user.wallet.id,user_id =user.id, amount = int(payload.amount),
+                payment_type =PaymentEnum.DEBIT,reference =trnxId,event = "charge.success",
+                provider_code= biller.provider,status = "success",channel =ChannelEnum.MOBILE,
+                statusCode = TransactionCodeEnum.PROCESSING,statusDescription = TransactionStatusEnum.PROCESSING,
+                product_type_id = biller.id,product_id=biller.product_id,recipient=user.wallet.walletAccount,
+                statusMessage =f"{biller.billerType} Purchase",balanceBefore = user.wallet.availableBalance,
+                balanceAfter = user.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now())),
+        savedCustomerAccount = paymentQuery.create(db=db,model=user)
+        if savedCustomerAccount:
+            #background_task.add_task(notifyUser,db=db,title=f"Debit Notification", message=createDebitRecord.statusMessage,userId=user.id, setting=setting)
+            #email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"payment":createDebitRecord},)
+            #background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Debit Notification",toAddress=user.email)
+            currentPayment = paymentQuery.getPaymentByReference(db=db,reference=trnxId)
+            if currentPayment:
+                params = {}
+                if biller.billerType == "airtime":
+                    params['amount'] = payload.amount
+                    params['beneficiary'] = payload.customerNumber
+                    params['customer_reference'] = trnxId
+                if biller.billerType == "data" and package:
+                    params['tariffTypeId'] = package.packageCode
+                topup = await topupboxservice.purchaseService(biller=biller,serviceprovider=biller.provider,params=params)
+                if topup and topup['statuscode'] == "200":
+                    currentPayment.statusCode = TransactionCodeEnum.SUCCESS
+                    currentPayment.statusDescription = TransactionStatusEnum.SUCCESS
+                    currentPayment.updated_at = datetime.now()
+                    background_task.add_task(glAccountingService.debitTransaction,response=response,setting=setting,db=db,biller=biller,customerAccount=user.wallet,amount=int(payload.amount),background_task=background_task,remark=statusMessage,merchant=merchant)
+                    return BillPaymentResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":currentPayment.reference})
     else: 
         logger.info(f"{INSUFFICIENTFUND} with user {user.firstname}")
         response.status_code = status.HTTP_400_BAD_REQUEST
