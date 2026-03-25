@@ -698,7 +698,7 @@ async def debitBillPayment(
                 statusCode = TransactionCodeEnum.PROCESSING,statusDescription = TransactionStatusEnum.PROCESSING,
                 product_type_id = biller.id,product_id=biller.product_id,recipient=user.wallet.walletAccount,
                 statusMessage =f"{biller.billerType} Purchase",balanceBefore = user.wallet.availableBalance,
-                balanceAfter = user.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now())),
+                balanceAfter = user.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now()))
         savedCustomerAccount = paymentQuery.create(db=db,model=user)
         if savedCustomerAccount:
             logger.info(f"saved payment for customer at {datetime.now()}")
