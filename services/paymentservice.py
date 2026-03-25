@@ -694,9 +694,9 @@ async def debitBillPayment(
             PaymentModel(
                 wallet_id = user.wallet.id,user_id =user.id, amount = int(payload.amount),
                 payment_type =PaymentEnum.DEBIT,reference =trnxId,event = "charge.success",
-                provider_code= biller.provider,status = "success",channel =ChannelEnum.MOBILE,
+                provider_code= biller.provider.billerId,status = "success",channel =ChannelEnum.MOBILE,
                 statusCode = TransactionCodeEnum.PROCESSING,statusDescription = TransactionStatusEnum.PROCESSING,
-                product_type_id = biller.id,product_id=biller.product_id,recipient=user.wallet.walletAccount,
+                product_type_id = biller.id,product_id=biller.product_id,recipient=payload.customerNumber,
                 statusMessage =f"{biller.billerType} Purchase",balanceBefore = user.wallet.availableBalance,
                 balanceAfter = user.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now()))
         savedCustomerAccount = paymentQuery.create(db=db,model=user)
