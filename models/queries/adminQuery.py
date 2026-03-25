@@ -19,6 +19,8 @@ def save_many(db: Session, models: List[object]):
     db.commit()
 def getRoleByTag(db: Session,tag:str):
     return db.query(RoleModel).filter(RoleModel.tag == tag).first()
+def getRoleByRoleType(db: Session,roleType:str):
+    return db.query(RoleModel).filter(RoleModel.roleType == roleType).first()
 def getRoleById(db: Session,roleId:int):
     return db.query(RoleModel).filter(RoleModel.id == roleId).first()
 def deleteRole(db: Session ,roleId:int):
@@ -73,15 +75,15 @@ def getAdminByCustomerId(db: Session,id:int):
 def getAdminProvider(db:Session):
     return db.query(AdminModel).join(RoleModel).filter(RoleModel.tag.in_([AdminRoleEnum.PROVIDER,AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER])).order_by(desc(AdminModel.created_at)).all()
 def getAllRole(db: Session,adminId:int=None):
-    return db.query(RoleModel).order_by(desc(RoleModel.created_at)).all()
+    return db.query(RoleModel).filter(RoleModel.roleType == AdminTypeEnum.INTERNAL).order_by(desc(RoleModel.created_at)).all()
 def getRole(db: Session,roleId:int=None):
     return db.query(RoleModel).filter(RoleModel.id ==roleId).first()
-def getRole(db: Session,roleId:int=None):
-    return db.query(RoleModel).filter(RoleModel.id ==roleId).first()
+def getRoleViaTag(db: Session,tag:str=None):
+    return db.query(RoleModel).filter(RoleModel.tag ==tag).first()
 def getAllAdmin(db: Session,adminId:int=None):
-    return db.query(AdminModel).order_by(desc(AdminModel.created_at)).all()
-def getAllAdminByRole(db: Session,roleId:int):
-    return db.query(AdminModel).filter(AdminModel.role_id == roleId).order_by(desc(AdminModel.created_at)).all()
+    return db.query(AdminModel).join(RoleModel).filter(RoleModel.roleType == AdminTypeEnum.INTERNAL).order_by(desc(AdminModel.created_at)).all()
+def getAllAdminByRole(db: Session,role:AdminTypeEnum):
+    return db.query(AdminModel).join(RoleModel).filter(RoleModel.roleType == role).order_by(desc(AdminModel.created_at)).all()
 def getAdmin(db: Session,adminId:int=None):
     return db.query(AdminModel).filter(AdminModel.id ==adminId).first()
 # trains

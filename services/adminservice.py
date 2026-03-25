@@ -55,7 +55,7 @@ async def createAccount(
             user = authQuery.getCheckAdmin(db=db,username=payload.email)
             if user:
                 response.status_code = status.HTTP_302_FOUND
-                return BaseResponse(statusCode=str(status.HTTP_302_FOUND),statusDescription=ALREADYEXIST,)
+                return BaseResponse(statusCode=str(status.HTTP_302_FOUND),statusDescription="Account already exist with the same details",)
             else:
                 return await createUserAccount(db=db,setting=setting,payload=payload,background_task=background_task,request=request,response=response)
     except Exception as ex:
@@ -128,7 +128,7 @@ async def verifyAccountOpening(
 async def createUserAccount(db: Session,setting: Setting,payload: CreateAdminRequest, background_task: BackgroundTasks, request: Request,response: Response):
     try:
         logger.info("started creating new admin account")
-        role = adminQuery.getRole(db=db,roleId=payload.tag)
+        role = adminQuery.getRoleViaTag(db=db,tag=payload.tag)
         if role:
             password = util.generate_password()
             logger.info(f"New admin created {payload.firstname} with password {password}")
@@ -137,12 +137,15 @@ async def createUserAccount(db: Session,setting: Setting,payload: CreateAdminReq
                     lastname=payload.lastname,
                     phonenumber=payload.phonenumber,
                     email=payload.email,
+                    companyName = payload.companyName,
+                    companyAddress = payload.companyAddress,
+                    provider_auth = payload.provider_auth,
+                    provider_url = payload.provider_url,
                     password=util.get_password_hash(password),
                     role_id=role.id,
                     status=True,
                     cashout_enabled=False,
                     cashout_limit=10000000,
-                    companyName=payload.companyName,
                     billerId = util.generateBillerId(),
                     created_at=datetime.now(),
                     updated_at=datetime.now(),
@@ -586,9 +589,9 @@ async def listOfAdminsByRole(response: Response,db: Session,admin: AdminModel,ro
         logger.info(f"started querying {role}")
         if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ADMIN,AdminRoleEnum.ACCOUNTANT]:
             if role:
-                existing = adminQuery.getRoleByTag(db=db,tag=AdminRoleEnum(role))
+                existing = AdminTypeEnum(role.upper())
                 if existing:
-                    return AdminsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getAllAdminByRole(db=db,roleId=existing.id))
+                    return AdminsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getAllAdminByRole(db=db,role=existing))
                 return AdminsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getAdminProvider(db=db))
             return AdminsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=[])
         response.status_code = status.HTTP_401_UNAUTHORIZED

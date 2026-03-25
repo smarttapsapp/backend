@@ -22,6 +22,9 @@ class AdminBase(BaseModel):
     phonenumber: str
     email: str
     companyName: Union[str,None]=None
+    companyAddress: Union[str,None]=None
+    provider_url: Union[str,None]=None
+    provider_auth: Union[str,None]=None
 class AdminCreate(AdminBase):
     password: Union[str, None] = None
     created_at: datetime
@@ -70,6 +73,10 @@ class AdminProfile(AdminBase):
             cashout_account=obj.cashout_account,
             cashout_bank=obj.cashout_bank,
             cashout_limit=obj.cashout_limit,
+            companyName=obj.companyName,
+            companyAddress=obj.companyAddress,
+            provider_auth=obj.provider_auth,
+            provider_url=obj.provider_url,
             identifier=obj.identifier,
             wallet=obj.wallet,
             tag=obj.role.tag,
@@ -80,7 +87,7 @@ class AdminProfile(AdminBase):
 
 class CreateAdminRequest(AdminBase):
     id:Optional[int]=None
-    tag:int
+    tag:str
     pass      
 class AdminLoginRequest(BaseModel):
     username: EmailStr

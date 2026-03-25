@@ -173,7 +173,10 @@ async def getAdmins(
 ):
     try:
         if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPPORT,AdminRoleEnum.ADMIN]:
-            return await adminservice.listOfAdminsByRole(response=response,db=db,admin=admin,role=role) if role else await adminservice.listOfAdmins(db=db,response=response,admin=admin,)
+            if role:
+                return await adminservice.listOfAdminsByRole(response=response,db=db,admin=admin,role=role) 
+            else: 
+                return await adminservice.listOfAdmins(db=db,response=response,admin=admin,)
         response.status_code = status.HTTP_401_UNAUTHORIZED
         return BaseResponse(statusCode=str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED,)
     except Exception as ex:
