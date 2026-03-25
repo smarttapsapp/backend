@@ -711,7 +711,7 @@ async def debitBillPayment(
                 logger.info(f"getting the current payment {currentPayment.reference} for processing at {datetime.now()}")
                 params = {}
                 if biller.billerType == "airtime":
-                    params['amount'] = payload.amount
+                    params['amount'] = str(int(payload.amount)/100)
                     params['beneficiary'] = payload.customerNumber
                     params['customer_reference'] = trnxId
                 if biller.billerType == "data" and package:

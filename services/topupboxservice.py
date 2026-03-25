@@ -12,9 +12,9 @@ async def purchaseService(biller:ProductTypeModel, serviceprovider:AdminModel,pa
     try:
         logger.info(f"started sending request to {serviceprovider.companyName} at {datetime.now()}")
         if str(biller.billerType).lower() == 'airtime':
-            providerUrl = f"{serviceprovider.provider_url}/{biller.billerId}/airtime"
+            providerUrl = f"{serviceprovider.provider_url}/recharge/{biller.billerId}/airtime"
         elif str(biller.billerType).lower() == 'data':
-            providerUrl = f"{serviceprovider.provider_url}/{biller.billerId}/data"
+            providerUrl = f"{serviceprovider.provider_url}/recharge/{biller.billerId}/data"
         elif biller.billerType == 'electricity':
             providerUrl = f"{serviceprovider.provider_url}/{biller.billerId}/electricity"
         elif biller.billerType == 'cable':
