@@ -701,11 +701,14 @@ async def debitBillPayment(
                 balanceAfter = user.wallet.availableBalance,created_at =datetime.now(),updated_at = datetime.now())),
         savedCustomerAccount = paymentQuery.create(db=db,model=user)
         if savedCustomerAccount:
+            logger.info(f"saved payment for customer at {datetime.now()}")
             #background_task.add_task(notifyUser,db=db,title=f"Debit Notification", message=createDebitRecord.statusMessage,userId=user.id, setting=setting)
             #email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"payment":createDebitRecord},)
             #background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Debit Notification",toAddress=user.email)
             currentPayment = paymentQuery.getPaymentByReference(db=db,reference=trnxId)
             if currentPayment:
+                logger.info(f"getting the current payment {biller.billerName} {biller.provider_id}for processing at {datetime.now()}")
+                logger.info(f"getting the current payment {currentPayment.reference} for processing at {datetime.now()}")
                 params = {}
                 if biller.billerType == "airtime":
                     params['amount'] = payload.amount
@@ -718,7 +721,7 @@ async def debitBillPayment(
                     currentPayment.statusCode = TransactionCodeEnum.SUCCESS
                     currentPayment.statusDescription = TransactionStatusEnum.SUCCESS
                     currentPayment.updated_at = datetime.now()
-                    background_task.add_task(glAccountingService.debitTransaction,response=response,setting=setting,db=db,biller=biller,customerAccount=user.wallet,amount=int(payload.amount),background_task=background_task,remark=statusMessage,merchant=merchant)
+                    background_task.add_task(glAccountingService.debitTransaction,response=response,setting=setting,db=db,biller=biller,customerAccount=user.wallet,amount=int(payload.amount),background_task=background_task,remark=currentPayment.statusMessage)
                     return BillPaymentResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":currentPayment.reference})
     else: 
         logger.info(f"{INSUFFICIENTFUND} with user {user.firstname}")

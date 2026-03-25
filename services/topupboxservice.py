@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 async def purchaseService(biller:ProductTypeModel, serviceprovider:AdminModel,params: dict = None):
     response = {}
     try:
-        logger.info(f"started sending request to {serviceprovider.firstname} at {datetime.now()}")
+        logger.info(f"started sending request to {serviceprovider.companyName} at {datetime.now()}")
         if str(biller.billerType).lower() == 'airtime':
             providerUrl = f"{serviceprovider.provider_url}/{biller.billerId}/airtime"
         elif str(biller.billerType).lower() == 'data':
