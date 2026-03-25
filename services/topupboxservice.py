@@ -24,18 +24,18 @@ async def purchaseService(biller:ProductTypeModel, serviceprovider:AdminModel,pa
         jsonresponse = res.json()
         if res.status_code in[200,201]:
             if jsonresponse["status"] == "2000":
-                response["statusCode"] = "200"
+                response["statuscode"] = "200"
                 response["tranxReference"] = jsonresponse["referenceNumber"]
                 response["confirmCode"] = jsonresponse["confirmationCode"]
                 response["mReference"] = jsonresponse["correlationId"]
                 response["statusDescription"] = jsonresponse["message"]
                 response["amount"] = jsonresponse["amount"]
             elif jsonresponse["status"] == "5010":
-                response["statusCode"] = "C001"
+                response["statuscode"] = "C001"
                 response["tranxReference"] = jsonresponse["referenceNumber"]
                 response["statusDescription"] = jsonresponse["message"]
             else:
-                response["statusCode"] = "C13"
+                response["statuscode"] = "C13"
                 response["tranxReference"] = jsonresponse["referenceNumber"]
                 response["statusDescription"] = jsonresponse["message"]
         else:
