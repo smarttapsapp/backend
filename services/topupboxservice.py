@@ -20,9 +20,9 @@ async def purchaseService(biller:ProductTypeModel, serviceprovider:AdminModel,pa
         elif biller.billerType == 'cable':
             providerUrl = f"{serviceprovider.provider_url}/{biller.billerId}/cable"
         header = {"Content-Type": "application/json","Authorization": serviceprovider.provider_auth}
-        res = await util.http(url=providerUrl,params=params,headers=header)
+        res = util.http(url=providerUrl,params=params,headers=header)
         jsonresponse = res.json()
-        if res.status_code == 200:
+        if res.status_code in[200,201]:
             if jsonresponse["status"] == "2000":
                 response["statusCode"] = "200"
                 response["tranxReference"] = jsonresponse["referenceNumber"]
