@@ -394,10 +394,11 @@ async def addPackage(db: Session,setting: Setting,payload: AddPackageRequest, ba
                     if paymentTerms and paymentTerms['statuscode'] == '200':
                         if paymentTerms['data'] and len(paymentTerms['data']) > 0:
                             for payment in paymentTerms['data']:
-                                existing = productQuery.getPackageByPaymentCode(db=db,code=str(payment['tarrifTypeId']))
+                                planId = payment['tarrifTypeId'] if 'tarrifTypeId' in payment else payment['planId']
+                                existing = productQuery.getPackageByPaymentCode(db=db,code=str(planId))
                                 if existing:
                                     logger.info(f"Started update for package {payment['name']} at {datetime.now()}")
-                                    existing.packageCode= payment['tarrifTypeId']
+                                    existing.packageCode= payment['tarrifTypeId'] if 'tarrifTypeId' in payment else payment['planId']
                                     existing.amount=payment['price']
                                     existing.billerId = biller.billerId
                                     existing.description=payment['description']
@@ -409,7 +410,7 @@ async def addPackage(db: Session,setting: Setting,payload: AddPackageRequest, ba
                                         product_type_id = biller.id,
                                         billerId = biller.billerId,
                                         name = payment['name'],
-                                        packageCode = payment['tarrifTypeId'],
+                                        packageCode = payment['tarrifTypeId'] if 'tarrifTypeId' in payment else payment['planId'],
                                         description = payment['description'],
                                         amount = payment['price'],
                                         validity = None,

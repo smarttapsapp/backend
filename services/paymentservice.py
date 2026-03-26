@@ -702,6 +702,7 @@ async def debitBillPayment(
         savedCustomerAccount = paymentQuery.create(db=db,model=user)
         if savedCustomerAccount:
             logger.info(f"saved payment for customer at {datetime.now()}")
+            background_task.add_task(notificationservice.sendNotification,notificationType="debit",setting=setting,background_task=background_task)
             #background_task.add_task(notifyUser,db=db,title=f"Debit Notification", message=createDebitRecord.statusMessage,userId=user.id, setting=setting)
             #email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"payment":createDebitRecord},)
             #background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Debit Notification",toAddress=user.email)

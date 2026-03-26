@@ -190,7 +190,7 @@ async def debitTransaction(response:Response,setting: Setting,db: Session,biller
                                      balanceAfter = customerAccount.availableBalance,created_at =datetime.now(),updated_at = datetime.now())),
                     savedCustomerAccount = adminQuery.save(db=db,account=customerAccount)
                     if savedCustomerAccount:
-                        background_task.add_task(notificationservice.sendNotification,notificationType="debit",setting=setting,background_task=background_task)
+                        
                         discount.admin.wallet.availableBalance = int(discount.admin.wallet.availableBalance) + int(provider_cost)
                         discount.admin.wallet.updated_at = datetime.now()
                         discount.admin.wallet.payments.append(PaymentModel(wallet_id = discount.admin.wallet.id,admin_id = discount.admin_id, amount = int(provider_cost),
@@ -228,7 +228,7 @@ async def debitTransaction(response:Response,setting: Setting,db: Session,biller
                                 if savedHeadoffice:
                                     background_task.add_task(notificationservice.sendNotification,notificationType="credit",setting=setting,background_task=background_task)
                                     background_task.add_task(notificationservice.sendNotification,notificationType="credit",setting=setting,background_task=background_task)
-                                    
+
                                     return BillPaymentResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":trnxId})
                                 logger.info(f"Unable to credit system wallet at {datetime.now()}")
                                 response.status_code = status.HTTP_400_BAD_REQUEST
@@ -406,7 +406,7 @@ async def debitTrainTransaction(request: Request,response:Response,setting:Setti
                     logger.info(f"started checking available merchant commission at {datetime.now()}")
                     commissionAmount = 0
                     if merchantCommission:
-                        logger.info(f"merchant is configured at {datetime.now()}")
+                        logger.info(f"merchant {merchantCommission.admin_id} is configured at {datetime.now()}")
                         commissionAmount = netIncome - int(merchantCommission.commission_rate) if merchantCommission.commission_type == CommissionType.calculated else (netIncome *  merchantCommission.commission_rate)
                     trnxId = f"{str(biller.billerId[:2]).upper()}-{util.generateId()}"
                     customer.wallet.availableBalance = int(customer.wallet.availableBalance) - int(payload.amount)
