@@ -127,6 +127,7 @@ class DebitRequest(PINRequest):
     transactionDate:str
 class BillNameEnquiryRequest(BaseModel):
     billerId:str
+    billerType:str
     packageId:str
     customerNumber:str
     amount: str
@@ -135,6 +136,7 @@ class BillNameEnquiryResponse(BaseResponse):
     data: Dict = None
 class BillPaymentRequest(PINRequest):
     billerId:str
+    billerType:str
     packageId:Optional[str]
     customerNumber:str
     walletAccount:str

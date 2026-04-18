@@ -53,8 +53,8 @@ def getHeadoffice(db: Session, glcode: str):
 def getHeadofficeAccount(db:Session):
     return db.query(AdminModel).filter(AdminModel.role.has(RoleModel.tag == AdminRoleEnum.HEADOFFICE)).first() #db.query(AdminModel).filter(AdminModel.role == AdminRoleEnum.HEADOFFICE).first()
 
-def get_single_biller_by_billerId(db: Session, billerId: str):
-    return db.query(ProductTypeModel).filter(ProductTypeModel.billerId == billerId).first()
+def get_single_biller_by_billerId(db: Session, billerId: str,billerType:str):
+    return db.query(ProductTypeModel).filter(ProductTypeModel.billerId == billerId, ProductTypeModel.billerType == billerType).first()
 
 def query_bus_routes(db: Session, departure: str, arrival: str, searchType: str):
     return db.query(ParkModel).filter(ParkModel.address.like(f"%{departure}%")).filter(ParkModel.address.like(f"%{arrival}%")).all()

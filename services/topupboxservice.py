@@ -12,13 +12,13 @@ async def purchaseService(biller:ProductTypeModel, serviceprovider:AdminModel,pa
     try:
         logger.info(f"started sending request to {serviceprovider.companyName} at {datetime.now()}")
         if str(biller.billerType).lower() == 'airtime':
-            providerUrl = f"{serviceprovider.provider_url}/recharge/{biller.billerId}/airtime"
+            providerUrl = f"{serviceprovider.provider_url}recharge/{biller.billerId}/airtime"
         elif str(biller.billerType).lower() == 'data':
-            providerUrl = f"{serviceprovider.provider_url}/recharge/{biller.billerId}/data"
+            providerUrl = f"{serviceprovider.provider_url}recharge/{biller.billerId}/data"
         elif biller.billerType == 'electricity':
-            providerUrl = f"{serviceprovider.provider_url}/{biller.billerId}/electricity"
-        elif biller.billerType == 'cable':
-            providerUrl = f"{serviceprovider.provider_url}/{biller.billerId}/cable"
+            providerUrl = f"{serviceprovider.provider_url}services/bills/electricity-request"
+        elif biller.billerType == 'cabletv':
+            providerUrl = f"{serviceprovider.provider_url}services/bills/cable-request"
         header = {"Content-Type": "application/json","Authorization": serviceprovider.provider_auth}
         res = util.http(url=providerUrl,params=params,headers=header)
         jsonresponse = res.json()
@@ -71,23 +71,20 @@ async def dataplans(biller:ProductTypeModel, serviceprovider:AdminModel):
         response["statuscode"] = "500"
         response["message"] = SYSTEMBUSY
     return response
-
-async def billEnquriesService(setting: Setting,biller:ProductTypeModel, serviceprovider:AdminModel,params: dict = None):
+async def billEnquriesService(serviceprovider:AdminModel,customerId: str,billerId: str):
     response = {}
     try:
         logger.info(
-            f"started sending request to {serviceprovider.provider_name} at {datetime.now()}"
+            f"started sending request to {serviceprovider.companyName} at {datetime.now()}"
         )
-        if serviceprovider.provider_code == '001':
-            params['key'] = serviceprovider.service_key
-            params['loginId'] =  serviceprovider.login_id
-        res = util.http(url=f'{serviceprovider.provider_url}validate',params=params,method=serviceprovider.auth_method)
+        headers = {"Content-Type": "application/json","Authorization": serviceprovider.provider_auth}
+        res = util.http(url=f'{serviceprovider.provider_url}services/bills/verify-name-elec',params={"account_number":customerId,"service_type": billerId},headers=headers)
         jsonresponse = res.json()
         if res.status_code == 200:
-            if jsonresponse['statusCode'] in ["00","C001"]:
+            if jsonresponse['status'] == "2000":
                 response["statuscode"] = "200"
                 response["message"] = SUCCESS
-                response["data"] = jsonresponse
+                response["data"] = jsonresponse['data'][0] if jsonresponse['data'] else {}
             else:
                 response["statuscode"] = "400"
                 response["message"] = "failed"
@@ -99,8 +96,6 @@ async def billEnquriesService(setting: Setting,biller:ProductTypeModel, servicep
         response["statuscode"] = "500"
         response["message"] = SYSTEMBUSY
     return response
-
-
 def requeryTopupBoxTransaction(payload):
     response = {}
     try:
@@ -128,4 +123,104 @@ def requeryTopupBoxTransaction(payload):
         print(ex)
         response["statusCode"] = "C001"
         response["statusDescription"] = "Pending"
+    return response
+async def cabletvProviders(product:ProductModel, serviceprovider:AdminModel):
+    response = {}
+    try:
+        logger.info(
+            f"started getting providerd for {product.name} {serviceprovider.lastname} at {datetime.now()}"
+        )
+        headers = {"Content-Type": "application/json","Authorization": serviceprovider.provider_auth}
+        res = util.http(url=f'{serviceprovider.provider_url}services/bills/cabletv-providers',headers=headers)
+        jsonresponse = res.json()
+        if res.status_code == 200:
+            if jsonresponse['status'] == "2000":
+                response["statuscode"] = "200"
+                response["message"] = SUCCESS
+                response["data"] = jsonresponse["data"]
+            else:
+                response["statuscode"] = "400"
+                response["message"] = "failed"
+        else:
+            response["statuscode"] = "400"
+            response["message"] = SYSTEMBUSY
+    except Exception as ex:
+        logger.info(ex)
+        response["statuscode"] = "500"
+        response["message"] = SYSTEMBUSY
+    return response
+async def cabletvPackages(biller:ProductTypeModel):
+    response = {}
+    try:
+        logger.info(
+            f"started data plan request for {biller.billerName} {biller.provider.lastname} at {datetime.now()}"
+        )
+        headers = {"Content-Type": "application/json","Authorization": biller.provider.provider_auth}
+        res = util.http(url=f'{biller.provider.provider_url}services/bills/multichoice-list',params={"service_type": biller.billerId},headers=headers)
+        jsonresponse = res.json()
+        if res.status_code == 200:
+            if jsonresponse['status'] == "2000":
+                response["statuscode"] = "200"
+                response["message"] = SUCCESS
+                response["data"] = jsonresponse["data"]
+            else:
+                response["statuscode"] = "400"
+                response["message"] = "failed"
+        else:
+            response["statuscode"] = "400"
+            response["message"] = SYSTEMBUSY
+    except Exception as ex:
+        logger.info(ex)
+        response["statuscode"] = "500"
+        response["message"] = SYSTEMBUSY
+    return response
+async def electricityProviders(product:ProductModel, serviceprovider:AdminModel):
+    response = {}
+    try:
+        logger.info(
+            f"started getting providerd for {product.name} {serviceprovider.lastname} at {datetime.now()}"
+        )
+        headers = {"Content-Type": "application/json","Authorization": serviceprovider.provider_auth}
+        res = util.http(url=f'{serviceprovider.provider_url}services/bills/all-billers',headers=headers)
+        jsonresponse = res.json()
+        if res.status_code == 200:
+            if jsonresponse['status'] == "2000":
+                response["statuscode"] = "200"
+                response["message"] = SUCCESS
+                response["data"] = jsonresponse["data"]
+            else:
+                response["statuscode"] = "400"
+                response["message"] = "failed"
+        else:
+            response["statuscode"] = "400"
+            response["message"] = SYSTEMBUSY
+    except Exception as ex:
+        logger.info(ex)
+        response["statuscode"] = "500"
+        response["message"] = SYSTEMBUSY
+    return response
+async def electricityPackages(biller:ProductTypeModel):
+    response = {}
+    try:
+        logger.info(
+            f"started data plan request for {biller.billerName} {biller.provider.companyName} at {datetime.now()}"
+        )
+        headers = {"Content-Type": "application/json","Authorization": biller.provider.provider_auth}
+        res = util.http(url=f'{biller.provider.provider_url}services/bills/all-billers',headers=headers)
+        jsonresponse = res.json()
+        if res.status_code == 200:
+            if jsonresponse['status'] == "2000":
+                response["statuscode"] = "200"
+                response["message"] = SUCCESS
+                response["data"] = jsonresponse["data"]
+            else:
+                response["statuscode"] = "400"
+                response["message"] = "failed"
+        else:
+            response["statuscode"] = "400"
+            response["message"] = SYSTEMBUSY
+    except Exception as ex:
+        logger.info(ex)
+        response["statuscode"] = "500"
+        response["message"] = SYSTEMBUSY
     return response

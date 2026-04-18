@@ -619,23 +619,29 @@ async def billerEnquiry(
         db: Session,
         user: Customer
 ):
-    biller = paymentQuery.get_single_biller_by_billerId(db=db,billerId=payload.billerId)
+    biller = paymentQuery.get_single_biller_by_billerId(db=db,billerId=payload.billerId,billerType=payload.billerType)
     if payload.customerNumber:
         if biller:
             package = next((x for x in biller.packages if x.packageCode == payload.packageId), None)
             if package:
-                if biller.billerType == "utility":
-                    return BillNameEnquiryResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={
-                        "fullName":"John Doe",
-                        "address":"3, lokoja street Abuja Lagos",
-                        "minimumAmount":"1000"
-                    })
-                return BillNameEnquiryResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={
-                        "fullName":"John Doe"
-                    })
-            logger.info(f"Invalid package code selected {payload.packageId}")    
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDBILLER)
+                if biller.billerType == "electricity":
+                    topup = await topupboxservice.billEnquriesService(serviceprovider=biller.provider,customerId=payload.customerNumber,billerId=payload.packageId)
+                    if topup and topup['statuscode'] == "200":
+                        return BillNameEnquiryResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=topup['data'])
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=topup['message'])
+                else:
+                    topup = await topupboxservice.billEnquriesService(serviceprovider=biller.provider,customerId=payload.customerNumber,billerId=payload.billerId)
+                    if topup and topup['statuscode'] == "200":
+                        return BillNameEnquiryResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data=topup['data'])
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=topup['message'])
+            else:
+                logger.info(f"Invalid package code selected {payload.packageId}")    
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDBILLER)
         logger.info(f"Invalid biller selected {payload.billerId}")    
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDBILLER)
@@ -651,7 +657,8 @@ async def payBills(
         user: CustomerModel,
         background_task:BackgroundTasks
 ):
-    biller = paymentQuery.get_single_biller_by_billerId(db=db,billerId=payload.billerId)
+    logger.info(f"started bill payment for biller {payload.billerId} for amount {payload.billerType}")
+    biller = paymentQuery.get_single_biller_by_billerId(db=db,billerId=payload.billerId, billerType=payload.billerType)
     if payload.customerNumber:
         if biller:
             if biller.hasPackages:
@@ -716,7 +723,27 @@ async def debitBillPayment(
                     params['beneficiary'] = payload.customerNumber
                     params['customer_reference'] = trnxId
                 if biller.billerType == "data" and package:
+                    params['amount'] = str(int(payload.amount)/100)
+                    params['beneficiary'] = payload.customerNumber
+                    params['customer_reference'] = trnxId
                     params['tariffTypeId'] = package.packageCode
+                if biller.billerType == "cabletv" and package:
+                    params['service_type'] = biller.billerId
+                    params['product_code'] = package.packageCode
+                    params['total_amount'] = str(int(payload.amount)/100)
+                    params['smartcard_number'] = payload.customerNumber
+                    params['product_monthsPaidFor'] = package.validity
+                    params['addon_code'] = []
+                    params['secret'] = trnxId
+                    params['agentId'] = "205"
+                if biller.billerType == "electricity" and package:
+                    params['account_number'] = payload.customerNumber
+                    params['service_type'] = package.packageCode
+                    params['amount'] = str(int(payload.amount)/100)
+                    params['metadata'] = package.packageCode
+                    params['phone'] = package.packageCode
+                    params['agentId'] = "205"
+                    params['secret'] = trnxId
                 topup = await topupboxservice.purchaseService(biller=biller,serviceprovider=biller.provider,params=params)
                 if topup and topup['statuscode'] == "200":
                     currentPayment.statusCode = TransactionCodeEnum.SUCCESS
@@ -724,6 +751,14 @@ async def debitBillPayment(
                     currentPayment.updated_at = datetime.now()
                     background_task.add_task(glAccountingService.debitTransaction,response=response,setting=setting,db=db,biller=biller,customerAccount=user.wallet,amount=int(payload.amount),background_task=background_task,remark=currentPayment.statusMessage)
                     return BillPaymentResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":currentPayment.reference})
+                else:
+                    currentPayment.statusCode = TransactionCodeEnum.FAILED
+                    currentPayment.statusDescription = TransactionStatusEnum.FAILED
+                    currentPayment.updated_at = datetime.now()
+                    paymentQuery.create(db=db,model=currentPayment)
+                    logger.info(f"topup failed for {payload.customerNumber} with biller {biller.billerName} at {datetime.now()}")
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
     else: 
         logger.info(f"{INSUFFICIENTFUND} with user {user.firstname}")
         response.status_code = status.HTTP_400_BAD_REQUEST

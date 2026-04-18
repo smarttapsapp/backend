@@ -1828,6 +1828,35 @@ async def addProduct(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+@router.post("/provider/refresh", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["seat"])
+async def refreshProvider(
+    payload:AddProductTypeRequest,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await productservice.refreshProvider(
+                db=db,
+                setting=setting,
+                payload=payload,
+                background_task=background_task,
+                request=request,
+                response=response,
+                admin=admin
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
 @router.delete("/product/{id}/delete", 
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["seat"])

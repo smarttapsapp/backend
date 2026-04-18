@@ -280,6 +280,7 @@ async def addBiller(db: Session,setting: Setting,payload: AddProductTypeRequest,
             existing.billerId = payload.billerId
             existing.billerName = payload.billerName
             existing.billerType = payload.billerType
+            existing.logo = payload.logo
             existing.customerField = payload.customerField
             existing.hasAddons = payload.hasAddons
             existing.hasLookup = payload.hasLookup
@@ -295,6 +296,7 @@ async def addBiller(db: Session,setting: Setting,payload: AddProductTypeRequest,
                 billerId =payload.billerId,
                 billerName = payload.billerName,
                 status = payload.status,
+                logo = payload.logo,
                 customerField = payload.customerField,
                 hasAddons = payload.hasAddons,
                 hasLookup = payload.hasLookup,
@@ -369,6 +371,51 @@ async def deleteBiller(db: Session, background_task: BackgroundTasks, request: R
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def refreshProvider(db: Session,setting: Setting,payload: AddProductTypeRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started product at {datetime.now()}")
+        existing = productQuery.getProductTypeById(db=db,billerId=payload.id)
+        if existing:
+
+            subject = "Biller Update"
+            existing.billerId = payload.billerId
+            existing.billerName = payload.billerName
+            existing.billerType = payload.billerType
+            existing.customerField = payload.customerField
+            existing.hasAddons = payload.hasAddons
+            existing.hasLookup = payload.hasLookup
+            existing.hasPackages = payload.hasPackages
+            existing.status=payload.status
+            existing.maxAmountLimit=payload.maxAmountLimit
+            existing.minAmountLimit=payload.minAmountLimit
+            existing.updated_at=datetime.now()
+        else:
+            subject = "New Biller"
+            existing = ProductTypeModel(
+                product_id=payload.product_id,
+                billerId =payload.billerId,
+                billerName = payload.billerName,
+                status = payload.status,
+                customerField = payload.customerField,
+                hasAddons = payload.hasAddons,
+                hasLookup = payload.hasLookup,
+                hasPackages = payload.hasPackages,
+                maxAmountLimit = payload.maxAmountLimit,
+                minAmountLimit = payload.minAmountLimit,
+                created_at=datetime.now(),updated_at=datetime.now(),)
+        created = productQuery.create(db=db, model=existing)
+        if created:
+            email_body = util.templates.TemplateResponse("product.html",{"request": request, "product": created,},)
+            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject=subject,toAddress=admin.email,)
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+
 # packages
 async def listOfPackages(response: Response,db: Session,admin: AdminModel,billerId: int):
     try:
@@ -389,47 +436,132 @@ async def addPackage(db: Session,setting: Setting,payload: AddPackageRequest, ba
         if biller:
             logger.info(f"biller {biller.billerType} package at {datetime.now()}")
             if biller.provider:
-                if biller.billerType.lower() == "data":
-                    paymentTerms = await topupboxservice.dataplans(biller=biller,serviceprovider=biller.provider)
-                    if paymentTerms and paymentTerms['statuscode'] == '200':
-                        if paymentTerms['data'] and len(paymentTerms['data']) > 0:
-                            for payment in paymentTerms['data']:
-                                planId = payment['tarrifTypeId'] if 'tarrifTypeId' in payment else payment['planId']
-                                existing = productQuery.getPackageByPaymentCode(db=db,code=str(planId))
-                                if existing:
-                                    logger.info(f"Started update for package {payment['name']} at {datetime.now()}")
-                                    existing.packageCode= payment['tarrifTypeId'] if 'tarrifTypeId' in payment else payment['planId']
-                                    existing.amount=payment['price']
-                                    existing.billerId = biller.billerId
-                                    existing.description=payment['description']
-                                    existing.name=payment['name']
-                                    productQuery.create(db=db,model=existing)
-                                else:
-                                    logger.info(f"Started onboarding for new package {biller.billerName} {payment['name']} at {datetime.now()}")
-                                    newproduct = PackageModel(
-                                        product_type_id = biller.id,
-                                        billerId = biller.billerId,
-                                        name = payment['name'],
-                                        packageCode = payment['tarrifTypeId'] if 'tarrifTypeId' in payment else payment['planId'],
-                                        description = payment['description'],
-                                        amount = payment['price'],
-                                        validity = None,
-                                        status = True,
-                                        updated_at = datetime.now(),
-                                        created_at = datetime.now())
-                                    productQuery.create(db=db,model=newproduct) 
-                            logger.info(f"saving all billers at {datetime.now()}")
-                            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                if biller.provider.identifier.lower() == "topupbox":
+                    logger.info(f"biller provider {biller.provider.identifier} package at {datetime.now()}")
+                    if biller.billerType.lower() == "data":
+                        paymentTerms = await topupboxservice.dataplans(biller=biller,serviceprovider=biller.provider)
+                        if paymentTerms and paymentTerms['statuscode'] == '200':
+                            if paymentTerms['data'] and len(paymentTerms['data']) > 0:
+                                for payment in paymentTerms['data']:
+                                    planId = payment['tarrifTypeId'] if 'tarrifTypeId' in payment else payment['planId']
+                                    existing = productQuery.getPackageByPaymentCode(db=db,code=str(planId))
+                                    if existing:
+                                        logger.info(f"Started update for package {payment['name']} at {datetime.now()}")
+                                        existing.packageCode= payment['tarrifTypeId'] if 'tarrifTypeId' in payment else payment['planId']
+                                        existing.amount=payment['price']
+                                        existing.billerId = biller.billerId
+                                        existing.description=payment['description']
+                                        existing.name=payment['name']
+                                        productQuery.create(db=db,model=existing)
+                                    else:
+                                        logger.info(f"Started onboarding for new package {biller.billerName} {payment['name']} at {datetime.now()}")
+                                        newproduct = PackageModel(
+                                            product_type_id = biller.id,
+                                            billerId = biller.billerId,
+                                            name = payment['name'],
+                                            packageCode = payment['tarrifTypeId'] if 'tarrifTypeId' in payment else payment['planId'],
+                                            description = payment['description'],
+                                            amount = payment['price'],
+                                            validity = None,
+                                            status = True,
+                                            updated_at = datetime.now(),
+                                            created_at = datetime.now())
+                                        productQuery.create(db=db,model=newproduct) 
+                                logger.info(f"saving all billers at {datetime.now()}")
+                                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                            else:
+                                response.status_code = status.HTTP_400_BAD_REQUEST
+                                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription= FAILED,)
                         else:
                             response.status_code = status.HTTP_400_BAD_REQUEST
-                            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription= FAILED,)
-                    else:
-                        response.status_code = status.HTTP_400_BAD_REQUEST
-                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription= paymentTerms['message'],)
+                            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription= paymentTerms['message'],)
+                elif biller.provider.identifier.lower() == "topupboxbill":
+                    if biller.billerType.lower() == "cabletv":
+                        logger.info(f"started getting biller provider {biller.provider.identifier} package at {datetime.now()}")
+                        paymentTerms = await topupboxservice.cabletvPackages(biller=biller)
+                        if paymentTerms and paymentTerms['statuscode'] == '200':
+                            logger.info(f"got biller provider {biller.provider.identifier} package response at {datetime.now()}")
+                            if paymentTerms['data'] and len(paymentTerms['data']) > 0:
+                                for payment in paymentTerms['data']:
+                                    existing = productQuery.getPackageByPaymentCode(db=db,code=str(payment['code']))
+                                    if existing:
+                                        logger.info(f"Started update for package {payment['name']} at {datetime.now()}")
+                                        existing.packageCode= payment['code']
+                                        existing.amount=str(int(payment['price'])*100)
+                                        existing.billerId = biller.billerId
+                                        existing.hasValidity = True if 'monthsPaidFor' in payment else False
+                                        existing.validity = payment['monthsPaidFor'] if 'monthsPaidFor' in payment else None
+                                        existing.description=payment['name']
+                                        existing.name=payment['name']
+                                        productQuery.create(db=db,model=existing)
+                                    else:
+                                        logger.info(f"Started onboarding for new package {biller.billerName} {payment['name']} at {datetime.now()}")
+                                        newproduct = PackageModel(
+                                            product_type_id = biller.id,
+                                            billerId = biller.billerId,
+                                            name = payment['name'],
+                                            hasValidity = True if 'monthsPaidFor' in payment else False,
+                                            packageCode = payment['code'],
+                                            description = payment['name'],
+                                            amount = str(int(payment['price'])*100),
+                                            validity = payment['monthsPaidFor'] if 'monthsPaidFor' in payment else None,
+                                            status = True,
+                                            updated_at = datetime.now(),
+                                            created_at = datetime.now())
+                                        productQuery.create(db=db,model=newproduct) 
+                                logger.info(f"saving all billers at {datetime.now()}")
+                                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription="Fetched packages successfully")
+                            else:
+                                response.status_code = status.HTTP_400_BAD_REQUEST
+                                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription= FAILED,)
+                        else:
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription= paymentTerms['message'],)
+                    elif biller.billerType.lower() == "electricity":
+                        logger.info(f"biller provider {biller.provider.identifier} package at {datetime.now()}")
+                        paymentTerms = await topupboxservice.electricityPackages(biller=biller)
+                        if paymentTerms and paymentTerms['statuscode'] == '200':
+                            if paymentTerms['data'] and len(paymentTerms['data']) > 0:
+                                elec = [p for p in paymentTerms['data'] if 'serviceType' in p and str(biller.billerId) in str(p['serviceType']).lower()]
+                                for el in elec:
+                                    existing = productQuery.getPackageByPaymentCode(db=db,code=str(el['serviceType']))
+                                    if existing:
+                                        logger.info(f"Started update for package {el['name']} at {datetime.now()}")
+                                        existing.packageCode = el['serviceType']
+                                        existing.amount=0
+                                        existing.hasValidity = False
+                                        existing.validity = None
+                                        existing.billerId = biller.billerId
+                                        existing.description=el['name']
+                                        existing.name=el['name']
+                                        productQuery.create(db=db,model=existing)
+                                    else:
+                                        logger.info(f"Started onboarding for new package {biller.billerName} {el['name']} at {datetime.now()}")
+                                        newproduct = PackageModel(
+                                            product_type_id = biller.id,
+                                            billerId = biller.billerId,
+                                            name = el['name'],
+                                            packageCode = el['serviceType'],
+                                            description = el['name'],
+                                            amount = 0,
+                                            validity = None,
+                                            status = True,
+                                            updated_at = datetime.now(),
+                                            created_at = datetime.now())
+                                        productQuery.create(db=db,model=newproduct) 
+                                logger.info(f"saving all billers at {datetime.now()}")
+                                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                            else:
+                                response.status_code = status.HTTP_400_BAD_REQUEST
+                                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription= FAILED,)
+                        else:
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription= paymentTerms['message'],)
                 else:
                     logger.info(f"biller not found at {datetime.now()}")
                     response.status_code = status.HTTP_400_BAD_REQUEST
-                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDBILLER,)
+                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Provider not found",)
+            
             else:
                 logger.info(f"biller provider not found at {datetime.now()}")
                 response.status_code = status.HTTP_400_BAD_REQUEST
