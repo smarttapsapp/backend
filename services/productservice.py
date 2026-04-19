@@ -448,7 +448,7 @@ async def addPackage(db: Session,setting: Setting,payload: AddPackageRequest, ba
                                     if existing:
                                         logger.info(f"Started update for package {payment['name']} at {datetime.now()}")
                                         existing.packageCode= payment['tarrifTypeId'] if 'tarrifTypeId' in payment else payment['planId']
-                                        existing.amount=payment['price']
+                                        existing.amount=str(int(payment['price'])*100)
                                         existing.billerId = biller.billerId
                                         existing.description=payment['description']
                                         existing.name=payment['name']
@@ -461,7 +461,7 @@ async def addPackage(db: Session,setting: Setting,payload: AddPackageRequest, ba
                                             name = payment['name'],
                                             packageCode = payment['tarrifTypeId'] if 'tarrifTypeId' in payment else payment['planId'],
                                             description = payment['description'],
-                                            amount = payment['price'],
+                                            amount = str(int(payment['price'])*100),
                                             validity = None,
                                             status = True,
                                             updated_at = datetime.now(),

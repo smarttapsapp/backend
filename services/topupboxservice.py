@@ -53,7 +53,7 @@ async def dataplans(biller:ProductTypeModel, serviceprovider:AdminModel):
             f"started data plan request for {biller.billerName} {serviceprovider.lastname} at {datetime.now()}"
         )
         headers = {"Content-Type": "application/json","Authorization": serviceprovider.provider_auth}
-        res = util.http(url=f'{serviceprovider.provider_url}/data-price-point/{biller.billerId}',headers=headers)
+        res = util.http(url=f'{serviceprovider.provider_url}data-price-point/{biller.billerId}',headers=headers)
         jsonresponse = res.json()
         if res.status_code == 200:
             if jsonresponse['status'] == "2000":
