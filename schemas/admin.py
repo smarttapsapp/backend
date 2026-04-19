@@ -25,6 +25,7 @@ class AdminBase(BaseModel):
     companyAddress: Union[str,None]=None
     provider_url: Union[str,None]=None
     provider_auth: Union[str,None]=None
+    identifier: Union[str,None]=None
 class AdminCreate(AdminBase):
     password: Union[str, None] = None
     created_at: datetime

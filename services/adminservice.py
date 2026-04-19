@@ -50,6 +50,24 @@ async def createAccount(
     try:
         if payload.id:
             logger.info(f"updating user {payload.firstname} at {str(datetime.now())}")
+            user = authQuery.getCheckAdmin(db=db,username=payload.email)
+            if user:
+                user.firstname = payload.firstname
+                user.identifier = payload.identifier if payload.identifier else user.identifier
+                user.lastname = payload.lastname
+                user.phonenumber = payload.phonenumber
+                user.email = payload.email
+                user.companyName = payload.companyName
+                user.companyAddress = payload.companyAddress
+                user.provider_auth = payload.provider_auth
+                user.provider_url = payload.provider_url
+                user.updated_at = datetime.now()
+                updatedUser = authQuery.create_account(db=db,user=user)
+                if updatedUser:
+                    return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ACCTERROR)
         else:
             logger.info(f"creating new user {payload.firstname} at {str(datetime.now())}")
             user = authQuery.getCheckAdmin(db=db,username=payload.email)
@@ -141,6 +159,7 @@ async def createUserAccount(db: Session,setting: Setting,payload: CreateAdminReq
                     companyAddress = payload.companyAddress,
                     provider_auth = payload.provider_auth,
                     provider_url = payload.provider_url,
+                    identifier=payload.identifier if payload.identifier else util.generateBillerId(),
                     password=util.get_password_hash(password),
                     role_id=role.id,
                     status=True,
