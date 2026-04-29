@@ -7,6 +7,7 @@ from fastapi import (
     Request,File,
     BackgroundTasks,
 )
+from schemas.bus_type import BusTypesResponse
 from schemas.response import *
 from schemas.request import *
 from sqlalchemy.orm import Session
@@ -36,6 +37,7 @@ from schemas.service_rate import *
 from schemas.general_ledger import *
 from schemas.journal import *
 from schemas.product import *
+from schemas.bus_type import *
 from schemas.product_type import *
 from schemas.package import *
 from schemas.payment import *
@@ -109,7 +111,6 @@ async def postLogout(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
-
 @router.get("/profile", 
     response_model=BaseResponse,
     response_model_exclude_unset=True,name="user profile")
@@ -134,7 +135,6 @@ async def getAdminProfile(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex),)
-
 @router.post(
     "/add",
     response_model=BaseResponse,
@@ -177,6 +177,28 @@ async def getAdmins(
                 return await adminservice.listOfAdminsByRole(response=response,db=db,admin=admin,role=role) 
             else: 
                 return await adminservice.listOfAdmins(db=db,response=response,admin=admin,)
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return BaseResponse(statusCode=str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/bus-providers",response_model=AdminsResponse,response_model_exclude_unset=True)
+async def get_bus_providers(response: Response,admin: Annotated[AdminModel, Depends(validateAdmin)],db: Annotated[Session, Depends(get_db)]):
+    try:
+        if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPPORT,AdminRoleEnum.ADMIN]:
+            return await adminservice.listOfBusProviders(db=db,response=response,admin=admin,)
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return BaseResponse(statusCode=str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/train-providers",response_model=AdminsResponse,response_model_exclude_unset=True)
+async def get_train_providers(response: Response,admin: Annotated[AdminModel, Depends(validateAdmin)],db: Annotated[Session, Depends(get_db)]):
+    try:
+        if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPPORT,AdminRoleEnum.ADMIN]:
+            return await adminservice.listOfTrainProviders(db=db,response=response,admin=admin,)
         response.status_code = status.HTTP_401_UNAUTHORIZED
         return BaseResponse(statusCode=str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED,)
     except Exception as ex:
@@ -394,6 +416,83 @@ async def getDashboardProductRequest(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+# bus type
+@router.get("/bus-types", 
+    response_model=BusTypesResponse,
+    response_model_exclude_unset=True,tags=["bus"])
+async def bus_types(
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+    startDate: str = Query(default=util.get_first_day_of_month()),
+    endDate: Optional[str] = Query(str(date.today())),
+):
+    try:
+        if admin:
+            if startDate and endDate:
+                start = datetime.strptime(startDate, "%Y-%m-%d")
+                end = datetime.strptime(endDate, "%Y-%m-%d")
+                if end < start:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BusTypesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="End date must be greater than or equal to start date.")
+            return await  adminservice.listOfBusTypes(response=response,db=db,admin=admin)
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BusTypesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.post("/bus-type/add", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["bus"])
+async def addBusType(
+    payload:AddBusTypeRequest,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await adminservice.addBusType(db=db,setting=setting,payload=payload,request=request,response=response,admin=admin,background_task=background_task)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.delete("/bus-type/{id}/delete", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["bus"])
+async def deleteBusType(
+    id:int,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await adminservice.deleteBusType(
+            id=id,
+                db=db,
+                request=request,
+                response=response,
+                setting=setting,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+
+
 # station
 @router.get("/bus/stations", 
     response_model=StationsResponse,
@@ -445,15 +544,35 @@ async def get_train_stations(
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["station"])
 async def addStation(
-    payload:AddStationRequest,
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
     setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
+    parkImage: UploadFile= File(None),
+    id: Optional[int] = Form(None),
+    admin_id: int = Form(...),
+    stationName: str = Form(...),
+    location: str = Form(...),
+    description: Optional[str] = Form(None),
+    address: Optional[str] = Form(False),
+    camera: Optional[bool] = Form(False),
+    status: Optional[bool] = Form(False),
+    contact: str = Form(...),
+    mode: str = Form(...),
 ):
     try:
+        payload=AddStationRequest(
+            id=id,
+            stationName=stationName,
+            mode=mode,
+            admin_id=admin_id,
+            location=location,
+            address=address,
+            camera=camera,
+            status=status,
+            contact=contact,description=description)
         return await adminservice.addStation(
             payload=payload,
                 db=db,
@@ -461,7 +580,8 @@ async def addStation(
                 request=request,
                 response=response,
                 admin=admin,
-                background_task=background_task
+                background_task=background_task,
+                parkImage=parkImage
             )
     except Exception as ex:
         logger.error(ex)
@@ -551,6 +671,24 @@ async def get_routes(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/routes/{providerId}", 
+    response_model=BusRoutesResponse,
+    response_model_exclude_unset=True,tags=["route"])
+async def get_routes_via_provider(
+    providerId:int,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT,AdminRoleEnum.BUSPROVIDER]:
+            return await  adminservice.listOfAdminRoutes(response=response,db=db,providerId=providerId)
+        return BusRoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED,)
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BusRoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.post("/route/add", 
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["route"])
@@ -1074,18 +1212,41 @@ async def get_buses(
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["bus"])
 async def addBus(
-    payload:AddBusRequest,
     request: Request,
     response: Response,
     admin: Annotated[AdminModel, Depends(validateAdmin)],
     setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     background_task: BackgroundTasks,
+    busImage: UploadFile= File(None),
+    id: Optional[int] = Form(None),
+    admin_id: int = Form(...),
+    name: str = Form(...),
+    bus_number: str = Form(...),
+    description: Optional[str] = Form(None),
+    tv: Optional[bool] = Form(False),
+    camera: Optional[bool] = Form(False),
+    airCondition: Optional[bool] = Form(False),
+    availabilityStatus: str = Form(...),
+    base_price: str = Form(...),
 ):
     try:
+        logger.info(f"Received bus data: id={id}, admin_id={admin_id}, name={name}, bus_number={bus_number}, description={description}, tv={tv}, camera={camera}, airCondition={airCondition}, availabilityStatus={availabilityStatus}, base_price={base_price}")
+        payload = AddBusRequest(
+            id=id,
+            admin_id=admin_id,
+            name=name,
+            bus_number=bus_number,
+            description=description,
+            tv=tv,
+            camera=camera,
+            airCondition=airCondition,
+            availabilityStatus=availabilityStatus,
+            base_price=base_price
+        )
         if payload.id:
             return await adminservice.editBus(db=db,setting=setting,payload=payload,request=request,response=response,admin=admin,background_task=background_task)
-        return await adminservice.addBus(db=db,setting=setting,payload=payload,request=request,response=response,admin=admin,background_task=background_task)
+        return await adminservice.addBus(db=db,setting=setting,payload=payload,request=request,response=response,admin=admin,background_task=background_task,busImage=busImage)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -1093,6 +1254,24 @@ async def addBus(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+@router.get("/buses/{providerId}", 
+    response_model=BusesResponse,
+    response_model_exclude_unset=True,tags=["bus"])
+async def get_buses_via_admin(
+    providerId:int,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT,AdminRoleEnum.BUSPROVIDER]:
+            return await  adminservice.listOfAdminBuses(response=response,db=db,providerId=providerId)
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED,)
+
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.post("/bus/{id}/edit", 
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["bus"])

@@ -57,12 +57,15 @@ class MovableEnum(PythonEnum):
     TRAIN = "train"
     AEROPLANE = "plane"
 class BusStatusEnum(PythonEnum):
+    AVAILABLE = "available"
+    UNAVAILABLE = "unavailable"
+    MAINTENANCE = "maintenance"
+    NOTINUSE = "notinuse"
     TRANSIT = "transit"
     BOARDING = "boarding"
     ACTIVE = "active"
     OPEN = "open"
     CLOSED = "closed"
-    INACTIVE = "inactive"
 class AccountEnum(PythonEnum):
     INDIVIDUAL = "individual"
     AGENT = "agent"
@@ -161,6 +164,32 @@ class TicketStatusEnum(PythonEnum):
 class TicketModeEnum(PythonEnum):
     BUS = "bus"
     TRAIN = "train"
+class ModeEnum(PythonEnum):
+    BUS = "BUS"
+    TRAIN = "TRAIN"
+class TripStatusEnum(PythonEnum):
+    SCHEDULED = "SCHEDULED"
+    BOARDING = "BOARDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+    FULL = "FULL"
+class SeatTypeEnum(PythonEnum):
+    PASSENGER = "PASSENGER"
+    DRIVER = "DRIVER"
+    AISLE = "AISLE"
+    VIP = "VIP"
+    VVIP = "VVIP"
+class BookingStatusEnum(PythonEnum):
+    RESERVED = "RESERVED"
+    CONFIRMED = "CONFIRMED"
+    CANCELLED = "CANCELLED"
+    BOARDED = "BOARDED"
+    COMPLETED = "COMPLETED"
+class CouponStatusEnum(PythonEnum):
+    OPEN = "OPEN"
+    INACTIVE = "INACTIVE"
+    EXPIRED = "EXPIRED"
 class RoleModel(Base):
     __tablename__ = "roles"
     id = Column(Integer, primary_key=True, index=True)
@@ -171,8 +200,8 @@ class RoleModel(Base):
     description = Column(String(255))
     status = Column(Boolean, default=False)
     admins = relationship("AdminModel",  uselist=False,back_populates="role")
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now())
 class AdminModel(Base):
     __tablename__ = "admins"
     id = Column(Integer, primary_key=True, index=True)
@@ -206,8 +235,8 @@ class AdminModel(Base):
     bus_routes = relationship("BusRouteModel", back_populates="provider")
     trains = relationship("TrainModel", back_populates="provider")
     support_tickets = relationship('SupportTicketModel', back_populates='admin')
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now())
 class CustomerModel(Base):
     __tablename__ = "customers"
     id = Column(Integer, primary_key=True, index=True)
@@ -294,8 +323,8 @@ class CustomerModel(Base):
     preference = relationship('UserNotificationPreference', uselist=False, back_populates='user')
     # ticketing
     support_tickets = relationship('SupportTicketModel', back_populates='user')
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now())
 class BeneficiaryModel(Base):
     __tablename__ = "beneficiaries"
     id = Column(Integer, primary_key=True, index=True)
@@ -307,28 +336,27 @@ class BeneficiaryModel(Base):
     billername = Column(String(255), nullable=True)
     logo = Column(Text, nullable=True)
     user_id = Column(Integer, ForeignKey("customers.id"))
-    updated_at = Column(DateTime, default=func.now())
-    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(),onupdate=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
 class OTPModel(Base):
     __tablename__ = "otps"
     id = Column(Integer, primary_key=True, index=True)
     otp = Column(String(6))
     servicename = Column(String(255))
-    status = Column(Enum(OTPStatusEnum), nullable=False, default=OTPStatusEnum.OPEN)
+    status = Column(Enum(OTPStatusEnum), nullable=False, default=OTPStatusEnum.OPEN,server_default=OTPStatusEnum.OPEN.value)
     user_id = Column(Integer, ForeignKey("customers.id"),nullable=True)
     admin_id = Column(Integer, ForeignKey("admins.id"),nullable=True)
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
     expired_at = Column(
         DateTime,
-        default=func.now() + timedelta(minutes=15),
-    )
-    updated_at = Column(DateTime, default=func.now())
+        default=func.now() + timedelta(minutes=15) )
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(),onupdate=func.now())
 class CardsModel(Base):
     __tablename__ = "cards"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("customers.id"))
     authorization_code = Column(String(100))
-    bin= Column(String(50),default='0')
+    bin= Column(String(50),default='0',server_default='0')
     last4= Column(String(5),nullable=True)
     exp_month= Column(String(3),nullable=True)
     exp_year= Column(String(5),nullable=True)
@@ -338,8 +366,8 @@ class CardsModel(Base):
     signature= Column(String(25),nullable=True)
     account_name= Column(String(25),nullable=True)
     reusable = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(),onupdate=func.now())
 class AccountModel(Base):
     __tablename__ = "wallets"
     id = Column(Integer, primary_key=True, index=True)
@@ -349,17 +377,17 @@ class AccountModel(Base):
     admin = relationship("AdminModel", back_populates="wallet")
     payments = relationship('PaymentModel', backref='wallet')
     walletAccount = Column(String(11))
-    availableBalance= Column(String(50),default='0')
+    availableBalance= Column(String(50),default='0',server_default='0')
     referenceNo= Column(String(11),nullable=True)
-    accountStatus = Column(Enum(AccountStatusEnum), nullable=False, default=AccountStatusEnum.ACTIVE)
+    accountStatus = Column(Enum(AccountStatusEnum), nullable=False, default=AccountStatusEnum.ACTIVE,server_default=AccountStatusEnum.ACTIVE.value)
     #accountStatus= Column(String(20),default=AccountStatusEnum.ACTIVE)
-    cashout_enabled = Column(Boolean, default=False)
+    cashout_enabled = Column(Boolean, default=False,server_default='0')
     cashout_account = Column(String(50), nullable=True)
     cashout_code = Column(String(50), nullable=True)
     cashout_bank = Column(String(50), nullable=True)
-    cashout_limit = Column(String(50), default="10000000")
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now())
+    cashout_limit = Column(String(50), default="10000000",server_default="10000000")
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(),onupdate=func.now())
 class CashOutModel(Base):
     __tablename__ = "cashouts"
     id = Column(Integer, primary_key=True, index=True)
@@ -371,14 +399,14 @@ class CashOutModel(Base):
     recipient= Column(String(50),nullable=False)
     approved= Column(String(50),nullable=True)
     rejected= Column(String(50),nullable=True)
-    withdrawalStatus =  Column(Enum(WithrawalStatusEnum), nullable=False, default=WithrawalStatusEnum.WAITING)
-    statusCode =  Column(Enum(TransactionCodeEnum), nullable=False, default=TransactionCodeEnum.PROCESSING)
-    statusDescription =  Column(Enum(TransactionStatusEnum), nullable=False, default=TransactionStatusEnum.PROCESSING)
+    withdrawalStatus =  Column(Enum(WithrawalStatusEnum), nullable=False, default=WithrawalStatusEnum.WAITING,server_default=WithrawalStatusEnum.WAITING.value)
+    statusCode =  Column(Enum(TransactionCodeEnum), nullable=False, default=TransactionCodeEnum.PROCESSING,server_default=TransactionCodeEnum.PROCESSING.value)
+    statusDescription =  Column(Enum(TransactionStatusEnum), nullable=False, default=TransactionStatusEnum.PROCESSING,server_default=TransactionStatusEnum.PROCESSING.value)
     reference = Column(String(100),nullable=False,unique=True, default=lambda: str(uuid.uuid4()),)
     transfer_code = Column(String(100),nullable=True)
     reason = Column(String(220),nullable=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(),onupdate=func.now())
 class DeviceModel(Base):
     __tablename__ = "devices"
     id = Column(Integer, primary_key=True, index=True)
@@ -391,8 +419,8 @@ class DeviceModel(Base):
     apiLevel = Column(String(255))
     user_id = Column(Integer, ForeignKey("customers.id"), unique=True)
     user = relationship("CustomerModel", back_populates="device")
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(),onupdate=func.now())
 class ProductModel(Base):
     __tablename__ = "products"
     id = Column(Integer, primary_key=True, index=True)
@@ -406,8 +434,8 @@ class ProductModel(Base):
     payments = relationship('PaymentModel',back_populates='product')
     enabledInline = Column(Boolean, default=False)
     isWeb = Column(Boolean, default=False)
-    updated_at = Column(DateTime, default=func.now())
-    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
 class ProductTypeModel(Base):
     __tablename__ = "product_types"
     id = Column(Integer, primary_key=True, index=True)
@@ -429,8 +457,8 @@ class ProductTypeModel(Base):
     hasAddons = Column(Boolean, default=False)
     product_id = Column(Integer, ForeignKey("products.id"))
     packages = relationship("PackageModel", backref="product_type")
-    updated_at = Column(DateTime, default=func.now())
-    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
 class PackageModel(Base):
     __tablename__ = "packages"
     id = Column(Integer, primary_key=True, index=True)
@@ -443,8 +471,8 @@ class PackageModel(Base):
     packageCode = Column(String(50))
     status = Column(Boolean, default=False)
     hasValidity = Column(Boolean, default=False)
-    updated_at = Column(DateTime, default=func.now())
-    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
 class TransactionModel(Base):
     __tablename__ = "transactions"
     id = Column(Integer, primary_key=True, index=True)
@@ -454,14 +482,14 @@ class TransactionModel(Base):
     channel = Column(
         Enum(TransactionChannelEnum),
         nullable=False,
-        default=TransactionChannelEnum.MOBILE,
+        default=TransactionChannelEnum.MOBILE,server_default=TransactionChannelEnum.MOBILE.value
     )
     status = Column(
         Enum(TransactionStatusEnum),
         nullable=False,
-        default=TransactionStatusEnum.PENDING,
+        default=TransactionStatusEnum.PENDING,server_default=TransactionStatusEnum.PENDING.value
     )
-    isDebit = Column(Boolean, default=True)
+    isDebit = Column(Boolean, default=True,server_default='1')
     remarks = Column(String(255), nullable=True)
     reference = Column(String(255), nullable=True)
     customerBillerId = Column(String(255), nullable=True)
@@ -478,11 +506,11 @@ class TransactionModel(Base):
     cardPan = Column(String(255), nullable=True)
     provider = Column(String(255), nullable=True)
     btcode = Column(String(5), nullable=True)
-    cashbackFee = Column(DECIMAL(10, 2), default=0.0)
-    serviceFee = Column(DECIMAL(10, 2), default=0.0)
-    accountImpacted = Column(Boolean,default=False)
-    updated_at = Column(DateTime, default=func.now())
-    created_at = Column(DateTime, default=func.now())
+    cashbackFee = Column(DECIMAL(10, 2), default=0.0,server_default='0.0')
+    serviceFee = Column(DECIMAL(10, 2), default=0.0,server_default='0.0')
+    accountImpacted = Column(Boolean,default=False,server_default='0')
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
 class PaymentModel(Base):
     __tablename__ = 'payments'
     
@@ -518,15 +546,15 @@ class PaymentModel(Base):
     productType = relationship("ProductTypeModel", backref="product_types")
     cashout_id = Column(Integer, ForeignKey('cashouts.id'))
     cashout = relationship("CashOutModel", backref="cashouts")
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now())
 class BankModel(Base):
     __tablename__ = "banks"
     id = Column(Integer, primary_key=True, index=True)
     cbnCode = Column(String(10))
     shortname = Column(String(10))
     longname = Column(String(255))
-    status = Column(Boolean, default=False)
+    status = Column(Boolean, default=False,server_default='0')
     code = Column(String(5), nullable=True)
     nubancode = Column(String(10), nullable=True)
     sortcode = Column(String(10), nullable=True)
@@ -534,8 +562,8 @@ class BankModel(Base):
     meta1 = Column(String(100), nullable=True)
     meta2 = Column(String(100), nullable=True)
     logo = Column(Text, nullable=True)
-    updated_at = Column(DateTime, default=func.now())
-    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
 class SettingsModel(Base):
     __tablename__ = "settings"
     id = Column(Integer, primary_key=True, index=True)
@@ -577,8 +605,8 @@ class SettingsModel(Base):
     gl_outflow= Column(String(25), nullable=True)
     gl_com= Column(String(25), nullable=True)
     gl_payable= Column(String(25), nullable=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now())
 class NotificationModel(Base):
     __tablename__ = "notifications"
     id = Column(Integer, primary_key=True, index=True)
@@ -589,8 +617,8 @@ class NotificationModel(Base):
     user_notifications = relationship("UserNotification", back_populates="notification",cascade="all, delete",passive_deletes=True )
     #users = relationship('CustomerModel', secondary='user_notifications', back_populates='notifications')
     #user_notifications = relationship('UserNotification', back_populates='notification')
-    updated_at = Column(DateTime, default=func.now())
-    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
 class UserNotificationPreference(Base):
     __tablename__ = 'user_notification_preferences'
     
@@ -601,7 +629,7 @@ class UserNotificationPreference(Base):
     receive_via_email = Column(Boolean, default=True)
     receive_via_sms = Column(Boolean, default=False)
     receive_in_app = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
     user = relationship('CustomerModel', back_populates='preference')
     admin = relationship('AdminModel', back_populates='preference')
     #notification_type = relationship('NotificationType')
@@ -613,7 +641,7 @@ class UserNotification(Base):
     admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True)
     notification_id = Column(Integer, ForeignKey('notifications.id', ondelete="CASCADE"), nullable=False,)
     is_read = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
     customer = relationship("CustomerModel", back_populates="user_notifications")
     admin = relationship("AdminModel", back_populates="user_notifications")
     notification = relationship("NotificationModel", back_populates="user_notifications")
@@ -634,8 +662,8 @@ class SupportTicketModel(Base):
     status = Column(Enum(OTPStatusEnum), default=OTPStatusEnum.OPEN) 
     attachment = Column(Text, nullable=True)
     comments = relationship('TicketCommentModel', backref='support_ticket', cascade='all, delete-orphan')
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(), onupdate=func.now())
 class TicketCommentModel(Base):
     __tablename__ = 'ticket_comments'
     
@@ -646,7 +674,7 @@ class TicketCommentModel(Base):
     comment = Column(Text, nullable=False)
     attachment = Column(Text, nullable=True)
     #attachments = relationship('TicketAttachmentModel', backref='ticket_comments', cascade='all, delete-orphan')
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
     user = relationship('CustomerModel', backref='comments')
     agent = relationship('AdminModel', backref='comments')
 class TicketAttachmentModel(Base):
@@ -656,7 +684,7 @@ class TicketAttachmentModel(Base):
     comment_id = Column(Integer, ForeignKey('ticket_comments.id'), nullable=False)
     file_path = Column(String(255), nullable=False)
     uploaded_by = Column(Integer, ForeignKey('customers.id'), nullable=False)
-    uploaded_at = Column(DateTime, default=func.now())
+    uploaded_at = Column(DateTime, default=func.now(),server_default=func.now())
     user = relationship('CustomerModel', backref='attachments')
 class LoanModel(Base):
     __tablename__ = 'loans'
@@ -669,7 +697,7 @@ class LoanModel(Base):
     start_date = Column(DateTime, nullable=False)
     end_date = Column(DateTime, nullable=False)
     status_id = Column(Integer, ForeignKey('loan_statuses.id'), nullable=False)
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
     type = relationship('LoanTypeModel', backref='loans')
     user = relationship('CustomerModel', backref='loans')
     status = relationship('LoanStatusModel', backref='loans')
@@ -679,16 +707,16 @@ class LoanTypeModel(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(50), nullable=False, unique=True)
     description = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(), onupdate=func.now())
 class LoanStatusModel(Base):
     __tablename__ = 'loan_statuses'
     
     id = Column(Integer, primary_key=True)
     name = Column(String(50), nullable=False, unique=True)
     description = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(), onupdate=func.now())
 class ScheduleSeatModel(Base):
     __tablename__ = 'seat_schedule'
     
@@ -700,21 +728,6 @@ class TrainSeatModel(Base):
     id = Column(Integer, primary_key=True)
     seat_id = Column(Integer, ForeignKey('seats.id'), nullable=False)
     train_id = Column(Integer, ForeignKey('trains.id'), nullable=False)
-class SeatModel(Base):
-    __tablename__ = 'seats'
-    
-    id = Column(Integer, primary_key=True)
-    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
-    route_id  = Column(Integer, ForeignKey("routes.id"), nullable=True)
-    route =  relationship("RouteModel",  back_populates="seats",cascade="all")
-    #schedule_id  = Column(Integer, ForeignKey("schedules.id"))
-    #schedules =  relationship("ScheduleModel", secondary="seat_schedule", back_populates="seats")
-    seatNumber = Column(String(50), nullable=True)
-    price = Column(String(25), nullable=False)
-    classType = Column(String(55),nullable=False)
-    availabilityStatus = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 class ParkModel(Base):
     __tablename__ = 'parks'
     id = Column(Integer, primary_key=True)
@@ -731,8 +744,8 @@ class ParkModel(Base):
     description = Column(String(255), nullable=True)
     policy = Column(String(255), nullable=True)
     status = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(), onupdate=func.now())
 class StationModel(Base):
     __tablename__ = 'stations'
     
@@ -763,90 +776,125 @@ class StationModel(Base):
         foreign_keys="BusRouteModel.destinationStation_id",
         back_populates="destinationStation"
     )
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(), onupdate=func.now())
 bus_route = Table('bus_route',
     Base.metadata,
     Column('bus_id', Integer, ForeignKey('buses.id' ,ondelete="CASCADE"), primary_key=True),
     Column('bus_routes_id', Integer, ForeignKey('bus_routes.id',ondelete="CASCADE"), primary_key=True)
 )
-class BusRouteModel(Base):
-    __tablename__ = 'bus_routes'
-    
+class BusTypeModel(Base):
+    __tablename__ = "bus_types"
     id = Column(Integer, primary_key=True)
-    bus_id = Column(Integer, ForeignKey('buses.id'), nullable=False)
-    identifier = Column(String(50), unique=False)
-    routeName = Column(String(50), nullable=True,)
-    isdelete = Column(Boolean, default=False)
     admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
-    mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS)
-    sourceStation_id = Column(Integer, ForeignKey("stations.id"))
-    destinationStation_id = Column(Integer, ForeignKey("stations.id"))
-    baseprice = Column(String(50), nullable=False,default=0)
-    sourceStation = relationship("StationModel", foreign_keys=[sourceStation_id], back_populates="bus_departures")
-    destinationStation = relationship("StationModel", foreign_keys=[destinationStation_id], back_populates="bus_arrivals")
-    bus = relationship("BusModel", back_populates="routes")
-    tickets = relationship("TicketModel", back_populates="busroute")
-    #buses = relationship('BusModel',secondary=bus_route,back_populates='routes',cascade="all")
-    provider = relationship("AdminModel", back_populates="bus_routes")
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    name = Column(String(50), nullable=False)
+    total_seats = Column(Integer, nullable=False)
+    created_at = Column(DateTime,default=func.now(), server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(), onupdate=func.now())
+    seats = relationship("SeatModel", back_populates="bus_type")
+    buses = relationship("BusModel", back_populates="bus_type")
+class SeatModel(Base):
+    __tablename__ = "seats"
+    id =  Column(Integer, primary_key=True)
+    bus_type_id =Column(Integer, ForeignKey('bus_types.id'), nullable=False)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
+    seat_number = Column(Integer, nullable=True)
+    seat_label = Column(String(10), nullable=True)
+    seatrow = Column(Integer, nullable=False)
+    seatcolumn = Column(Integer, nullable=False)
+    seattype = Column(Enum(SeatTypeEnum), default=SeatTypeEnum.PASSENGER,server_default=SeatTypeEnum.PASSENGER.value)
+    is_bookable = Column(Boolean, default=True,server_default='1')
+    price = Column(String(25), nullable=True ,default='0',server_default='0')
+    bus_type = relationship("BusTypeModel", back_populates="seats")
+    __table_args__ = (
+        UniqueConstraint("bus_type_id", "seatrow", "seatcolumn", name="uq_layout_position"),
+    )
 class BusModel(Base):
     __tablename__ = 'buses'
     id = Column(Integer, primary_key=True)
     identifier = Column(String(50), unique=False)
     admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
+    bus_type_id = Column(Integer, ForeignKey("bus_types.id"))
     name = Column(String(100), nullable=False, unique=True)
     bus_number = Column(String(10),)
     billerId = Column(String(25),nullable=True)
     description = Column(String(255), nullable=True)
-    types = Column(Enum(MovableEnum), nullable=False, default=MovableEnum.BUS)
-    airCondition = Column(Boolean, default=False)
-    camera = Column(Boolean, default=False)
-    tv = Column(Boolean, default=False)
-    isdelete = Column(Boolean, default=False)
+    types = Column(Enum(MovableEnum), nullable=False, default=MovableEnum.BUS,server_default=MovableEnum.BUS.value)
+    airCondition = Column(Boolean, default=False,server_default='0')
+    camera = Column(Boolean, default=False,server_default='0')
+    tv = Column(Boolean, default=False,server_default='0')
+    isdelete = Column(Boolean, default=False,server_default='0')
     base_price = Column(String(25), nullable=True)
-    availabilityStatus = Column(Enum(BusStatusEnum), nullable=False, default=BusStatusEnum.ACTIVE)
+    availabilityStatus = Column(Enum(BusStatusEnum), nullable=False, default=BusStatusEnum.ACTIVE,server_default=BusStatusEnum.ACTIVE.value)
     busImage = Column(String(255), nullable=True)
-    bus_capacity = Column(String(25),nullable=True,default="0")
+    bus_capacity = Column(String(25),nullable=True,default="0",server_default='0')
     swap_bus = Column(String(25),nullable=True)
     provider = relationship("AdminModel", back_populates="buses")
-    routes = relationship('BusRouteModel',back_populates='bus',cascade="all, delete-orphan")
+    #routes = relationship('BusRouteModel',back_populates='bus',cascade="all, delete-orphan")
     schedules =  relationship("BusScheduleModel", back_populates="bus",cascade="all, delete-orphan")
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    bus_type = relationship("BusTypeModel", back_populates="buses")
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(), onupdate=func.now())
+class BusRouteModel(Base):
+    __tablename__ = 'bus_routes'
+    
+    id = Column(Integer, primary_key=True)
+    #bus_id = Column(Integer, ForeignKey('buses.id'), nullable=False)
+    identifier = Column(String(50), unique=False)
+    routeName = Column(String(50), nullable=True)
+    isdelete = Column(Boolean, default=False,server_default='0')
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0,server_default='0')
+    mode = Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS,server_default=TicketModeEnum.BUS.value)  # schedule mode
+    sourceStation_id = Column(Integer, ForeignKey("stations.id"))
+    destinationStation_id = Column(Integer, ForeignKey("stations.id"))
+    baseprice = Column(String(50), nullable=False,default=0,server_default='0')
+    sourceStation = relationship("StationModel", foreign_keys=[sourceStation_id], back_populates="bus_departures")
+    destinationStation = relationship("StationModel", foreign_keys=[destinationStation_id], back_populates="bus_arrivals")
+    bus_schedules = relationship('BusScheduleModel',back_populates='busroute')
+    #bus = relationship("BusModel", back_populates="routes")
+    tickets = relationship("TicketModel", back_populates="busroute")
+    provider = relationship("AdminModel", back_populates="bus_routes")
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(), onupdate=func.now())
 class BusScheduleModel(Base):
     __tablename__ = 'bus_schedules'
     id = Column(Integer, primary_key=True)
     identifier = Column(String(50), unique=False)
-    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0,server_default='0')
     bus_id = Column(Integer, ForeignKey('buses.id'), nullable=False)
+    bus_route_id = Column(Integer, ForeignKey("bus_routes.id"), nullable=False)
     departureTime = Column(String(50), nullable=False)
     arrivalTime = Column(String(255), nullable=True)
+    status = Column(Enum(TripStatusEnum), default=TripStatusEnum.SCHEDULED,server_default=TripStatusEnum.SCHEDULED.value)
+    timeOfOperation = Column(Enum(TimeOfOperationEnum), default=TimeOfOperationEnum.MORNING,server_default=TimeOfOperationEnum.MORNING.value)
+    trip_Date = Column(DateTime, default=func.now(),server_default=func.now())
+    total_seats = Column(Integer, nullable=False)
+    booked_seats = Column(Integer, default=0,server_default='0')
     daysOfOperation = Column(String(255), nullable=True)
-    isdelete = Column(Boolean, default=False)
-    price = Column(String(25), nullable=True)
-    timeOfOperation = Column(Enum(TimeOfOperationEnum), default=TimeOfOperationEnum.MORNING)
-    mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS) 
+    isdelete = Column(Boolean, default=False,server_default='0')
+    price = Column(String(25), nullable=True,default='0',server_default='0')
+    mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS,server_default=TicketModeEnum.BUS.value) 
     bus = relationship("BusModel", back_populates="schedules")
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    busroute = relationship("BusRouteModel", back_populates="bus_schedules")
+    #tickets = relationship("TicketModel", back_populates="busschedule")
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(), onupdate=func.now())
 class RouteModel(Base):
     __tablename__ = 'routes'
     
     id = Column(Integer, primary_key=True)
     routeName = Column(String(50), nullable=True,)
-    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0)
-    isdelete = Column(Boolean, default=False)
-    mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.TRAIN)  # schedule mode
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True,default=0,server_default='0')
+    isdelete = Column(Boolean, default=False,server_default='0')
+    mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.TRAIN,server_default=TicketModeEnum.TRAIN.value)  # schedule mode
     sourceStation_id = Column(Integer, ForeignKey("stations.id"))
     destinationStation_id = Column(Integer, ForeignKey("stations.id"))
     #sourceStation = relationship("StationModel", foreign_keys=[sourceStation_id], back_populates="depature")
     #destinationStation = relationship("StationModel", foreign_keys=[destinationStation_id], back_populates="arrival")
-    seats = relationship('SeatModel',back_populates='route',cascade="all")
+    #seats = relationship('SeatModel',back_populates='route',cascade="all")
     #provider = relationship("AdminModel", back_populates="routes")
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(), onupdate=func.now())
 class ScheduleModel(Base):
     __tablename__ = 'schedules'
     
@@ -862,8 +910,8 @@ class ScheduleModel(Base):
     daysOfOperation = Column(String(255), nullable=True)
     timeOfOperation = Column(Enum(TimeOfOperationEnum), default=TimeOfOperationEnum.MORNING)
     mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS)  # schedule mode
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(), onupdate=func.now())
     #trains = relationship("TrainModel", secondary="train_schedule", back_populates="schedules")
     #buses = relationship("BusModel", secondary="bus_schedule", back_populates="schedules")
 class TicketModel(Base):
@@ -871,33 +919,38 @@ class TicketModel(Base):
     
     id = Column(Integer, primary_key=True)
     customer_id = Column(Integer, ForeignKey('customers.id'), nullable=False)
+    seat_id = Column(Integer, ForeignKey("seats.id")) 
     admin_id = Column(Integer, ForeignKey('admins.id'), nullable=False,default=0)
-    customer = relationship('CustomerModel', backref='tickets')
     bus_id = Column(Integer, ForeignKey('buses.id'), nullable=True)
     train_id = Column(Integer, ForeignKey('trains.id'), nullable=True)
     route_id = Column(Integer, ForeignKey('train_routes.id'), nullable=True)
     busroute_id = Column(Integer, ForeignKey('bus_routes.id'), nullable=True)
-    seat_id = Column(Integer, ForeignKey('train_pricing.id'), nullable=True)
+    #seat_id = Column(Integer, ForeignKey('train_pricing.id'), nullable=True)
+    schedule_id = Column(Integer, ForeignKey('train_schedules.id'), nullable=True)  # Train schedule
+    busschedule_id = Column(Integer, ForeignKey('bus_schedules.id'), nullable=True)  # Train schedule
+    ticket_number =  Column(String(50), unique=True)
+    isdelete = Column(Boolean, default=False,server_default='0')
+    price = Column(String(25), nullable=True)  # Ticket price
+    qr_code = Column(String(255), nullable=False,unique=True)  # QR code string or URL
+    status= Column(Enum(TicketStatusEnum), default=TicketStatusEnum.BOOKED,server_default=TicketStatusEnum.BOOKED.value)  # Ticket status
+    mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS,server_default=TicketModeEnum.BUS.value)  # Ticket status
+    status = Column(Enum(BookingStatusEnum), default=BookingStatusEnum.RESERVED,server_default=BookingStatusEnum.RESERVED.value)
+    boarding_date = Column(String(50), nullable=True)
+    booked_at = Column(DateTime, default=func.now(),server_default=func.now())
+    expired_at = Column(DateTime, default=func.now(),server_default=func.now())# Purchase time
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(), onupdate=func.now())
+    customer = relationship('CustomerModel', backref='tickets')
+    schedule = relationship('TrainScheduleModel', backref='tickets')
+    bus_schedule = relationship('BusScheduleModel', backref='tickets')
     bus = relationship('BusModel', backref='tickets')
     train = relationship('TrainModel', backref='tickets')
     route = relationship('TrainRouteModel', backref='tickets')
     busroute = relationship('BusRouteModel', back_populates='tickets')
-    schedule_id = Column(Integer, ForeignKey('train_schedules.id'), nullable=True)  # Train schedule
-    busschedule_id = Column(Integer, ForeignKey('bus_schedules.id'), nullable=True)  # Train schedule
-    schedule = relationship('TrainScheduleModel', backref='tickets')
-    busschedule = relationship('BusScheduleModel', backref='tickets')
-    ticket_number =  Column(String(50), unique=True)
-    isdelete = Column(Boolean, default=False)
-    seat_number = Column(String(50), nullable=True)  # Seat number
-    price= Column(String(25), nullable=True)  # Ticket price
-    qr_code = Column(String(255), nullable=False,unique=True)  # QR code string or URL
-    status= Column(Enum(TicketStatusEnum), default=TicketStatusEnum.BOOKED)  # Ticket status
-    mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS)  # Ticket status
-    boarding_date = Column(String(50), nullable=True)
-    booked_at = Column(DateTime, default=func.now())  
-    expired_at = Column(DateTime, default=func.now())# Purchase time
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    verified_by = Column(String(100))
+    __table_args__ = (
+        UniqueConstraint("busschedule_id", "seat_id", name="uq_bus_schedule_seat"),
+    )
 class GLAccountModel(Base):
     __tablename__ = "gl_accounts"
 
@@ -907,7 +960,7 @@ class GLAccountModel(Base):
     gl_type = Column(Enum(AccountType), nullable=False)
     gl_balance = Column(String(20), nullable=False,default='0')
     journal_entries = relationship('JournalEntryModel', backref='gl_account')
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
     updated_at = Column(DateTime, default=func.now(),onupdate=func.now())
 class JournalEntryModel(Base):
     __tablename__ = "journal_entries"
@@ -918,7 +971,7 @@ class JournalEntryModel(Base):
     admin_id = Column(Integer, ForeignKey("admins.id"))
     amount = Column(String(20), nullable=False)
     is_debit = Column(Boolean, nullable=False)
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
     updated_at = Column(DateTime, default=func.now(),onupdate=func.now())
 class ServiceRateModel(Base):
     __tablename__ = "service_rates"
@@ -933,7 +986,7 @@ class ServiceRateModel(Base):
     provider_discount_type = Column(Enum(CommissionType), nullable=False)
     active = Column(Boolean, default=True)
     updated_at = Column(DateTime, default=func.now(),onupdate=func.now())
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
 class CommissionModel(Base):
     __tablename__ = "commissions"
 
@@ -946,7 +999,7 @@ class CommissionModel(Base):
     commission_rate = Column(Numeric(7, 2), nullable=False)
     commission_type = Column(Enum(CommissionType), nullable=False)
     updated_at = Column(DateTime, default=func.now(),onupdate=func.now())
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
     __table_args__ = (
         UniqueConstraint('admin_id', 'product_type_id', name='uix_admin_product_type'),
     )
@@ -971,8 +1024,8 @@ class TrainRouteModel(Base):
     trains = relationship('TrainModel',secondary=train_route,back_populates='routes',cascade="all")
     provider = relationship("AdminModel", back_populates="routes")
     prices = relationship("PricingModel", back_populates="route")
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(), onupdate=func.now())
 class TrainModel(Base):
     __tablename__ = "trains"
     
@@ -985,13 +1038,13 @@ class TrainModel(Base):
     image = Column(String(255), nullable=True)
     billerId = Column(String(25),nullable=True)
     description = Column(String(255), nullable=True)
-    isdelete = Column(Boolean, default=False)
+    isdelete = Column(Boolean, default=False,server_default='0')
     provider = relationship("AdminModel", back_populates="trains")
     #route = relationship("TrainRouteModel", back_populates="trains")
     routes = relationship('TrainRouteModel',secondary=train_route,back_populates='trains',cascade="all")
     schedules = relationship("TrainScheduleModel", back_populates="train")
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(), onupdate=func.now())
 class TrainScheduleModel(Base):
     __tablename__ = "train_schedules"
 
@@ -1001,12 +1054,11 @@ class TrainScheduleModel(Base):
     admin_id = Column(Integer, ForeignKey('admins.id'), nullable=True)
     departureTime = Column(String(50), nullable=False)
     arrivalTime = Column(String(255), nullable=True)
-    isdelete = Column(Boolean, default=False)
+    isdelete = Column(Boolean, default=False,server_default='0')
     timeOfOperation = Column(Enum(TimeOfOperationEnum), default=TimeOfOperationEnum.MORNING)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(), onupdate=func.now())
     train = relationship("TrainModel", back_populates="schedules")
-    #bookings = relationship("BookingModel", back_populates="schedule")
 class PricingModel(Base):
     __tablename__ = "train_pricing"
 
@@ -1019,6 +1071,15 @@ class PricingModel(Base):
     dynamic_pricing = Column(Boolean, default=False)
     isdelete = Column(Boolean, default=False)
     availabilityStatus = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),server_default=func.now(), onupdate=func.now())
     route = relationship("TrainRouteModel", back_populates="prices")
+class CouponModel(Base):
+    __tablename__ = "boarding_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_id = Column(Integer, ForeignKey('admins.id'), nullable=False,default=0)
+    coupon_name = Column(String(100), nullable=False)
+    coupon_amount = Column(String(100), nullable=False)
+    status = Column(Enum(CouponStatusEnum), default=CouponStatusEnum.OPEN,server_default=CouponStatusEnum.OPEN.value)
+    created_at = Column(DateTime,default=func.now(),server_default=func.now())

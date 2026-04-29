@@ -33,6 +33,7 @@ class BusBase(BaseModel):
         populate_by_name = True
 class Bus(BusBase):
     id: Optional[int]=None
+    companyName: str
     routes: Optional[List[Route]] = []
     schedules: Optional[List[BusSchedule]] = []
     created_at: Union[datetime, None] = func.now()
@@ -70,6 +71,15 @@ class MiniBus(BaseModel):
         from_attributes = True
         populate_by_name = True
 class AddBusRequest(BusBase):
+    id: Optional[int]=None
+    identifier: Optional[int]=None
+    @model_validator(mode="before")
+    @classmethod
+    def compute_kobo(cls, values):
+        if values.get("base_price") is not None:
+            values["base_price"] = str(int(values["base_price"]) * 100)
+        return values
+class AddBusRequestOld(BusBase):
     id: Optional[int]=None
     identifier: Optional[int]=None
     schedules:List[dict]

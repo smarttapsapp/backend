@@ -74,6 +74,10 @@ def getAdminByCustomerId(db: Session,id:int):
     return db.query(AdminModel).filter(AdminModel.customer_id ==id).first()
 def getAdminProvider(db:Session):
     return db.query(AdminModel).join(RoleModel).filter(RoleModel.tag.in_([AdminRoleEnum.PROVIDER,AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER])).order_by(desc(AdminModel.created_at)).all()
+def getBusProvider(db:Session):
+    return db.query(AdminModel).join(RoleModel).filter(RoleModel.tag == AdminRoleEnum.BUSPROVIDER).order_by(desc(AdminModel.created_at)).all()
+def getTrainProvider(db:Session):
+    return db.query(AdminModel).join(RoleModel).filter(RoleModel.tag == AdminRoleEnum.TRAINPROVIDER).order_by(desc(AdminModel.created_at)).all()
 def getAllRole(db: Session,adminId:int=None):
     return db.query(RoleModel).filter(RoleModel.roleType == AdminTypeEnum.INTERNAL).order_by(desc(RoleModel.created_at)).all()
 def getRole(db: Session,roleId:int=None):
@@ -86,6 +90,8 @@ def getAllAdminByRole(db: Session,role:AdminTypeEnum):
     return db.query(AdminModel).join(RoleModel).filter(RoleModel.roleType == role).order_by(desc(AdminModel.created_at)).all()
 def getAdmin(db: Session,adminId:int=None):
     return db.query(AdminModel).filter(AdminModel.id ==adminId).first()
+def getAdminIdentifier(db: Session, id: str):
+    return db.query(AdminModel).filter(AdminModel.identifier == id).first()
 # trains
 def getTrains(db: Session,adminId:int=None):
     if adminId:
@@ -102,11 +108,62 @@ def countTrains(db: Session):
     return db.query(TrainModel).count()
 def getTrainsByBusiness(db: Session,adminId:int=None):
     return db.query(TrainModel).filter(TrainModel.route_id ==adminId).order_by(desc(TrainModel.created_at)).all()
+#bus types
+def getBusTypes(db: Session,adminId:int=None):
+    if adminId:
+        return db.execute(select(BusTypeModel, AdminModel.companyName).join(AdminModel, AdminModel.id == BusTypeModel.admin_id).filter(BusTypeModel.admin_id ==adminId).order_by(desc(BusTypeModel.created_at))).mappings().all()
+    return db.execute(select(
+        BusTypeModel.id,
+        BusTypeModel.name,
+        BusTypeModel.admin_id,
+        BusTypeModel.total_seats,
+        BusTypeModel.created_at, AdminModel.companyName).join(AdminModel, AdminModel.id == BusTypeModel.admin_id).order_by(desc(BusTypeModel.created_at))).mappings().all()
+def getBusTypeId(db: Session, id: int):
+    return db.execute(select(BusTypeModel).join(AdminModel).filter(BusTypeModel.id == id)).scalars().first()
+def deleteBusType(db: Session,id:int):
+    return db.query(BusTypeModel).filter(BusTypeModel.id ==id).delete()
 #buses
-def getBuses(db: Session,adminId:int=None):
+def getBusesOld(db: Session,adminId:int=None):
     if adminId:
         return db.query(BusModel).filter(BusModel.admin_id ==adminId,BusModel.isdelete == False).order_by(desc(BusModel.created_at)).all()
     return db.query(BusModel).filter(BusModel.isdelete == False).order_by(desc(BusModel.created_at)).all()
+def getBuses(db: Session,adminId:int=None):
+    if adminId:
+        return db.execute(select(
+        BusModel.id,
+        BusModel.identifier,
+        BusModel.name,
+        BusModel.bus_number,
+        BusModel.bus_capacity,
+        BusModel.busImage,
+        BusModel.admin_id,
+        BusModel.billerId,
+        BusModel.description,
+        BusModel.types,
+        BusModel.tv,
+        BusModel.camera,
+        BusModel.airCondition,
+        BusModel.base_price,
+        BusModel.created_at, 
+        AdminModel.companyName).join(AdminModel, AdminModel.id == BusModel.admin_id).filter(BusModel.admin_id ==adminId).order_by(desc(BusModel.created_at))).mappings().all()
+    return db.execute(select(
+        BusModel.id,
+        BusModel.identifier,
+        BusModel.name,
+        BusModel.bus_number,
+        BusModel.bus_capacity,
+        BusModel.busImage,
+        BusModel.admin_id,
+        BusModel.billerId,
+        BusModel.description,
+        BusModel.types,
+        BusModel.tv,
+        BusModel.camera,
+        BusModel.airCondition,
+        BusModel.base_price,
+        BusModel.created_at, 
+        AdminModel.companyName).join(AdminModel, AdminModel.id == BusModel.admin_id).order_by(desc(BusModel.created_at))).mappings().all()
+
 def getBus(db: Session,busNumber:str):
     return db.query(BusModel).filter(BusModel.bus_number == busNumber).first()
 def getBusesByIds(db:Session,ids:list[int],adminId:int=None):
@@ -120,10 +177,42 @@ def countBuses(db: Session):
 def getBusesByBusiness(db: Session,parkId:int=None):
     return db.query(BusModel).filter(BusModel.park_id ==parkId).order_by(desc(BusModel.created_at)).all()
 # stations
-def getstations(db: Session,adminId:int=None):
+def getstations(db: Session,mode:MovableEnum,adminId:int=None):
     if adminId:
-        return db.query(StationModel).filter(StationModel.admin_id ==adminId,StationModel.isdelete == False).order_by(desc(StationModel.created_at)).all()
-    return db.query(StationModel).filter(StationModel.isdelete == False).order_by(desc(StationModel.created_at)).all()
+        return db.execute(select(
+        StationModel.id,
+        StationModel.identifier,
+        StationModel.stationName,
+        StationModel.location,
+        StationModel.status,
+        StationModel.parkImage,
+        StationModel.admin_id,
+        StationModel.contact,
+        StationModel.description,
+        StationModel.address,
+        StationModel.lat,
+        StationModel.long,
+        StationModel.policy,
+        StationModel.mode,
+        StationModel.created_at, 
+        AdminModel.companyName).join(AdminModel, AdminModel.id == StationModel.admin_id).filter(StationModel.admin_id == adminId,StationModel.mode == mode.value,StationModel.isdelete == False)).mappings().all()
+    return db.execute(select(
+        StationModel.id,
+        StationModel.identifier,
+        StationModel.stationName,
+        StationModel.location,
+        StationModel.status,
+        StationModel.parkImage,
+        StationModel.admin_id,
+        StationModel.contact,
+        StationModel.description,
+        StationModel.address,
+        StationModel.lat,
+        StationModel.long,
+        StationModel.policy,
+        StationModel.mode,
+        StationModel.created_at, 
+        AdminModel.companyName).join(AdminModel, AdminModel.id == StationModel.admin_id).filter(StationModel.mode == mode.value,StationModel.isdelete == False).order_by(desc(StationModel.created_at))).mappings().all()
 def getStationById(db: Session,stationId:str):
     return db.query(StationModel).filter(StationModel.identifier == stationId).first()
 def deleteStation(db: Session ,stationId:int):
@@ -133,6 +222,30 @@ def getRoutes(db: Session,adminId:int=None):
     if adminId:
         return db.query(TrainRouteModel).filter(TrainRouteModel.admin_id ==adminId,TrainRouteModel.isdelete == False).order_by(desc(TrainRouteModel.created_at)).all()
     return db.query(TrainRouteModel).filter(TrainRouteModel.isdelete == False).order_by(desc(TrainRouteModel.created_at)).all()
+def getBusRoutes(db: Session,adminId:int=None):
+    if adminId:
+        return db.execute(select(
+        BusRouteModel.id,
+        BusRouteModel.identifier,
+        BusRouteModel.routeName,
+        BusRouteModel.admin_id,
+        BusRouteModel.sourceStation_id,
+        BusRouteModel.destinationStation_id,
+        BusRouteModel.baseprice,
+        BusRouteModel.created_at,
+        BusRouteModel.mode,
+        AdminModel.companyName).join(AdminModel, AdminModel.id == BusRouteModel.admin_id).filter(BusRouteModel.admin_id ==adminId).order_by(desc(BusRouteModel.created_at))).mappings().all()
+    return db.execute(select(
+        BusRouteModel.id,
+        BusRouteModel.identifier,
+        BusRouteModel.routeName,
+        BusRouteModel.admin_id,
+        BusRouteModel.sourceStation_id,
+        BusRouteModel.destinationStation_id,
+        BusRouteModel.baseprice,
+        BusRouteModel.created_at,
+        BusRouteModel.mode,
+        AdminModel.companyName).join(AdminModel, AdminModel.id == BusRouteModel.admin_id).order_by(desc(BusRouteModel.created_at))).mappings().all()
 def getRouteById(db: Session,routeId:int):
     return db.query(TrainRouteModel).filter(TrainRouteModel.id == routeId).first()
 def getRouteByStartStopStation(db: Session,start:int,stop:int,adminId:int):

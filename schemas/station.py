@@ -5,16 +5,22 @@ from pydantic import BaseModel
 from schemas.response import BaseResponse
 
 class StationBase(BaseModel):
+    admin_id: int
     stationName: Union[str, None] = None
     location: Union[str, None] = None
     mode: Union[str, None] = None
     identifier: Union[str, None] = None
+    contact: Optional[str]=None
+    address: Optional[str]=None
+    parkImage: Optional[str]=None
+    description: Optional[str]=None
+    status:Optional[bool]=True
     class Config:
         from_attributes = True
         populate_by_name = True
 
 class Station(StationBase):
-    admin_id: int
+    companyName: Union[str, None] = None
     created_at: Union[datetime, None] = func.now()
     updated_at: Union[datetime, None] = func.now()
 
@@ -30,3 +36,4 @@ class StationResponse(BaseResponse):
 
 class AddStationRequest(StationBase):
     identifier: Optional[str]=None
+    id: Optional[str]=None

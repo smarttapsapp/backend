@@ -1298,6 +1298,32 @@ async def addCashout(
             logger.info(ex)
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def get_trip_seats(trip_id: int, db: Session):
+    trip = db.query(TripModel).filter(TripModel.id == trip_id).first()
+
+    seats = db.query(Seat).filter(
+        Seat.bus_type_id == trip.bus.bus_type_id
+    ).all()
+
+    booked = db.query(Booking.seat_id).filter(
+        Booking.trip_id == trip_id,
+        Booking.status.in_([TicketStatusEnum.BOOKED, TicketStatusEnum.EXPIRED])
+    ).all()
+
+    booked_ids = {b[0] for b in booked}
+
+    result = []
+
+    for seat in seats:
+        result.append({
+            "id": str(seat.id),
+            "label": seat.seat_label,
+            "row": seat.row,
+            "column": seat.column,
+            "status": "BOOKED" if seat.id in booked_ids else "AVAILABLE"
+        })
+
+    return result
 # Admin Payments
 def adminPayments(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
     try:

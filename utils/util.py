@@ -358,10 +358,13 @@ def get_today():
     return datetime.today().strftime("%Y-%m-%d")
 def get_lat_lon(location_name: str):
     logger.info(f"getting geolocation info for ${location_name} at {datetime.now()}")
-    geolocator = Nominatim(user_agent="geoapi")
-    location = geolocator.geocode(location_name)
-    if location:
-        return location.latitude, location.longitude
+    try:
+        geolocator = Nominatim(user_agent="geoapi")
+        location = geolocator.geocode(location_name)
+        if location:
+            return location.latitude, location.longitude
+    except Exception as ex:
+        logger.info(ex)
     return None, None
 def is_within_radius(lat1, lon1, lat2, lon2, radius_km):
     logger.info(f"Started calculation............ {lat1,lat2} and {lon1,lon2}")

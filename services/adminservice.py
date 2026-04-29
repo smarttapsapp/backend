@@ -8,6 +8,7 @@ import shutil
 from models.queries import authQuery,queries,adminQuery,customerQuery
 from datetime import datetime,timedelta
 from schemas import otp
+from schemas.bus_type import AddBusTypeRequest, BusTypesResponse
 from utils import util
 from schemas.setting import Setting
 from utils.constant import *
@@ -602,6 +603,29 @@ async def listOfProviders(response: Response,db: Session,admin: AdminModel):
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return AdminsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def listOfBusProviders(response: Response,db: Session,admin: AdminModel):
+    try:
+        logger.info(f"started querying bus providers")
+        if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ADMIN,AdminRoleEnum.ACCOUNTANT]:
+            return AdminsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getBusProvider(db=db))
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return AdminsResponse(statusCode= str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED,)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return AdminsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def listOfTrainProviders(response: Response,db: Session,admin: AdminModel):
+    try:
+        logger.info(f"started querying train providers")
+        if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ADMIN,AdminRoleEnum.ACCOUNTANT]:
+            return AdminsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getTrainProvider(db=db))
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return AdminsResponse(statusCode= str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED,)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return AdminsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+
 # admin
 async def listOfAdminsByRole(response: Response,db: Session,admin: AdminModel,role:str):
     try:
@@ -702,7 +726,91 @@ async def listOfParks(request: Request,response: Response,setting: Setting,db: S
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return ParksResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-# buses
+# buses Type
+async def listOfBusTypes(response: Response,db: Session,admin: AdminModel):
+    try:
+        logger.info(f"started querying products")
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
+            return BusTypesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getBusTypes(db=db))
+        else:
+            return BusTypesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getBusTypes(db=db,adminId=admin.id))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def addBusType(db: Session,setting: Setting,payload: AddBusTypeRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started creating/updating bus type @ {datetime.now()}")
+        if admin.role.tag in[AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
+            if payload.id:
+                logger.info(f"started updating bus type @ {datetime.now()}")
+                previous = adminQuery.getBusTypeId(db=db, id=payload.id)
+                if not previous:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+                if admin.role.tag == AdminRoleEnum.BUSPROVIDER and previous.admin_id != admin.id:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+                previous.name = payload.name
+                previous.total_seats = payload.total_seats
+            else:
+                seat_models = [SeatModel(
+                    admin_id=payload.admin_id,
+                    seatrow=seat.seatrow,
+                    is_bookable=seat.is_bookable,
+                    seatcolumn=seat.seatcolumn,
+                    seattype=seat.seattype,
+                    seat_number=util.generateId(length=8),
+                    seat_label=seat.seat_label,) for seat in payload.seats]
+                previous = BusTypeModel(
+                    admin_id=payload.admin_id,
+                    name=payload.name,
+                    total_seats=payload.total_seats,
+                    seats=seat_models,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),)
+            created = queries.create(db=db, model=previous)
+            if created:
+                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Bus Type",toAddress=admin.email,)
+                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=f"Bus type {payload.name} created/updated successfully")
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=f"Unable to create or update bus type {payload.name}")
+        else:
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            return BaseResponse(statusCode = str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)   
+async def deleteBusType(db: Session,setting: Setting, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,id: int):
+    try:
+        logger.info(f"started deleting bus type {id} @ {datetime.now()}")
+        if admin.role.tag not in [AdminRoleEnum.BUSPROVIDER, AdminRoleEnum.ADMIN, AdminRoleEnum.SUPERADMIN]:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+        item = adminQuery.getBusTypeId(db=db, id=id)
+        if not item:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+        if admin.role.tag in [AdminRoleEnum.BUSPROVIDER] and item.admin_id != admin.id:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+        created = adminQuery.deleteBusType(db=db, id=item.id)
+        if created:
+            db.commit()
+            email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="Delete Bus",toAddress=admin.email,)
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=f"Bus type {item.name} deleted successfully")
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+# bus routes
 async def listOfBusRoutes(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
     try:
         logger.info(f"started querying products")
@@ -714,7 +822,65 @@ async def listOfBusRoutes(request: Request,response: Response,setting: Setting,d
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BusRoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def listOfAdminRoutes(response: Response,db: Session,providerId:int):
+    try:
+        logger.info(f"started querying routes via {providerId}")
+        return BusRoutesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getBusRoutes(db=db,adminId=providerId))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BusRoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 async def addBusRoute(db: Session,setting: Setting,payload: AddBusRouteRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started creating new route @ {datetime.now()}")
+        if admin.role.tag in[AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
+            existing = queries.getBusRouteByStartStopStation(db=db,start=payload.startId, stop=payload.stopId,adminId=admin.id)
+            if existing:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ALREADYEXIST)
+            else:
+                busProvider = adminQuery.getAdminIdentifier(db=db, id=payload.admin_id)
+                if busProvider and busProvider.role.tag == AdminRoleEnum.BUSPROVIDER:
+                    startStation = adminQuery.getStationById(db=db,stationId=payload.startId)
+                    if startStation:
+                        stopStation = adminQuery.getStationById(db=db,stationId=payload.stopId)
+                        if stopStation:
+                            previous = queries.getBusRouteById(db=db,routeId=payload.id)
+                            if previous and previous.admin_id == admin.id:
+                                previous.destinationStation_id=stopStation.id
+                                previous.sourceStation_id=startStation.id
+                                previous.updated_at = datetime.now()
+                                previous.baseprice = int(payload.baseprice)*100
+                            else:
+                                previous = BusRouteModel(identifier=util.generateId(length=6),routeName=f"{startStation.stationName} to {stopStation.stationName}",sourceStation_id=startStation.id,destinationStation_id=stopStation.id,mode=startStation.mode,admin_id=busProvider.id,created_at=datetime.now(),updated_at=datetime.now(),baseprice=int(payload.baseprice)*100)
+                            created = adminQuery.create(db=db, model=previous)
+                            if created:
+                                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Route Created",toAddress=admin.email,)
+                                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                            else:
+                                response.status_code = status.HTTP_400_BAD_REQUEST
+                                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
+                            #else:
+                            #    response.status_code = status.HTTP_400_BAD_REQUEST
+                            #    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOROUTE)
+                        else:
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=ENDSTATIONERR)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=STARTSTATIONERR)
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+        else:
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            return BaseResponse(statusCode = str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def addBusRouteOld(db: Session,setting: Setting,payload: AddBusRouteRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
     try:
         logger.info(f"started creating new route @ {datetime.now()}")
         if admin.role.tag in[AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
@@ -763,7 +929,8 @@ async def addBusRoute(db: Session,setting: Setting,payload: AddBusRouteRequest, 
     except Exception as ex:
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+#buses
 async def listOfBuses(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str,endDate: str):
     try:
         logger.info(f"started querying buses")
@@ -775,7 +942,15 @@ async def listOfBuses(request: Request,response: Response,setting: Setting,db: S
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BusesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-async def addBus(db: Session,setting: Setting,payload: AddBusRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+async def listOfAdminBuses(response: Response,db: Session,providerId:int):
+    try:
+        logger.info(f"started querying buses")
+        return BusesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getBuses(db=db,adminId=providerId))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BusesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def addBusOld(db: Session,setting: Setting,payload: AddBusRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,busImage: UploadFile):
     try:
         logger.info(f"started creating/updating bus @ {datetime.now()}")
         if admin.role.tag in[AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
@@ -823,6 +998,99 @@ async def addBus(db: Session,setting: Setting,payload: AddBusRequest, background
         else:
             response.status_code = status.HTTP_401_UNAUTHORIZED
             return BaseResponse(statusCode = str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)   
+async def addBus(db: Session,setting: Setting,payload: AddBusRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,busImage: UploadFile):
+    try:
+        logger.info(f"started creating/updating bus @ {datetime.now()}")
+        if admin.role.tag in[AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:   
+            busProvider = adminQuery.getAdmin(db=db, adminId=payload.admin_id)
+            if busProvider and busProvider.role.tag == AdminRoleEnum.BUSPROVIDER:
+                image_url ="" 
+                if payload.id:
+                    logger.info(f"started updating bus @ {datetime.now()}")
+                    previous = adminQuery.getBusById(db=db, id=payload.id)
+                    if not previous:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+                    if admin.role.tag == AdminRoleEnum.BUSPROVIDER and previous.admin_id != admin.id:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+                    if busImage and busImage.content_type.startswith("image/"):
+                        UPLOAD_DIR = Path("templates/buses")
+                        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+                        if user.profile_picture:
+                            filename = Path(payload.bus_number).name
+                            logger.info(filename)
+                            file_path = UPLOAD_DIR / filename 
+                            logger.info(file_path)
+                            if file_path.exists():
+                                file_path.unlink()
+                        file_ext = busImage.filename.split(".")[-1]
+                        unique_name = f"{payload.bus_number}.{file_ext}"
+                        file_path = UPLOAD_DIR / unique_name
+                        with file_path.open("wb") as buffer:
+                            shutil.copyfileobj(busImage.file, buffer)
+                        image_url = f"buses/{unique_name}"
+                        user.profile_picture = image_url
+                        user.updated_at = datetime.now()
+                        saved = queries.create(db=db,model=user)
+                        return  BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription ="Profile photo uploaded successfully")
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription="Invalid Image",)
+            
+                    previous.airCondition = payload.airCondition
+                    previous.tv = payload.tv
+                    previous.base_price = int(payload.base_price)*100
+                    previous.camera = payload.camera
+                    previous.name = payload.name
+                    previous.bus_capacity=payload.bus_capacity
+                    previous.description = payload.description
+                    previous.billerId = admin.billerId
+                    previous.updated_at = datetime.now()
+                else:
+                    if busImage and busImage.content_type.startswith("image/"):
+                        UPLOAD_DIR = Path("templates/buses")
+                        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+                        file_ext = busImage.filename.split(".")[-1]
+                        unique_name = f"{payload.bus_number}.{file_ext}"
+                        file_path = UPLOAD_DIR / unique_name
+                        with file_path.open("wb") as buffer:
+                            shutil.copyfileobj(busImage.file, buffer)
+                        image_url = f"buses/{unique_name}"
+                    bus = BusModel(
+                        identifier=util.generateId(length=6),
+                        busImage=image_url,
+                        admin_id=busProvider.id,
+                        name=payload.name,
+                        bus_number=payload.bus_number,
+                        description=payload.description,
+                        tv=payload.tv,
+                        camera=payload.camera,
+                        airCondition=payload.airCondition,
+                        bus_capacity=payload.bus_capacity,
+                        base_price=int(payload.base_price),
+                        availabilityStatus=payload.availabilityStatus,
+                        created_at=datetime.now(),updated_at=datetime.now(),
+                        billerId=busProvider.billerId,isdelete=False)
+                    saved = queries.create(db=db,model=bus)
+                    if saved:
+                        email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                        background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Bus",toAddress=admin.email,)
+                        return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription="Bus created successfully")
+            else:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Invalid Bus Provider",)
+        else:
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            return BaseResponse(statusCode = str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED)
+    except IntegrityError as e:
+        logger.error(str(e))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Bus with the same details already exist")
     except Exception as ex:
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -1432,19 +1700,31 @@ async def deleteRoute(db: Session,setting: Setting, background_task: BackgroundT
 async def listOfStations(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel,mode:MovableEnum):
     try:
         logger.info(f"started querying products")
-        if admin.role.tag in[AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER]:
-            return StationsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getstations(db=db,mode=mode,adminId=admin.id))
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
+            return StationsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getstations(db=db,mode=mode))
         else:
-            return StationsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=queries.getstations(db=db,mode=mode))
+            return StationsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getstations(db=db,mode=mode,adminId=admin.id))
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return StationsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-async def addStation(db: Session,setting: Setting,payload: AddStationRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+async def addStation(db: Session,setting: Setting,payload: AddStationRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,parkImage:UploadFile=None):
     try:
         logger.info(f"started creating/updating new station @ {datetime.now()}")
         if admin.role.tag in [AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
-            if admin:
+            busProvider = adminQuery.getAdmin(db=db, adminId=payload.admin_id)
+            if busProvider and busProvider.role.tag in [AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.TRAINPROVIDER]:
+                image_url = ""
+                if parkImage and parkImage.content_type.startswith("image/"):
+                    UPLOAD_DIR = Path("templates/parks")
+                    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+                    file_ext = parkImage.filename.split(".")[-1]
+                    unique_name = f"{util.generateUniqueId()}.{file_ext}"
+                    file_path = UPLOAD_DIR / unique_name
+                    with file_path.open("wb") as buffer:
+                        shutil.copyfileobj(parkImage.file, buffer)
+                    image_url = f"parks/{unique_name}"
+
                 if payload.identifier:
                     existing = queries.getStationById(db=db,stationId=payload.identifier)
                     if existing:
@@ -1457,23 +1737,28 @@ async def addStation(db: Session,setting: Setting,payload: AddStationRequest, ba
                             existing.identifier=util.generateId(length=6)
                         existing.stationName = payload.stationName
                         existing.location = payload.location
+                        existing.parkImage = image_url
+                        existing.contact = payload.contact
+                        existing.description = payload.description
+                        existing.address = payload.address
+                        existing.status = payload.status
+                        existing.admin_id = payload.admin_id
                 else:
                     geo = util.get_lat_lon(location_name=payload.location)
-                    if geo:
-                        existing = StationModel(
-                            identifier=util.generateId(length=6),
-                                    admin_id = admin.id,
-                                    stationName = payload.stationName,
-                                    location =  payload.location,
-                                    description = f"{payload.stationName} {payload.location}",
-                                    parkImage = payload.location,
-                                    address = f"{payload.stationName} {payload.location}",
-                                    contact = admin.phonenumber,
-                                    policy = "",
-                                    status = True,
-                                    long = geo[1],
-                                    lat =geo[0],isdelete=False,
-                                    mode= TicketModeEnum(payload.mode) )
+                    existing = StationModel(
+                        identifier=util.generateId(length=6),
+                        admin_id = busProvider.id,
+                        stationName = payload.stationName,
+                        location =  payload.location,
+                        description = f"{payload.description}",
+                        parkImage = image_url,
+                        address = f"{payload.address}",
+                        contact = payload.contact if payload.contact else admin.phonenumber,
+                        policy = "",
+                        status = payload.status,
+                        long = geo[1],
+                        lat =geo[0],isdelete=False,
+                        mode= TicketModeEnum(payload.mode) )
                 created = queries.create(db=db,model=existing)
                 if created:
                     email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
@@ -1484,7 +1769,7 @@ async def addStation(db: Session,setting: Setting,payload: AddStationRequest, ba
                     return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED)
             else:
                 response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Invalid provider")
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED)

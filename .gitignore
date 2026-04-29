@@ -161,5 +161,4 @@ cython_debug/
 #.idea/
 /alembic
 alembic*
-/templates/profiles
-/templates/tickets
+/templates/
