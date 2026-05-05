@@ -111,7 +111,12 @@ def getTrainsByBusiness(db: Session,adminId:int=None):
 #bus types
 def getBusTypes(db: Session,adminId:int=None):
     if adminId:
-        return db.execute(select(BusTypeModel, AdminModel.companyName).join(AdminModel, AdminModel.id == BusTypeModel.admin_id).filter(BusTypeModel.admin_id ==adminId).order_by(desc(BusTypeModel.created_at))).mappings().all()
+        return db.execute(select(
+        BusTypeModel.id,
+        BusTypeModel.name,
+        BusTypeModel.admin_id,
+        BusTypeModel.total_seats,
+        BusTypeModel.created_at, AdminModel.companyName).join(AdminModel, AdminModel.id == BusTypeModel.admin_id).filter(BusTypeModel.admin_id ==adminId).order_by(desc(BusTypeModel.created_at))).mappings().all()
     return db.execute(select(
         BusTypeModel.id,
         BusTypeModel.name,
@@ -181,7 +186,33 @@ def getBusesByBusiness(db: Session,parkId:int=None):
 # schedules
 def getBusSchedules(db: Session,adminId:int=None):
     if adminId:
-        return db.query(BusScheduleModel).filter(BusScheduleModel.admin_id ==adminId).order_by(desc(BusScheduleModel.created_at)).all()
+        return db.execute(select(
+        BusScheduleModel.id,
+        BusScheduleModel.identifier,
+        BusScheduleModel.timeOfOperation,
+        BusScheduleModel.total_seats,
+        BusScheduleModel.status,
+        BusScheduleModel.trip_Date,
+        BusScheduleModel.admin_id,
+        BusScheduleModel.arrivalTime,
+        BusScheduleModel.booked_seats,
+        BusScheduleModel.trip_Date,
+        BusScheduleModel.bus_id,
+        BusScheduleModel.bus_route_id,
+        BusScheduleModel.departureTime,
+        BusScheduleModel.price,
+        BusScheduleModel.created_at,
+        AdminModel.companyName,
+        BusModel.name.label("busName"),
+        BusRouteModel.routeName,
+    )
+    .join(AdminModel, AdminModel.id == BusScheduleModel.admin_id)
+    .join(BusModel, BusModel.id == BusScheduleModel.bus_id)
+    .join(BusRouteModel, BusRouteModel.id == BusScheduleModel.bus_route_id)
+    .filter(BusScheduleModel.admin_id ==adminId)
+    .filter(BusScheduleModel.isdelete == False)
+    .order_by(desc(BusScheduleModel.created_at))
+).mappings().all()
     return db.execute(
     select(
         BusScheduleModel.id,

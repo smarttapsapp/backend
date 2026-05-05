@@ -1296,6 +1296,7 @@ async def addBus(
     busImage: UploadFile= File(None),
     id: Optional[int] = Form(None),
     admin_id: int = Form(...),
+    bus_type_id: int = Form(...),
     name: str = Form(...),
     bus_number: str = Form(...),
     description: Optional[str] = Form(None),
@@ -1317,7 +1318,8 @@ async def addBus(
             camera=camera,
             airCondition=airCondition,
             availabilityStatus=availabilityStatus,
-            base_price=base_price
+            base_price=base_price,
+            bus_type_id=bus_type_id
         )
         if payload.id:
             return await adminservice.editBus(db=db,setting=setting,payload=payload,request=request,response=response,admin=admin,background_task=background_task)
