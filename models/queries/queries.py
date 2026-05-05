@@ -225,7 +225,163 @@ def getTrainRoutesByStations(db: Session,departure:str,arrival:str,mode:str):
         .filter(func.lower(DestinationStation.stationName).like(f"%{arrival.lower()}%"))
         .all()
     )
-def getBusRoutesByStations(db: Session,departure:str,arrival:str,mode:str):
+def getBusRoutesByStations(db: Session,departure:int=None,arrival:int=None):
+    if departure and arrival:
+        return (
+        db.execute(
+        select(
+            BusScheduleModel.id,
+            BusScheduleModel.identifier,
+            BusScheduleModel.timeOfOperation,
+            BusScheduleModel.total_seats,
+            BusScheduleModel.status,
+            BusScheduleModel.trip_Date,
+            BusScheduleModel.admin_id,
+            BusScheduleModel.arrivalTime,
+            BusScheduleModel.booked_seats,
+            BusScheduleModel.trip_Date,
+            BusScheduleModel.bus_id,
+            BusScheduleModel.bus_route_id,
+            BusScheduleModel.departureTime,
+            BusScheduleModel.price,
+            BusScheduleModel.created_at,
+            AdminModel.companyName,
+            BusModel.id.label("busID"),
+            BusModel.bus_number.label("busNumber"),
+            BusModel.busImage.label("busImage"),
+            BusModel.name.label("busName"),
+            BusModel.base_price.label("busPrice"),
+            BusRouteModel.id.label("routeId"),
+            BusRouteModel.routeName,
+            BusRouteModel.baseprice.label("routePrice"),
+        )
+        .join(AdminModel, AdminModel.id == BusScheduleModel.admin_id)
+        .join(BusModel, BusModel.id == BusScheduleModel.bus_id)
+        .join(BusRouteModel, BusRouteModel.id == BusScheduleModel.bus_route_id)
+        .filter(BusScheduleModel.isdelete == False)
+        .filter(BusRouteModel.sourceStation_id == departure,BusRouteModel.destinationStation_id==arrival)
+        .order_by(desc(BusScheduleModel.created_at))
+        ).mappings().all()
+        )
+    elif departure and not arrival:
+        return (
+        db.execute(
+        select(
+            BusScheduleModel.id,
+            BusScheduleModel.identifier,
+            BusScheduleModel.timeOfOperation,
+            BusScheduleModel.total_seats,
+            BusScheduleModel.status,
+            BusScheduleModel.trip_Date,
+            BusScheduleModel.admin_id,
+            BusScheduleModel.arrivalTime,
+            BusScheduleModel.booked_seats,
+            BusScheduleModel.trip_Date,
+            BusScheduleModel.bus_id,
+            BusScheduleModel.bus_route_id,
+            BusScheduleModel.departureTime,
+            BusScheduleModel.price,
+            BusScheduleModel.created_at,
+            AdminModel.companyName,
+            BusModel.id.label("busID"),
+            BusModel.bus_number.label("busNumber"),
+            BusModel.busImage.label("busImage"),
+            BusModel.name.label("busName"),
+            BusModel.base_price.label("busPrice"),
+            BusRouteModel.id.label("routeId"),
+            BusRouteModel.routeName,
+            BusRouteModel.baseprice.label("routePrice"),
+        )
+        .join(AdminModel, AdminModel.id == BusScheduleModel.admin_id)
+        .join(BusModel, BusModel.id == BusScheduleModel.bus_id)
+        .join(BusRouteModel, BusRouteModel.id == BusScheduleModel.bus_route_id)
+        .filter(BusScheduleModel.isdelete == False)
+        .filter(BusRouteModel.sourceStation_id == departure)
+        .order_by(desc(BusScheduleModel.created_at))
+        ).mappings().all()
+        )
+    elif arrival and not departure:
+        return (
+        db.execute(
+        select(
+            BusScheduleModel.id,
+            BusScheduleModel.identifier,
+            BusScheduleModel.timeOfOperation,
+            BusScheduleModel.total_seats,
+            BusScheduleModel.status,
+            BusScheduleModel.trip_Date,
+            BusScheduleModel.admin_id,
+            BusScheduleModel.arrivalTime,
+            BusScheduleModel.booked_seats,
+            BusScheduleModel.trip_Date,
+            BusScheduleModel.bus_id,
+            BusScheduleModel.bus_route_id,
+            BusScheduleModel.departureTime,
+            BusScheduleModel.price,
+            BusScheduleModel.created_at,
+            AdminModel.companyName,
+            BusModel.id.label("busID"),
+            BusModel.bus_number.label("busNumber"),
+            BusModel.busImage.label("busImage"),
+            BusModel.name.label("busName"),
+            BusModel.base_price.label("busPrice"),
+            BusRouteModel.id.label("routeId"),
+            BusRouteModel.routeName,
+            BusRouteModel.baseprice.label("routePrice"),
+        )
+        .join(AdminModel, AdminModel.id == BusScheduleModel.admin_id)
+        .join(BusModel, BusModel.id == BusScheduleModel.bus_id)
+        .join(BusRouteModel, BusRouteModel.id == BusScheduleModel.bus_route_id)
+        .filter(BusScheduleModel.isdelete == False)
+        .filter(BusRouteModel.destinationStation_id==arrival)
+        .order_by(desc(BusScheduleModel.created_at))
+        ).mappings().all()
+        )
+    else:
+        logger.info(f"this search is getting here")
+        return (
+        db.execute(
+        select(
+            BusScheduleModel.id,
+            BusScheduleModel.identifier,
+            BusScheduleModel.timeOfOperation,
+            BusScheduleModel.total_seats,
+            BusScheduleModel.status,
+            BusScheduleModel.trip_Date,
+            BusScheduleModel.arrivalTime,
+            BusScheduleModel.booked_seats,
+            BusScheduleModel.trip_Date,
+            BusScheduleModel.bus_id,
+            BusScheduleModel.bus_route_id,
+            BusScheduleModel.departureTime,
+            BusScheduleModel.price,
+            AdminModel.companyName,
+            BusModel.id.label("busID"),
+            BusModel.bus_number.label("busNumber"),
+            BusModel.busImage.label("busImage"),
+            BusModel.name.label("busName"),
+            BusModel.base_price.label("busPrice"),
+            BusModel.tv,
+            BusModel.camera,
+            BusModel.airCondition,
+            BusModel.description.label("busDescription"),
+            BusRouteModel.id.label("routeId"),
+            BusRouteModel.routeName,
+            BusRouteModel.baseprice.label("routePrice"),
+        )
+        .join(AdminModel, AdminModel.id == BusScheduleModel.admin_id)
+        .join(BusModel, BusModel.id == BusScheduleModel.bus_id)
+        .join(BusRouteModel, BusRouteModel.id == BusScheduleModel.bus_route_id)
+        .filter(BusScheduleModel.isdelete == False)
+        .order_by(desc(BusScheduleModel.created_at))
+        ).mappings().all()
+        )
+def get_trip_seats(db: Session, tripId:int):
+    trip = db.query(BusScheduleModel).filter(BusScheduleModel.id == tripId).first()
+    return db.query(SeatModel).filter(
+        SeatModel.bus_type_id == trip.bus.bus_type_id
+    ).all()
+def getBusRoutesByStationsOld(db: Session,departure:str,arrival:str,mode:str):
     SourceStation = aliased(StationModel)
     DestinationStation = aliased(StationModel)
     return (

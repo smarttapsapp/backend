@@ -72,6 +72,7 @@ class MiniBus(BaseModel):
         populate_by_name = True
 class AddBusRequest(BusBase):
     id: Optional[int]=None
+    bus_type_id:int
     identifier: Optional[int]=None
     @model_validator(mode="before")
     @classmethod

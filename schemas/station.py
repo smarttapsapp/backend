@@ -4,6 +4,17 @@ from sqlalchemy import func
 from pydantic import BaseModel
 from schemas.response import BaseResponse
 
+class StationMobile(BaseModel):
+    stationName: Union[str, None] = None
+    location: Union[str, None] = None
+    mode: Union[str, None] = None
+    identifier: Union[str, None] = None
+    parkImage: Optional[str]=None
+    companyName: Union[str, None] = None
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
 class StationBase(BaseModel):
     admin_id: int
     stationName: Union[str, None] = None
@@ -37,3 +48,6 @@ class StationResponse(BaseResponse):
 class AddStationRequest(StationBase):
     identifier: Optional[str]=None
     id: Optional[str]=None
+
+class StationsMobileResponse(BaseResponse):
+    data: Union[List[StationMobile],None] = None

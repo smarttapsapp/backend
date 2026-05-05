@@ -25,13 +25,21 @@ class Ticket(TicketBase):
     qr_code: Union[str, None] = None
     schedule: Union[ScheduleBase, None] = None
     busschedule: Union[BusScheduleBase, None] = None
-    bus: Union[BusBase, None] = None
-    train: Union[TrainBase, None] = None
-    route: Union[RouteBase, None] = None
-    busroute: Union[BusRouteBase, None] = None
+    busName: Union[str, None] = None
+    bus_number: Union[str, None] = None
+    busImage: Union[str, None] = None
+    busPrice: Union[str, None] = None
+    seat_label: Union[str, None] = None
+    routeName: Union[str, None] = None
+    routePrice: Union[str, None] = None
+    timeOfOperation: Union[str, None] = None
+    arrivalTime: Union[str, None] = None
+    departureTime: Union[str, None] = None
+    tripPrice: Union[str, None] = None
+    tripStatus: Union[str, None] = None
+    firstname: Union[str, None] = None
+    lastname: Union[str, None] = None
     created_at: Union[datetime, None] = func.now()
-    updated_at: Union[datetime, None] = func.now()
-
     class Config:
         from_attributes = True
         populate_by_name = True

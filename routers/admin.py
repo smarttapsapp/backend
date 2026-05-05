@@ -26,6 +26,7 @@ from schemas.role import *
 from schemas.station import *
 from schemas.route import RoutesResponse,AddRouteRequest
 from schemas.bus_route import BusRoutesResponse,AddBusRouteRequest
+from schemas.bus_schedule import BusSchedulesResponse,AddBusScheduleRequest
 from schemas.train import *
 from schemas.bus import BusesResponse,AddBusRequest
 from schemas.park import ParksResponse
@@ -768,6 +769,80 @@ async def deleteRoute(
             statusDescription=str(ex),
         )
 #schedules
+@router.get("/bus-schedules", 
+    response_model=BusSchedulesResponse,
+    response_model_exclude_unset=True,tags=["schedule"])
+async def get_bus_schedules(
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        return await adminservice.listOfBusSchedules(
+                response=response,
+                db=db,
+                admin=admin,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BusSchedulesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.post("/bus-schedule/add", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["schedule"])
+async def add_bus_schedule(
+    payload:AddBusScheduleRequest,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await adminservice.addBusSchedule(
+            payload=payload,
+                db=db,
+                setting=setting,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+@router.delete("/bus-schedule/{id}/delete", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=["schedule"])
+async def delete_bus_schedule(
+    id:int,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    db: Annotated[Session, Depends(get_db)],
+    background_task: BackgroundTasks,
+):
+    try:
+        return await adminservice.deleteSchedule(
+            scheduleId=id,
+                db=db,
+                request=request,
+                response=response,
+                admin=admin,
+                background_task=background_task
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(
+            statusCode=str(status.HTTP_400_BAD_REQUEST),
+            statusDescription=str(ex),
+        )
+#train schedules
 @router.get("/schedules", 
     response_model=SchedulesResponse,
     response_model_exclude_unset=True,tags=["schedule"])
@@ -793,7 +868,7 @@ async def get_schedules(
 @router.post("/schedule/add", 
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["schedule"])
-async def addSchedule(
+async def add_schedule(
     payload:AddScheduleRequest,
     request: Request,
     response: Response,

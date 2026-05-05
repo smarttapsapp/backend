@@ -21,6 +21,7 @@ from schemas.admin import *
 from schemas.station import *
 from schemas.seat import *
 from schemas.schedule import *
+from schemas.bus_schedule import *
 from schemas.payment import *
 from schemas.route import RoutesResponse,AddRouteRequest
 from schemas.bus_route import BusRoutesResponse,AddBusRouteRequest
@@ -1050,6 +1051,7 @@ async def addBus(db: Session,setting: Setting,payload: AddBusRequest, background
                     previous.bus_capacity=payload.bus_capacity
                     previous.description = payload.description
                     previous.billerId = admin.billerId
+                    previous.bus_type_id=payload.bus_type_id,
                     previous.updated_at = datetime.now()
                 else:
                     if busImage and busImage.content_type.startswith("image/"):
@@ -1073,6 +1075,7 @@ async def addBus(db: Session,setting: Setting,payload: AddBusRequest, background
                         airCondition=payload.airCondition,
                         bus_capacity=payload.bus_capacity,
                         base_price=int(payload.base_price),
+                        bus_type_id=payload.bus_type_id,
                         availabilityStatus=payload.availabilityStatus,
                         created_at=datetime.now(),updated_at=datetime.now(),
                         billerId=busProvider.billerId,isdelete=False)
@@ -1250,69 +1253,80 @@ async def deleteBus(db: Session,setting: Setting, background_task: BackgroundTas
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
 # schedules
-async def listOfSchedules(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+async def listOfBusSchedules(response: Response,db: Session,admin: AdminModel):
     try:
         logger.info(f"started querying available schedules")
         if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
-            return SchedulesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getSchedules(db=db))
+            return BusSchedulesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getBusSchedules(db=db))
         else:
-            return SchedulesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getSchedules(db=db,adminId=admin.id))
+            return BusSchedulesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getBusSchedules(db=db,adminId=admin.id))
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return SchedulesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-async def addSchedule(db: Session,setting: Setting,payload: AddScheduleRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+        return BusSchedulesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,data=[])
+async def addBusSchedule(db: Session,setting: Setting,payload: AddBusScheduleRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
     try:
         logger.info(f"started creating new schedule at {datetime.now()}")
-        existing = adminQuery.getScheduleById(db=db,scheduleId=payload.id)
-        if existing:
-            existing.arrivalTime = payload.arrivalTime
-            existing.departureTime = payload.departureTime
-            existing.timeOfOperation = payload.timeOfOperation
-        else:
-            existing = ScheduleModel(
-                identifier=util.generateId(length=6),
-                admin_id = admin.id,
-                timeOfOperation = payload.timeOfOperation,
-                departureTime = payload.departureTime,
-                arrivalTime = payload.arrivalTime,
-                mode = payload.mode,
-                created_at=datetime.now(),updated_at=datetime.now(),)
-        created = queries.create(db=db, model=existing)
-        if created:
-            email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
-            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Schedule",toAddress=admin.email,)
-            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
-        else:
+        if admin.role.tag in[AdminRoleEnum.BUSPROVIDER,AdminRoleEnum.ADMIN,AdminRoleEnum.SUPERADMIN]:
+            bus = adminQuery.getBusId(db=db,id=payload.bus_id)
+            if bus:
+                if bus.admin_id == payload.admin_id:
+                    if bus.availabilityStatus and not bus.isdelete:
+                        busRoute = adminQuery.getBusRouteById(db=db,routeId=payload.bus_route_id)
+                        if busRoute and not busRoute.isdelete:
+                            if admin.role.tag == AdminRoleEnum.BUSPROVIDER and admin.id != payload.admin_id:
+                                response.status_code = status.HTTP_400_BAD_REQUEST
+                                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="An error occured while creating trip")
+                            existing = adminQuery.getBusScheduleById(db=db,scheduleId=payload.id)
+                            if existing:
+                                existing.arrivalTime = payload.arrivalTime
+                                existing.departureTime = payload.departureTime
+                                existing.timeOfOperation = payload.timeOfOperation
+                                existing.bus_id = payload.bus_id
+                                existing.bus_route_id = payload.bus_route_id
+                                existing.status = payload.status
+                                existing.trip_Date = payload.trip_Date
+                                existing.price = payload.price
+                                existing.total_seats = bus.bus_type.total_seats
+                            else:
+                                existing = BusScheduleModel(
+                                    identifier=util.generateId(length=6),
+                                    arrivalTime = payload.arrivalTime,
+                                    departureTime = payload.departureTime,
+                                    timeOfOperation = payload.timeOfOperation,
+                                    bus_id = payload.bus_id,
+                                    bus_route_id = payload.bus_route_id,
+                                    status = payload.status,
+                                    trip_Date =payload.trip_Date ,
+                                    price = payload.price,
+                                    total_seats = int(bus.bus_type.total_seats),
+                                    mode = payload.mode,
+                                    admin_id = payload.admin_id,
+                                    created_at=datetime.now(),updated_at=datetime.now(),)
+                            created = queries.create(db=db, model=existing)
+                            if created:
+                                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Schedule",toAddress=admin.email,)
+                                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                            else:
+                                response.status_code = status.HTTP_400_BAD_REQUEST
+                                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed to create a trip")
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Invalid Routes ")
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Bus is not available")
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Bus does not exist")
             response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Bus does not exist")
+        else:
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            return BaseResponse(statusCode = str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED)
     except Exception as ex:
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
-async def updateSchedule(db: Session,setting: Setting,payload: AddRoleRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
-    try:
-        logger.info(f"started creating new admin role @ {datetime.now()}")
-        role = adminQuery.getRole(db=db,roleId=payload.tag)
-        if role:
-            role.name = payload.name
-            role.tag =AdminRoleEnum(payload.tag)
-            role.updated_at=datetime.now()
-            created = queries.create(db=db, model=role)
-            if created:
-                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
-                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
-                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
-        else:
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
-    except Exception as ex:
-        logger.error(str(ex))
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
-async def deleteSchedule(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,scheduleId: int):
+async def deleteBusSchedule(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,scheduleId: int):
     try:
         logger.info(f"started deleting schedule {scheduleId} @ {datetime.now()}")
         schedule = adminQuery.deleteSchedule(db=db,scheduleId=scheduleId)
@@ -1326,7 +1340,7 @@ async def deleteSchedule(db: Session, background_task: BackgroundTasks, request:
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
-# schedules
+# seats
 async def listOfSeats(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
     try:
         logger.info(f"started querying available schedules")
@@ -1540,6 +1554,83 @@ async def deleteTrain(db: Session,setting: Setting,background_task: BackgroundTa
         db.rollback()
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="This train cannot be deleted because passengers have already booked tickets on it.")
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+# schedules
+async def listOfSchedules(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
+    try:
+        logger.info(f"started querying available schedules")
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
+            return SchedulesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getSchedules(db=db))
+        else:
+            return SchedulesResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getSchedules(db=db,adminId=admin.id))
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return SchedulesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def addSchedule(db: Session,setting: Setting,payload: AddScheduleRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started creating new schedule at {datetime.now()}")
+        existing = adminQuery.getScheduleById(db=db,scheduleId=payload.id)
+        if existing:
+            existing.arrivalTime = payload.arrivalTime
+            existing.departureTime = payload.departureTime
+            existing.timeOfOperation = payload.timeOfOperation
+        else:
+            existing = ScheduleModel(
+                identifier=util.generateId(length=6),
+                admin_id = admin.id,
+                timeOfOperation = payload.timeOfOperation,
+                departureTime = payload.departureTime,
+                arrivalTime = payload.arrivalTime,
+                mode = payload.mode,
+                created_at=datetime.now(),updated_at=datetime.now(),)
+        created = queries.create(db=db, model=existing)
+        if created:
+            email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+            background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Schedule",toAddress=admin.email,)
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def updateSchedule(db: Session,setting: Setting,payload: AddRoleRequest, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started creating new admin role @ {datetime.now()}")
+        role = adminQuery.getRole(db=db,roleId=payload.tag)
+        if role:
+            role.name = payload.name
+            role.tag =AdminRoleEnum(payload.tag)
+            role.updated_at=datetime.now()
+            created = queries.create(db=db, model=role)
+            if created:
+                email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
+                background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Role",toAddress=admin.email,)
+                return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def deleteSchedule(db: Session, background_task: BackgroundTasks, request: Request,response: Response,admin:AdminModel,scheduleId: int):
+    try:
+        logger.info(f"started deleting schedule {scheduleId} @ {datetime.now()}")
+        schedule = adminQuery.deleteSchedule(db=db,scheduleId=scheduleId)
+        if schedule:
+            response.status_code = status.HTTP_200_OK
+            return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=NOTEXIST)
     except Exception as ex:
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST

@@ -93,12 +93,14 @@ class AutoFundRequest(BaseModel):
     amount:str
     thresholdAmount:str
 class BuyTicketRequest(PINRequest):
-    busId:int
-    routeId: int
-    scheduleId: int
     walletAccount:str
+    tripId: int
     amount: str
-    boardingDate:str
+    seats:List[int]
+    @validator("amount")
+    def amount_validator(cls, amount):
+        #formattedAmount = util.amountToKobo(amount=amount)
+        return str(int(amount)*100)
 class BuyTrainTicketRequest(PINRequest):
     trainId:int
     scheduleId: int

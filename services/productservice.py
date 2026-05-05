@@ -14,7 +14,6 @@ from schemas.station import StationsResponse
 from schemas.route import RoutesResponse,RouteResponse,TrainRoutesResponse
 from schemas.bus_route import BusRoutesResponse
 from services import topupboxservice
-from fastapi import Response,Request,status
 from models.queries import productQuery,queries
 from schemas.beneficiary import *
 from fastapi import (
@@ -36,6 +35,7 @@ def getAllBillers(db: Session):
     return productQuery.get_all_biller(db=db)
 def getSingleBiller(db: Session, id: int):
     return productQuery.get_single_biller_by_id(db=db, id=id)
+
 async def searchMovablesRoutes(response: Response,db: Session,user: Customer,departure: str,arrival: str,mode: str,latitude:str,longitude:str):
     try:
         logger.info(f"Started searching for {mode} route by {user.firstname}")
@@ -58,6 +58,7 @@ async def searchMovablesRoutes(response: Response,db: Session,user: Customer,dep
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BusRoutesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+
 def searchTrainRoutes(response: Response,db: Session,user: Customer,departure: str,arrival: str,mode: str,latitude:str,longitude:str):
     try:
         logger.info(f"Started searching for train from {departure} to {arrival} latitude {latitude} longtitude {longitude} at {datetime.now()}") 

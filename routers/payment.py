@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from utils.constant import *
 from typing import Annotated
 from utils.dependencies import getSystemSetting, verified_user,validateTransactionPIN,validateAdmin,validateCustomer
-from services import productservice,paymentservice
+from services import productservice,paymentservice,bus
 from utils.database import get_db
 from datetime import date
 from schemas.payment import *
@@ -279,7 +279,7 @@ async def buy_ticket(
 ):
     try:
         if user:
-            return await paymentservice.debitBusTicket(user=user,request=request,db=db,response=response,setting=setting,payload=payload,background_task=background_task)
+            return await bus.confirm_booking(user=user,request=request,db=db,response=response,setting=setting,payload=payload,background_task=background_task)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -315,23 +315,17 @@ async def buy_train_ticket(
 async def get_tickets(
     request: Request,
     response: Response,
-    user: Annotated[Customer, Depends(verified_user)],
+    user: Annotated[CustomerModel, Depends(verified_user)],
     setting: Annotated[Setting, Depends(getSystemSetting)],
     db: Annotated[Session, Depends(get_db)],
     startDate: Optional[str] = Query(None),
     endDate: Optional[str] = Query(None),
-    transaction_type: Optional[str] = Query(None),
+    transaction_type: Optional[str] = Query("bus"),
 ):
     try:
         if user:
-            logger.info(startDate)
-            if startDate is '' or endDate is '':
-                return await paymentservice.getAllTickets(
-                request=request,
-                response=response,
-                setting=setting,
-                db=db,
-                user=user,)
+            if transaction_type.lower() == "bus":
+                return await bus.getAllTickets(response=response,db=db,user=user,startDate=startDate,endDate=endDate,transactionType=transaction_type)
             else:
                 logger.info(type(startDate))
                 start = datetime.strptime(startDate, "%Y-%m-%d")
@@ -608,7 +602,6 @@ async def cashout_recipient_verification(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-
 @router.post("/cashout/recipient",
     response_model=BaseResponse,
     response_model_exclude_unset=True,tags=["cashout"])

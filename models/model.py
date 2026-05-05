@@ -932,7 +932,6 @@ class TicketModel(Base):
     isdelete = Column(Boolean, default=False,server_default='0')
     price = Column(String(25), nullable=True)  # Ticket price
     qr_code = Column(String(255), nullable=False,unique=True)  # QR code string or URL
-    status= Column(Enum(TicketStatusEnum), default=TicketStatusEnum.BOOKED,server_default=TicketStatusEnum.BOOKED.value)  # Ticket status
     mode= Column(Enum(TicketModeEnum), default=TicketModeEnum.BUS,server_default=TicketModeEnum.BUS.value)  # Ticket status
     status = Column(Enum(BookingStatusEnum), default=BookingStatusEnum.RESERVED,server_default=BookingStatusEnum.RESERVED.value)
     boarding_date = Column(String(50), nullable=True)

@@ -14,13 +14,13 @@ from schemas.admin import Admin
 import time
 from utils.database import get_db
 from sqlalchemy.orm import Session
-from schemas.park import ParksResponse
+from schemas.bus_schedule import BusSchedulesMobileResponse
 from schemas.route import RoutesResponse,RouteResponse,TrainRoutesResponse,TrainRouteResponse
-from services import productservice
+from services import productservice,bus
 from schemas.customer import Customer
 from schemas.setting import Setting
 from schemas.product import ProductsResponse
-from schemas.station import StationsResponse
+from schemas.station import StationsMobileResponse
 from schemas.bus import BusesResponse
 from schemas.admin import ProvidersResponse
 from schemas.bus_route import BusRoutesResponse,BusRouteResponse
@@ -92,30 +92,56 @@ async def get_available_routes(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return RoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,data=[])
 @router.get("/bus_search",
-    response_model=BusRoutesResponse,
+    response_model=BusSchedulesMobileResponse,
     response_model_exclude_unset=True,tags=['bus'])
 async def get_Bus_Routes(
-    request: Request,
     response: Response,
-    user: Annotated[Customer, Depends(verified_user)],
-    setting: Annotated[Setting, Depends(getSystemSetting)],
+    user: Annotated[CustomerModel, Depends(verified_user)],
     db: Annotated[Session, Depends(get_db)],
     departure: str = Query(None),
     arrival: str = Query(None),
-    searchType: str = Query("bus"),
     latitude: str = Query(None),
     longitude: str = Query(None),
 ):
     try:
+        logger.info(type(arrival))
         if user:
-            return await productservice.searchMovablesRoutes(response=response,db=db,user=user,departure=departure,arrival=arrival,mode=searchType,latitude=latitude,longitude=longitude)
+            if departure and arrival:
+                return await bus.searchMovablesRoutes(response=response,db=db,latitude=latitude,longitude=longitude,departure=departure,arrival=arrival)
+            elif departure and not arrival:
+                return await bus.searchMovablesRoutes(response=response,db=db,latitude=latitude,longitude=longitude,departure=departure)
+            elif arrival and not departure:
+                return await bus.searchMovablesRoutes(response=response,db=db,latitude=latitude,longitude=longitude,arrival=arrival)
+            else:
+                return await bus.searchMovablesRoutes(response=response,db=db,latitude=latitude,longitude=longitude)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
-            return BusRoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)
+            return BusSchedulesMobileResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BusRoutesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+        return BusSchedulesMobileResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/trip/seat/{tripId}",
+    response_model=BaseResponse,
+    response_model_exclude_unset=True,tags=['bus'])
+async def get_Bus_Seats(
+    tripId:int,
+    response: Response,
+    user: Annotated[CustomerModel, Depends(verified_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        if user:
+            r = await bus.get_trip_seats(response=response,db=db,tripId=tripId)
+            logger.info(r)
+            return r
+        else:
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.get("/bus_provider/{providerId}",
     response_model=BusRoutesResponse,
     response_model_exclude_unset=True,tags=['bus'])
@@ -155,9 +181,9 @@ async def get_Bus_Providers(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return ProvidersResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 @router.get("/stations/{mode}",
-    response_model=StationsResponse,
+    response_model=StationsMobileResponse,
     response_model_exclude_unset=True,)
-async def get_Train_Stations(
+async def get_Stations(
     mode:str,
     request: Request,
     response: Response,
@@ -167,14 +193,16 @@ async def get_Train_Stations(
 ):
     try:
         if user:
-            return productservice.stations(mode=mode,request=request,response=response,setting=setting,db=db,user=user)
+            if mode == "train":
+                return productservice.stations(mode=mode,request=request,response=response,setting=setting,db=db,user=user)
+            return bus.stations(response=response,db=db)
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
-            return StationsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,data=[])
+            return StationsMobileResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNKNOWNUSER,data=[])
     except Exception as ex:
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return StationsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,data=[])
+        return StationsMobileResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,data=[])
 @router.get("/train_search",
     response_model=TrainRoutesResponse,
     response_model_exclude_unset=True,tags=['train'])
