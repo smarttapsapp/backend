@@ -13,7 +13,7 @@ from schemas.route import RouteBase
 
 class TicketBase(BaseModel):
     ticket_number: str
-    mode: str
+    mode:  Union[str, None] = None
     status: str
     booked_at: datetime
     expired_at: datetime

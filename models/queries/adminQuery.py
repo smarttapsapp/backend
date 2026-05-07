@@ -354,6 +354,41 @@ def deleteSchedule(db: Session ,scheduleId:int):
         db.commit()
         return True
     return False
+def getTripManifest(db: Session,tripId:int):
+    return (db.execute(select(
+        TicketModel.id,
+        TicketModel.ticket_number,
+        TicketModel.price,
+        TicketModel.qr_code,
+        TicketModel.status,
+        TicketModel.boarding_date,
+        TicketModel.booked_at,
+        TicketModel.expired_at,
+        TicketModel.created_at,
+        CustomerModel.firstname,
+        CustomerModel.lastname,
+        CustomerModel.photo,
+        CustomerModel.phonenumber,
+        CustomerModel.next_of_kin_name,
+        CustomerModel.next_of_kin_phone,
+        CustomerModel.next_of_kin_address,
+        BusRouteModel.routeName,
+        BusModel.bus_number,
+        BusModel.name.label("busName"),
+        BusModel.busImage,
+        BusScheduleModel.daysOfOperation,
+        BusScheduleModel.departureTime,
+        BusScheduleModel.arrivalTime,
+        SeatModel.seat_label,
+        AdminModel.companyName)
+        .join(AdminModel, AdminModel.id == TicketModel.admin_id)
+        .join(CustomerModel, CustomerModel.id == TicketModel.customer_id)
+        .join(BusModel, BusModel.id == TicketModel.bus_id)
+        .join(BusRouteModel, BusRouteModel.id == TicketModel.busroute_id)
+        .join(BusScheduleModel, BusScheduleModel.id == TicketModel.busschedule_id)
+        .join(SeatModel, SeatModel.id == TicketModel.seat_id)
+        .filter(TicketModel.busschedule_id ==tripId)
+        .order_by(desc(BusRouteModel.created_at))).mappings().all())
 # seat
 def getSeats(db: Session,adminId:int=None):
     if adminId:

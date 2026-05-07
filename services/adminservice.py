@@ -1340,6 +1340,14 @@ async def deleteBusSchedule(db: Session, background_task: BackgroundTasks, reque
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+async def tripManifest(response: Response,db: Session,tripId:int):
+    try:
+        logger.info(f"started querying manifest via {tripId}")
+        return TicketsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getTripManifest(db=db,tripId=tripId))
+    except Exception as ex:
+        logger.info(ex)
+        return TicketsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,data=[])
+
 # seats
 async def listOfSeats(request: Request,response: Response,setting: Setting,db: Session,admin: AdminModel):
     try:

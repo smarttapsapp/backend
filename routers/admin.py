@@ -840,8 +840,17 @@ async def delete_bus_schedule(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
-            statusDescription=str(ex),
-        )
+            statusDescription=SYSTEMBUSY, )
+@router.get("/bus-manifest/{tripId}",response_model=TicketsResponse,response_model_exclude_unset=True,tags=["route"])
+async def get_trip_manifest(tripId:int,response: Response,admin: Annotated[AdminModel, Depends(validateAdmin)],db: Annotated[Session, Depends(get_db)]):
+    try:
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT,AdminRoleEnum.BUSPROVIDER]:
+            return await  adminservice.tripManifest(response=response,db=db,tripId=tripId)
+        return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED,)
+
+    except Exception as ex:
+        logger.error(ex)
+        return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,data=[])
 #train schedules
 @router.get("/schedules", 
     response_model=SchedulesResponse,
