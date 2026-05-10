@@ -151,6 +151,10 @@ async def createUserAccount(db: Session,setting: Setting,payload: CreateAdminReq
         logger.info("started creating new admin account")
         role = adminQuery.getRoleViaTag(db=db,tag=payload.tag)
         if role:
+            if role.tag == AdminRoleEnum.HEADOFFICE:
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="You Cannot add Headoffice role")
+
             password = util.generate_password()
             logger.info(f"New admin created {payload.firstname} with password {password}")
             newAdmin = AdminModel(

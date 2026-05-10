@@ -8,7 +8,7 @@ from sqlalchemy import (
     Enum,
     Numeric,Table,
     Text,
-    DECIMAL,func,UniqueConstraint,Date, cast,
+    DECIMAL,func,UniqueConstraint,Date, cast,Index,CheckConstraint
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
@@ -90,6 +90,11 @@ class AccountType(PythonEnum):
     equity = "equity"
     revenue = "revenue"
     expense = "expense"
+class PartyType(PythonEnum):
+    HEAD_OFFICE      = "HEAD_OFFICE"
+    SERVICE_PROVIDER = "SERVICE_PROVIDER"
+    MERCHANT         = "MERCHANT"
+    CUSTOMER         = "CUSTOMER"
 class CommissionType(PythonEnum):
     percentage = "percentage"
     calculated = "calculated"
@@ -548,6 +553,7 @@ class PaymentModel(Base):
     cashout = relationship("CashOutModel", backref="cashouts")
     created_at = Column(DateTime, default=func.now(),server_default=func.now())
     updated_at = Column(DateTime, default=func.now(),server_default=func.now())
+
 class BankModel(Base):
     __tablename__ = "banks"
     id = Column(Integer, primary_key=True, index=True)
@@ -957,10 +963,53 @@ class GLAccountModel(Base):
     code = Column(String(20), unique=True, nullable=False)
     name = Column(String(100), nullable=False)
     gl_type = Column(Enum(AccountType), nullable=False)
+    party_type = Column(Enum(PartyType),nullable=True)
     gl_balance = Column(String(20), nullable=False,default='0')
-    journal_entries = relationship('JournalEntryModel', backref='gl_account')
     created_at = Column(DateTime, default=func.now(),server_default=func.now())
     updated_at = Column(DateTime, default=func.now(),onupdate=func.now())
+    #journal_entries = relationship('JournalEntryModel', backref='gl_account')
+    entries = relationship("GLEntry", back_populates="account",foreign_keys="gl_entries.account_code",primaryjoin="gl_accounts.code == gl_entries.account_code")
+class GLTransaction(Base):
+    """One business event — groups all its DR/CR entries."""
+    __tablename__ = "gl_transactions"
+
+    id               = Column(Integer, primary_key=True, index=True)
+    reference        = Column(String(100), unique=True, nullable=False, index=True)
+    transaction_type = Column(String(50),  nullable=False)
+    description      = Column(String(255), nullable=True)
+    total_amount     = Column(String(50), nullable=False)
+    fee_amount       = Column(String(50), default=0)
+    provider_cost    = Column(String(50), default=0)
+    commission       = Column(String(50), default=0)
+    status           = Column(Enum(TransactionStatusEnum), default=TransactionStatusEnum.PENDING,server_default=TransactionStatusEnum.PENDING.value)
+    posted_at        = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=func.now(),server_default=func.now())
+    updated_at = Column(DateTime, default=func.now(),onupdate=func.now())
+    entries          = relationship("GLEntry", back_populates="transaction")
+class GLEntry(Base):
+    """Individual debit or credit line — every transaction has >= 2 entries."""
+    __tablename__ = "gl_entries"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    transaction_ref = Column(String(100), ForeignKey("gl_transactions.reference"),nullable=False, index=True)
+    account_code    = Column(String(10),  ForeignKey("gl_accounts.code"),nullable=False, index=True)
+    entry_type      = Column(Enum(PaymentEnum), nullable=False)
+    amount          = Column(String(50), nullable=False)
+    party_type      = Column(Enum(PartyType), nullable=False)
+    customer_id        = Column(Integer, nullable=True, index=True)
+    description     = Column(String(255), nullable=True)
+    posted_at       = Column(DateTime, default=func.now(),server_default=func.now())
+    created_at      = Column(DateTime, default=func.now(),server_default=func.now())
+    transaction     = relationship("GLTransaction", back_populates="entries")
+    account         = relationship("GLAccountModel", back_populates="entries",foreign_keys=[account_code],primaryjoin="gl_accounts.code == gl_entries.account_code")
+
+    __table_args__ = (
+        Index("idx_gl_entry_ref_account", "transaction_ref", "account_code"),
+        Index("idx_gl_entry_customer",       "party_type", "customer_id"),
+        CheckConstraint("amount > 0", name="ck_gl_entry_amount_positive"),
+    )
+
+
 class JournalEntryModel(Base):
     __tablename__ = "journal_entries"
 
@@ -972,6 +1021,7 @@ class JournalEntryModel(Base):
     is_debit = Column(Boolean, nullable=False)
     created_at = Column(DateTime, default=func.now(),server_default=func.now())
     updated_at = Column(DateTime, default=func.now(),onupdate=func.now())
+
 class ServiceRateModel(Base):
     __tablename__ = "service_rates"
     id = Column(Integer, primary_key=True)
