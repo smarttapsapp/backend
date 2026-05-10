@@ -967,7 +967,12 @@ class GLAccountModel(Base):
     created_at = Column(DateTime, default=func.now(),server_default=func.now())
     updated_at = Column(DateTime, default=func.now(),onupdate=func.now())
     #journal_entries = relationship('JournalEntryModel', backref='gl_account')
-    entries = relationship("GLEntry", back_populates="account",foreign_keys="gl_entries.account_code",primaryjoin="gl_accounts.code == gl_entries.account_code")
+    entries = relationship(
+    "GLEntry",
+    back_populates="account",
+    foreign_keys="[GLEntry.account_code]",
+    primaryjoin="GLAccountModel.code == GLEntry.account_code"
+)
 class GLTransaction(Base):
     """One business event — groups all its DR/CR entries."""
     __tablename__ = "gl_transactions"
@@ -1000,7 +1005,7 @@ class GLEntry(Base):
     posted_at       = Column(DateTime, default=func.now(),server_default=func.now())
     created_at      = Column(DateTime, default=func.now(),server_default=func.now())
     transaction     = relationship("GLTransaction", back_populates="entries")
-    account         = relationship("GLAccountModel", back_populates="entries",foreign_keys=[account_code],primaryjoin="gl_accounts.code == gl_entries.account_code")
+    account         = relationship("GLAccountModel", back_populates="entries",foreign_keys=[account_code],primaryjoin="GLAccountModel.code == GLEntry.account_code")
 
     __table_args__ = (
         Index("idx_gl_entry_ref_account", "transaction_ref", "account_code"),
