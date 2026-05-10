@@ -96,6 +96,8 @@ class Payment(PaymentBase):
     productName: Union[str, None] = None
     billerName: Union[str, None] = None
     companyName: Union[str, None] = None
+    providerAmount: Union[str, None] = None
+    commissionAmount: Union[str, None] = None
     created_at: Optional[datetime] = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = Field(default_factory=datetime.now)
     class Config:
