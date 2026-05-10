@@ -524,7 +524,6 @@ class PaymentModel(Base):
     user_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
     admin_id = Column(Integer, ForeignKey("admins.id"), nullable=True)
     cashout_id = Column(Integer, ForeignKey("cashouts.id"),nullable=True)
-    code = Column(String(20), ForeignKey("gl_accounts.code"))
     amount = Column(String(50), nullable=False)
     reference = Column(String(100),nullable=False,unique=True, default=lambda: str(uuid.uuid4()),)
     transactionreference = Column(String(100), nullable=True)
