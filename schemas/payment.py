@@ -84,6 +84,25 @@ class GenerateQRRequest(PINRequest):
     pin: str
 class PaymentsResponse(BaseResponse):
     data: Union[List[Payment],None] = None 
+
+class Payment(PaymentBase):
+    id: Optional[int]
+    statusMessage: Union[str, None] = None
+    statusCode: Union[str, None] = None
+    channel: Union[str, None] = None
+    status: Union[str, None] = None
+    firstname: Union[str, None] = None
+    lastname: Union[str, None] = None
+    productName: Union[str, None] = None
+    billerName: Union[str, None] = None
+    companyName: Union[str, None] = None
+    created_at: Optional[datetime] = Field(default_factory=datetime.now)
+    updated_at: Optional[datetime] = Field(default_factory=datetime.now)
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+class RevenuesResponse(BaseResponse):
+    data: Union[List[Payment],None] = None 
 class PaymentResponse(BaseResponse):
     data: Transaction = None
 class FundRequest(BaseModel):

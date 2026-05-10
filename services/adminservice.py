@@ -2647,3 +2647,26 @@ async def toggleCustomerAccountStatus(customerId: int,request: Request,response:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return CashoutsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+# Revenue 
+async def listAllRevenue(response: Response,setting: Setting,db: Session,admin: AdminModel,startDate: str=None,endDate: str=None):
+    try:
+        logger.info(
+            f"started querying revenue list from {startDate} to {endDate}"
+        )
+        if admin.role.tag in [AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.SUPERADMIN,AdminRoleEnum.HEADOFFICE,AdminRoleEnum.SUPPORT]:
+            return RevenuesResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=adminQuery.getListOfRevenue(db=db,startDate=startDate,endDate=endDate)
+            )
+        else:
+            logger.info(f"Getting revenue for admin {admin.id}")
+            return RevenuesResponse(
+                statusCode= str(status.HTTP_200_OK),
+                statusDescription=SUCCESS,
+                data=adminQuery.getListOfRevenue(db=db,startDate=startDate,endDate=endDate,adminId=admin.id)
+            )
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return RevenuesResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

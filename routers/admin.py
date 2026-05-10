@@ -2048,6 +2048,29 @@ async def toggle_discount(
             statusCode=str(status.HTTP_400_BAD_REQUEST),
             statusDescription=str(ex),
         )
+# Revenue
+@router.get("/revenue", 
+    response_model=RevenuesResponse,
+    response_model_exclude_unset=True,tags=["accounting"])
+async def get_total_revenue(
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    startDate: str = Query(None),
+    endDate: str = Query(None),
+):
+    try:
+        if admin:
+            return await adminservice.listAllRevenue(
+                response=response,
+                setting=setting,
+                db=db,
+                admin=admin,)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return RevenuesResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 
 # products
 @router.get("/products", 

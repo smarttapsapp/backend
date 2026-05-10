@@ -546,3 +546,100 @@ def getCustomerById(db: Session, customerId: int):
 # get ticket details
 def getTicketById(db: Session, ticketId: int):
     return db.query(TicketModel).filter(TicketModel.id == ticketId).first()
+def getListOfRevenue(db: Session,startDate:str=None,endDate:str=None,adminId:int=None):
+    if startDate and endDate:
+        start = datetime.strptime(startDate, "%Y-%m-%d").date()
+        end = datetime.strptime(endDate, "%Y-%m-%d").date()+ timedelta(days=1) - timedelta(seconds=1)
+        if adminId:
+            return (db.execute(select(
+                    PaymentModel.id,
+                    PaymentModel.payment_type,
+                    PaymentModel.amount,
+                    PaymentModel.channel,
+                    PaymentModel.status,
+                    PaymentModel.statusCode,
+                    PaymentModel.event,
+                    PaymentModel.admin_id,
+                    PaymentModel.statusDescription,
+                    PaymentModel.statusMessage,
+                    PaymentModel.reference,
+                    PaymentModel.recipient,
+                    ProductModel.name.label("productName"),
+                    ProductTypeModel.billerName,
+                    CustomerModel.firstname,
+                    CustomerModel.lastname,
+                    PaymentModel.created_at)
+                    .join(CustomerModel, CustomerModel.id == PaymentModel.user_id)
+                    .join(ProductTypeModel, ProductTypeModel.id == PaymentModel.product_type_id)
+                    .join(ProductModel, ProductModel.id == PaymentModel.product_id)
+                    .filter(PaymentModel.admin_id == adminId,PaymentModel.created_at.between(start,end))).mappings().all())
+        else:
+            return (db.execute(select(
+                    PaymentModel.id,
+                    PaymentModel.payment_type,
+                    PaymentModel.amount,
+                    PaymentModel.channel,
+                    PaymentModel.status,
+                    PaymentModel.statusCode,
+                    PaymentModel.event,
+                    PaymentModel.admin_id,
+                    PaymentModel.statusDescription,
+                    PaymentModel.statusMessage,
+                    PaymentModel.reference,
+                    PaymentModel.recipient,
+                    ProductModel.name.label("productName"),
+                    ProductTypeModel.billerName,
+                    CustomerModel.firstname,
+                    CustomerModel.lastname,
+                    PaymentModel.created_at)
+                    .join(CustomerModel, CustomerModel.id == PaymentModel.user_id)
+                    .join(ProductTypeModel, ProductTypeModel.id == PaymentModel.product_type_id)
+                    .join(ProductModel, ProductModel.id == PaymentModel.product_id)
+                    .filter(PaymentModel.created_at.between(start,end))).mappings().all())
+    else:
+        if adminId:
+            return (db.execute(select(
+                    PaymentModel.id,
+                    PaymentModel.payment_type,
+                    PaymentModel.amount,
+                    PaymentModel.channel,
+                    PaymentModel.status,
+                    PaymentModel.statusCode,
+                    PaymentModel.event,
+                    PaymentModel.admin_id,
+                    PaymentModel.statusDescription,
+                    PaymentModel.statusMessage,
+                    PaymentModel.reference,
+                    PaymentModel.recipient,
+                    ProductModel.name.label("productName"),
+                    ProductTypeModel.billerName,
+                    CustomerModel.firstname,
+                    CustomerModel.lastname,
+                    PaymentModel.created_at)
+                    .join(CustomerModel, CustomerModel.id == PaymentModel.user_id)
+                    .join(ProductTypeModel, ProductTypeModel.id == PaymentModel.product_type_id)
+                    .join(ProductModel, ProductModel.id == PaymentModel.product_id)
+                    .filter(PaymentModel.admin_id == adminId)).mappings().all())
+        else:
+            return (db.execute(select(
+                    PaymentModel.id,
+                    PaymentModel.payment_type,
+                    PaymentModel.amount,
+                    PaymentModel.channel,
+                    PaymentModel.status,
+                    PaymentModel.statusCode,
+                    PaymentModel.event,
+                    PaymentModel.admin_id,
+                    PaymentModel.statusDescription,
+                    PaymentModel.statusMessage,
+                    PaymentModel.reference,
+                    PaymentModel.recipient,
+                    ProductModel.name.label("productName"),
+                    ProductTypeModel.billerName,
+                    CustomerModel.firstname,
+                    CustomerModel.lastname,
+                    PaymentModel.created_at)
+                    .join(ProductTypeModel, ProductTypeModel.id == PaymentModel.product_type_id)
+                    .join(ProductModel, ProductModel.id == PaymentModel.product_id)
+                    .join(CustomerModel, CustomerModel.id == PaymentModel.user_id)
+                    ).mappings().all())
