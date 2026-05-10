@@ -53,9 +53,11 @@ async def createAccount(
         if payload.id:
             logger.info(f"updating user {payload.firstname} at {str(datetime.now())}")
             user = authQuery.getCheckAdmin(db=db,username=payload.email)
-            if user:
+            if user and str(user.id) == str(payload.id):
+                password = util.generate_password()
                 user.firstname = payload.firstname
                 user.identifier = payload.identifier if payload.identifier else user.identifier
+                user.password = util.get_password_hash(password=password)
                 user.lastname = payload.lastname
                 user.phonenumber = payload.phonenumber
                 user.email = payload.email
@@ -66,6 +68,8 @@ async def createAccount(
                 user.updated_at = datetime.now()
                 updatedUser = authQuery.create_account(db=db,user=user)
                 if updatedUser:
+                    email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": updatedUser,"password":password},)
+                    background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="Welcome to Smart Tap - Your Account Has Been Updated",toAddress=user.email,)
                     return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
@@ -81,10 +85,7 @@ async def createAccount(
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(
-                    statusCode=str(status.HTTP_400_BAD_REQUEST),
-                    statusDescription=SYSTEMBUSY,
-                )
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 async def authenticate_user(
         request:Request,
         db: Session,
@@ -201,7 +202,7 @@ async def createUserAccount(db: Session,setting: Setting,payload: CreateAdminReq
                     util.mailer,
                     str(email_body.body, "utf-8"),
                     setting=setting,
-                    subject="Onboarding Notification",
+                    subject="Welcome to Smart Tap - Your Account Has Been Created",
                     toAddress=newAdmin.email,
                 )
                 return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)

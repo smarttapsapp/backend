@@ -1,6 +1,162 @@
 {% extends "base.html" %}
 <!-- Include the footer  -->
 {% block content %}
-<p>Hello {{user.firstname}} {{user.lastname}},</p>
-<p>You just login to your Account succesfully from {{password}}.</p>
+<table
+  width="100%"
+  cellpadding="0"
+  cellspacing="0"
+  style="background-color: #f4f6f9; padding: 40px 0"
+>
+  <tr>
+    <td align="center">
+      <table
+        width="600"
+        cellpadding="0"
+        cellspacing="0"
+        style="background: #ffffff; border-radius: 8px; overflow: hidden"
+      >
+        <!-- Body -->
+        <tr>
+          <td style="padding: 40px 30px; color: #333333">
+            <p style="margin-top: 0; font-size: 16px">
+              Dear <strong>{{user.firstname}} {{user.lastname}}</strong>,
+            </p>
+
+            <p style="font-size: 15px; line-height: 1.7">
+              We are pleased to inform you that your account has been
+              successfully created and activated on our platform.
+            </p>
+
+            <!-- Login Details -->
+            <table
+              width="100%"
+              cellpadding="0"
+              cellspacing="0"
+              style="
+                margin: 30px 0;
+                border: 1px solid #e5e7eb;
+                border-radius: 6px;
+              "
+            >
+              <tr>
+                <td
+                  colspan="2"
+                  style="
+                    background: #f8fafc;
+                    padding: 15px;
+                    border-bottom: 1px solid #e5e7eb;
+                  "
+                >
+                  <strong style="font-size: 16px">Login Details</strong>
+                </td>
+              </tr>
+
+              <tr>
+                <td
+                  style="
+                    padding: 12px 15px;
+                    width: 35%;
+                    border-bottom: 1px solid #f1f5f9;
+                  "
+                >
+                  <strong>Portal URL</strong>
+                </td>
+                <td
+                  style="padding: 12px 15px; border-bottom: 1px solid #f1f5f9"
+                >
+                  <a
+                    href="https://portal.smarttaps.org/"
+                    style="color: #2563eb; text-decoration: none"
+                  >
+                    https://portal.smarttaps.org/
+                  </a>
+                </td>
+              </tr>
+
+              <tr>
+                <td
+                  style="
+                    padding: 12px 15px;
+                    width: 35%;
+                    border-bottom: 1px solid #f1f5f9;
+                  "
+                >
+                  <strong>Username</strong>
+                </td>
+                <td
+                  style="padding: 12px 15px; border-bottom: 1px solid #f1f5f9"
+                >
+                  {{user.email}}
+                </td>
+              </tr>
+
+              <tr>
+                <td style="padding: 12px 15px">
+                  <strong>Temporary Password</strong>
+                </td>
+                <td style="padding: 12px 15px">{{password}}</td>
+              </tr>
+            </table>
+
+            <p style="font-size: 15px; line-height: 1.7">
+              For security purposes, we strongly recommend that you change your
+              password immediately after your first login.
+            </p>
+
+            <!-- CTA -->
+            <div style="margin: 35px 0; text-align: center">
+              <a
+                href="https://portal.smarttaps.org/login"
+                style="
+                  background: #2563eb;
+                  color: #ffffff;
+                  text-decoration: none;
+                  padding: 14px 28px;
+                  border-radius: 6px;
+                  display: inline-block;
+                  font-weight: bold;
+                "
+              >
+                Login to Portal
+              </a>
+            </div>
+
+            <!-- Support -->
+            <div
+              style="
+                margin-top: 30px;
+                border-top: 1px solid #e5e7eb;
+                padding-top: 20px;
+              "
+            >
+              <p style="margin: 0 0 10px; font-size: 15px">
+                If you require assistance, please contact our support team:
+              </p>
+
+              <p style="margin: 5px 0; color: #4b5563">
+                <strong>Email:</strong> helpdesk@smarttaps.org
+              </p>
+
+              <p style="margin: 5px 0; color: #4b5563">
+                <strong>Phone:</strong> +2348026163992
+              </p>
+            </div>
+
+            <p style="margin-top: 35px; font-size: 15px">
+              We look forward to supporting your business and providing you with
+              a seamless experience on our platform.
+            </p>
+
+            <p style="margin-top: 30px; line-height: 1.7">
+              Kind regards,<br />
+              <strong>Admin Support</strong><br />
+              Admin<br />
+              Smart Taps
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
 {% endblock %}
