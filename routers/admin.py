@@ -1595,6 +1595,7 @@ async def get_setting(
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return TicketsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+
 # Accounting
 @router.get("/ledgers", 
     response_model=GLedgersResponse,

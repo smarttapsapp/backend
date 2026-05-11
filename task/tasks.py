@@ -244,3 +244,31 @@ def run_auto_fund_wallet(self):
         raise
     finally:
         db.close()
+@celery_app.task(bind=True)
+def paystackNotification(self):
+    db = CelerySessionLocal()
+    cutoff = datetime.now() - timedelta(minutes=10)
+    try:
+        setting= getSystemSetting(db=db)
+        txns = (db.query(TransactionModel).filter(TransactionModel.statusCode == "C001",TransactionModel.created_at <= cutoff).order_by(asc(TransactionModel.created_at)).with_for_update().limit(5).all() )
+        for txn in txns:
+            if txn.reference:
+                logger.info(f"Requerying transaction with reference {txn.reference} and status {txn.statusCode} for the time at {str(datetime.now())}")
+                response = transactionRequery(db=db,transaction=txn,setting=setting)
+                if response.statusCode == "200":
+                    txn.statusCode = response.statusCode
+                    txn.statusMessage = response.statusDescription
+                else:
+                    txn.statusCode = response.statusCode
+                    txn.statusMessage = response.statusDescription
+            else:
+                txn.statusCode = "C13"
+                txn.statusMessage = "Transaction has no reference for requery"
+                logger.info(f"Transaction with id {txn.id} phone {txn.recipient} done at {txn.created_at} has no reference for requery at {str(datetime.now())}")
+            txn.updated_at = datetime.now()
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()

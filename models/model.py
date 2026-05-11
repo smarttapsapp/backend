@@ -85,11 +85,11 @@ class AccountRatingEnum(PythonEnum):
     SILVER = "silver"
     BRONZE = "bronze"
 class AccountType(PythonEnum):
-    asset = "asset"
-    liability = "liability"
-    equity = "equity"
-    revenue = "revenue"
-    expense = "expense"
+    ASSET = "ASSET"
+    LIABILITY = "LIABILITY"
+    INCOME = "INCOME"
+    EXPENSE = "EXPENSE"
+    EQUITY = "EQUITY"
 class PartyType(PythonEnum):
     HEAD_OFFICE      = "HEAD_OFFICE"
     SERVICE_PROVIDER = "SERVICE_PROVIDER"
@@ -141,6 +141,7 @@ class TransactionStatusEnum(PythonEnum):
     PENDING = "pending"
     PROCESSING = "processing"
     FAILED = "failed"
+    POSTED = "posted"
 class TransactionCodeEnum(PythonEnum):
     SUCCESS = "00"
     PENDING = "E01"
@@ -955,6 +956,66 @@ class TicketModel(Base):
     __table_args__ = (
         UniqueConstraint("busschedule_id", "seat_id", name="uq_bus_schedule_seat"),
     )
+class GLTransactionType(Base):
+
+    __tablename__ = "gl_transaction_types"
+
+    id = Column(Integer, primary_key=True)
+
+    code = Column(String(50), unique=True)
+
+    name = Column(String(100))
+
+    description = Column(String(255))
+
+    is_active = Column(Boolean, default=True)
+class ProviderGLMapping(Base):
+
+    __tablename__ = "provider_gl_mapping"
+
+    id = Column(Integer, primary_key=True)
+
+    provider_code = Column(String(50))
+
+    account_code = Column(
+        String(20),
+        ForeignKey("gl_accounts.code")
+    )
+
+    is_active = Column(Boolean, default=True)
+class GatewaySettlementGL(Base):
+
+    __tablename__ = "gateway_settlement_gl"
+
+    id = Column(Integer, primary_key=True)
+
+    gateway = Column(String(50))
+
+    account_code = Column(
+        String(20),
+        ForeignKey("gl_accounts.code")
+    )
+class GLPostingRule(Base):
+    __tablename__ = "gl_posting_rules"
+    id = Column(Integer, primary_key=True)
+    transaction_type = Column(String(50), nullable=False, index=True)
+    entry_type = Column(Enum(PaymentEnum),nullable=False )
+    account_role = Column(String(50), nullable=False)
+    account_code = Column(String(20),ForeignKey("gl_accounts.code"), nullable=False)
+    created_at = Column(DateTime,default=func.now(),server_default=func.now())
+    is_active = Column(Boolean, default=True)
+    priority = Column(Integer, default=1)
+    created_at = Column(DateTime, default=func.now())
+    account = relationship("GLAccountModel")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "transaction_type",
+            "entry_type",
+            "account_role",
+            name="uq_gl_posting_rule"
+        ),
+    )
 class GLAccountModel(Base):
     __tablename__ = "gl_accounts"
 
@@ -964,9 +1025,9 @@ class GLAccountModel(Base):
     gl_type = Column(Enum(AccountType), nullable=False)
     party_type = Column(Enum(PartyType),nullable=True)
     gl_balance = Column(String(20), nullable=False,default='0')
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now(),server_default=func.now())
     updated_at = Column(DateTime, default=func.now(),onupdate=func.now())
-    #journal_entries = relationship('JournalEntryModel', backref='gl_account')
     entries = relationship(
     "GLEntry",
     back_populates="account",
@@ -985,6 +1046,7 @@ class GLTransaction(Base):
     fee_amount       = Column(String(50), default=0)
     provider_cost    = Column(String(50), default=0)
     commission       = Column(String(50), default=0)
+    merchant_com     = Column(String(50), default=0)
     status           = Column(Enum(TransactionStatusEnum), default=TransactionStatusEnum.PENDING,server_default=TransactionStatusEnum.PENDING.value)
     posted_at        = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=func.now(),server_default=func.now())
@@ -1136,3 +1198,19 @@ class CouponModel(Base):
     coupon_amount = Column(String(100), nullable=False)
     status = Column(Enum(CouponStatusEnum), default=CouponStatusEnum.OPEN,server_default=CouponStatusEnum.OPEN.value)
     created_at = Column(DateTime,default=func.now(),server_default=func.now())
+class AccountingAuditLog(Base):
+
+    __tablename__ = "accounting_audit_logs"
+
+    id = Column(Integer, primary_key=True)
+
+    admin_id = Column(Integer)
+
+    action = Column(String(100))
+
+    table_name = Column(String(100))
+
+
+    ip_address = Column(String(50))
+
+    created_at = Column(DateTime, default=func.now())

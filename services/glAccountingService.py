@@ -855,3 +855,243 @@ async def toggleDiscount(db: Session,response: Response, setting: Setting,backgr
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
+
+async def post_funding_gl(db: Session,reference: str,transaction_type:str,customer_id: int, amount: str,):
+    gl_ref = f"GL-{reference}"
+    existing = db.query(GLTransaction).filter(GLTransaction.reference == gl_ref).first()
+    if existing:
+        return
+    txn = GLTransaction(reference=gl_ref, transaction_type=transaction_type,description=f"Customer wallet funding {reference}",total_amount=amount,fee_amount=fee,provider_cost=fee,commission="0")
+    e = make_entry
+    entries = [
+            # bank account receives full payment
+            e(gl_ref, "1001", "DR", amount,     "HEAD_OFFICE", None,        "Bank receipt — customer funding"),
+            # customer wallet credited with net
+            e(gl_ref, "2001", "CR", amount, "CUSTOMER",    customer_id, "Customer wallet credit"),
+        ]
+    txn.status = TransactionStatus.POSTED
+    txn.posted_at = datetime.now()
+    db.add(txn)
+    for entry in entries:
+        db.add(entry)
+    db.execute(update(PaymentModel).where(PaymentModel.reference == reference).values(event="Y"))
+    db.commit()
+def make_entry(ref: str, code: str, entry_type: str, amount: str, party_type: str,customer_id: int = None, description: str = None, ) -> GLEntry:
+    return GLEntry(transaction_ref=ref,account_code=code,entry_type=entry_type,amount=amount,party_type=party_type,customer_id=customer_id,description=description,posted_at=datetime.now(),)
+async def validate_entries(entries: list[GLEntry]):
+    debit_total =0
+    credit_total = 0
+
+    for entry in entries:
+        amount = int(str(entry.amount))
+
+        if entry.entry_type == PaymentEnum.DEBIT:
+            debit_total += amount
+        else:
+            credit_total += amount
+
+    if debit_total != credit_total:
+        raise Exception(
+            f"Journal not balanced "
+            f"DR={debit_total} CR={credit_total}"
+        )
+def get_gl_account(
+    db: Session,
+    transaction_type: str,
+    entry_type: PaymentEnum,
+    account_role: str,
+):
+
+    rule = db.query(GLPostingRule).filter(
+        GLPostingRule.transaction_type == transaction_type,
+        GLPostingRule.entry_type == entry_type,
+        GLPostingRule.account_role == account_role,
+        GLPostingRule.is_active == True,
+    ).first()
+
+    if not rule:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing GL Rule "
+                   f"{transaction_type} "
+                   f"{entry_type} "
+                   f"{account_role}"
+        )
+
+    return rule.account
+async def post_transaction_gl(
+    db: Session,
+    transaction_type: str,
+    reference: str,
+    customer_id: int,
+    amount: Decimal,
+    provider_cost: Decimal,
+):
+
+    gl_ref = f"GL-{reference}"
+
+    # -----------------------------------------
+    # Idempotency Check
+    # -----------------------------------------
+
+    existing = db.query(GLTransaction).filter(
+        GLTransaction.reference == gl_ref
+    ).first()
+
+    if existing:
+        return existing
+
+    commission = amount - provider_cost
+
+    # -----------------------------------------
+    # Dynamic GL Resolution
+    # -----------------------------------------
+
+    customer_wallet_gl = get_gl_account(
+        db,
+        transaction_type,
+        PaymentEnum.DEBIT,
+        "CUSTOMER_WALLET"
+    )
+
+    provider_payable_gl = get_gl_account(
+        db,
+        transaction_type,
+        PaymentEnum.CREDIT,
+        "PROVIDER_PAYABLE"
+    )
+
+    commission_gl = get_gl_account(
+        db,
+        transaction_type,
+        PaymentEnum.CREDIT,
+        "COMMISSION_REVENUE"
+    )
+
+    # -----------------------------------------
+    # Create Transaction Header
+    # -----------------------------------------
+
+    txn = GLTransaction(
+        reference=gl_ref,
+        transaction_type=transaction_type,
+        description=f"{transaction_type} posting",
+        total_amount=amount,
+        provider_cost=provider_cost,
+        commission=commission,
+        status=TransactionStatus.POSTED,
+        posted_at=datetime.now(),
+    )
+
+    db.add(txn)
+
+    # -----------------------------------------
+    # Create Entries
+    # -----------------------------------------
+
+    entries = [
+
+        # DR Customer Wallet
+        make_entry(
+            gl_ref,
+            customer_wallet_gl.code,
+            PaymentEnum.DEBIT,
+            amount,
+            PartyType.CUSTOMER,
+            customer_id,
+            "Customer wallet debit"
+        ),
+
+        # CR Provider Payable
+        make_entry(
+            gl_ref,
+            provider_payable_gl.code,
+            PaymentEnum.CREDIT,
+            provider_cost,
+            PartyType.PROVIDER,
+            None,
+            "Provider payable"
+        ),
+
+        # CR Revenue
+        make_entry(
+            gl_ref,
+            commission_gl.code,
+            PaymentEnum.CREDIT,
+            commission,
+            PartyType.HEAD_OFFICE,
+            None,
+            "Commission revenue"
+        ),
+    ]
+
+    validate_entries(entries)
+
+    db.add_all(entries)
+
+    # -----------------------------------------
+    # Update GL Balances
+    # -----------------------------------------
+
+    for entry in entries:
+
+        account = db.query(GLAccountModel).filter(
+            GLAccountModel.code == entry.account_code
+        ).with_for_update().first()
+
+        if entry.entry_type == PaymentEnum.DEBIT:
+
+            if account.gl_type in [
+                AccountType.ASSET,
+                AccountType.EXPENSE
+            ]:
+                account.gl_balance += entry.amount
+            else:
+                account.gl_balance -= entry.amount
+
+        else:
+
+            if account.gl_type in [
+                AccountType.LIABILITY,
+                AccountType.INCOME,
+                AccountType.EQUITY
+            ]:
+                account.gl_balance += entry.amount
+            else:
+                account.gl_balance -= entry.amount
+
+    db.commit()
+
+    return txn
+async def post_airtime_purchase(
+    db: Session,
+    reference: str,
+    customer_id: int,
+    amount: Decimal,
+    provider_cost: Decimal,
+):
+
+    return await post_transaction_gl(
+        db=db,
+        transaction_type="AIRTIME_PURCHASE",
+        reference=reference,
+        customer_id=customer_id,
+        amount=amount,
+        provider_cost=provider_cost,
+    )
+async def post_cabletv_purchase(
+    db: Session,
+    reference: str,
+    customer_id: int,
+    amount: Decimal,
+    provider_cost: Decimal,
+):
+
+    return await post_transaction_gl(
+        db=db,
+        transaction_type="CABLETV_PURCHASE",
+        reference=reference,
+        customer_id=customer_id,
+        amount=amount,
+        provider_cost=provider_cost,
+    )

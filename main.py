@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request,status
 from fastapi.exceptions import RequestValidationError
 from utils.dependencies import middlewares
 from middleware.http import LoggingMiddleware
-from routers import auth, admin, customer, payment, transaction,notification,product,configuration
+from routers import auth, admin, customer, payment, transaction,notification,product,configuration,accounting
 
 logging.config.fileConfig("logging.conf", disable_existing_loggers=False)
 logger = logging.getLogger(__name__)
@@ -60,6 +60,7 @@ app.include_router(customer.adminRouter,prefix="/admin")
 app.include_router(notification.adminRouter,prefix="/admin")
 app.include_router(payment.adminRouter,prefix="/admin")
 app.include_router(product.adminRouter,prefix="/admin")
+app.include_router(accounting.router,prefix="/admin/accounting")
 app.mount("/mobile", mobileApp)
 app.mount("/static", StaticFiles(directory="templates"), name="static")
 # Add the logging middleware to FastAPI

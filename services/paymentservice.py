@@ -244,7 +244,6 @@ async def paystackNotification(
                 payment.user.hasAuthToken = True
                 updatedPayment = paymentQuery.create_payment(db=db,payment=payment)
                 if updatedPayment:
-                    background_task.add_task(post_funding_gl,db=db,reference=json_data["data"]["reference"],customer_id=payment.user_id,amount = json_data["data"]["amount"], fee=json_data["data"]["fees"],net_amount = json_data["data"]["amount"])
                     card = paymentQuery.getCardByLast4(db=db,last4=json_data["data"]["authorization"]["last4"])
                     if card is None:
                         createCard = CardsModel(
@@ -266,6 +265,7 @@ async def paystackNotification(
                         addCard = paymentQuery.create_card(db=db,card=createCard)
                     msg = f"Your purse has been funded with ₦{util.kobo_to_naira(int(updatedPayment.amount)):,.2f} successfully."
                     background_task.add_task(notifyUser,db=db,title=f"Fund Notification", message=msg,userId=payment.user_id, setting=setting)
+                    await post_funding_gl(db=db,reference=json_data["data"]["reference"],customer_id=payment.user_id,amount = json_data["data"]["amount"], fee=json_data["data"]["fees"],net_amount = json_data["data"]["amount"])
                     return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
@@ -280,70 +280,6 @@ async def paystackNotification(
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
-async def post_funding_gl(
-        db: Session,
-        reference: str,
-        customer_id: int,
-        amount: str,
-        fee: str,
-        net_amount: str,
-    ):
-        """
-        Post GL entries for wallet funding:
- 
-          DR 1001  Settlement Bank Account     (amount)    ← bank receives full amount
-          CR 2001  Customer Wallet Liability   (net_amount) ← we owe customer net
-          CR 5002  Gateway Fee Expense         (fee)        ← gateway keeps fee
-        """
-        txn = GLTransaction(reference=f"GL-{reference}", transaction_type="WALLET_FUNDING",description=f"Customer wallet funding {reference}",total_amount=amount,fee_amount=fee,provider_cost=fee,commission="0", )
- 
-        e = make_entry
-        ref = f"GL-{reference}"
- 
-        entries = [
-            # bank account receives full payment
-            e(ref, "1001", "DR", amount,     "HEAD_OFFICE", None,        "Bank receipt — customer funding"),
-            # customer wallet credited with net
-            e(ref, "2001", "CR", net_amount, "CUSTOMER",    customer_id, "Customer wallet credit"),
-        ]
- 
-        if fee > 0:
-            entries.append(
-                # gateway fee is an expense
-                e(ref, "5002", "CR", fee, "HEAD_OFFICE", None, "Gateway fee")
-            )
-            entries.append(
-                e(ref, "5002", "DR", fee, "HEAD_OFFICE", None, "Gateway fee expense")
-            )
- 
-        txn.status    = TransactionStatus.POSTED
-        txn.posted_at = datetime.now()
-        db.add(txn)
-        for entry in entries:
-            db.add(entry)
- 
-        # mark GL as posted on the funding transaction
-        db.execute(
-            update(PaymentModel)
-            .where(PaymentModel.reference == reference)
-            .values(event="Y")
-        )
-        db.commit()
-def make_entry(
-        ref: str, code: str, entry_type: str,
-        amount: str, party_type: str,
-        party_id: int = None, description: str = None,
-    ) -> GLEntry:
-        return GLEntry(
-            transaction_ref=ref,
-            account_code=code,
-            entry_type=entry_type,
-            amount=amount,
-            party_type=party_type,
-            party_id=party_id,
-            description=description,
-            posted_at=datetime.now(),
-        )
 async def opayNotification(
     request: Request,
     db: Session,
