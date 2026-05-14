@@ -941,7 +941,7 @@ async def post_funding_gl(db: Session,reference: str,transaction_type:str,custom
             # customer wallet credited with net
             e(gl_ref, customer_wallet_gl.code, "CR", amount, customer_wallet_gl.party_type,customer_id, "Customer wallet credit"),
         ]
-    txn.status = TransactionStatus.POSTED
+    txn.status = TransactionStatusEnum.POSTED
     txn.posted_at = datetime.now()
     db.add(txn)
     for entry in entries:
@@ -1051,7 +1051,7 @@ async def post_transaction_gl(
         total_amount=amount,
         provider_cost=provider_cost,
         commission=commission,
-        status=TransactionStatus.POSTED,
+        status=TransactionStatusEnum.POSTED,
         posted_at=datetime.now(),
     )
 
