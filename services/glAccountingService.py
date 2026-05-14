@@ -933,8 +933,8 @@ async def post_funding_gl(db: Session,reference: str,transaction_type:str,custom
         return
     txn = GLTransaction(reference=gl_ref, transaction_type=transaction_type,description=f"Customer wallet funding {reference}",total_amount=amount,fee_amount="0",provider_cost="0",commission="0")
     e = make_entry
-    customer_wallet_gl = adminQuery.getGlAccountTransactionEntryAccountRole(db,transaction_type,PaymentEnum.DEBIT,"CUSTOMER_WALLET")
-    settlement_bank_gl = adminQuery.getGlAccountTransactionEntryAccountRole(db,transaction_type,PaymentEnum.CREDIT,"WALLET_FUNDING")
+    customer_wallet_gl = adminQuery.getGlAccountTransactionEntryAccountRole(db,transaction_type,PaymentEnum.CREDIT,"CUSTOMER_WALLET")
+    settlement_bank_gl = adminQuery.getGlAccountTransactionEntryAccountRole(db,transaction_type,PaymentEnum.DEBIT,"WALLET_FUNDING")
     entries = [
             # bank account receives full payment
             e(gl_ref, settlement_bank_gl.code, "DR", amount, settlement_bank_gl.party_type, None,"Bank receipt — customer funding"),
