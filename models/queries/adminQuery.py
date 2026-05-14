@@ -451,6 +451,11 @@ def getSupportTickets(db: Session,startDate:str,endDate:str,adminId:int=None):
         if adminId:
             return db.query(SupportTicketModel).filter(SupportTicketModel.admin_id == adminId).filter(SupportTicketModel.created_at.between(start,end)).order_by(desc(SupportTicketModel.created_at)).all()
     return db.query(SupportTicketModel).order_by(desc(SupportTicketModel.created_at)).all()
+# posting rules
+def postingRules(db:Session):
+    return db.query(GLPostingRule).order_by(desc(GLPostingRule.created_at)).all()
+def postingRule(db: Session,id:int):
+    return db.query(GLPostingRule).filter(GLPostingRule.id == id).first()
 # gl accounting
 def getGlAccounts(db: Session):
     return db.query(GLAccountModel).order_by(desc(GLAccountModel.created_at)).all()
@@ -458,6 +463,22 @@ def getGlAccountById(db: Session,id:int):
     return db.query(GLAccountModel).filter(GLAccountModel.id == id).first()
 def deleteGlAccount(db: Session ,id:int):
     return db.query(GLAccountModel).filter(GLAccountModel.id == id).delete()
+def getGlAccountTransactionEntryAccountRole(
+    db: Session,
+    transaction_type: str,
+    entry_type: PaymentEnum,
+    account_role: str
+) -> GLAccountModel:
+
+    rule = db.query(GLPostingRule).filter(
+        GLPostingRule.transaction_type == transaction_type,
+        GLPostingRule.entry_type == entry_type,
+        GLPostingRule.account_role == account_role
+    ).first()
+
+    if not rule:
+        return None
+    return rule.account
 # journal entries 
 def getGlJournals(db: Session):
     return db.query(JournalEntryModel).order_by(desc(JournalEntryModel.created_at)).all()

@@ -12,7 +12,7 @@ from utils.constant import *
 from schemas.customer import *
 from schemas.payment import *
 from schemas.cashout import *
-from services import notificationservice,glAccountingService
+from services import notificationservice
 from schemas.ticket import TicketResponse,TicketsResponse
 from schemas.admin import Admin
 from fastapi import (
@@ -264,8 +264,13 @@ async def paystackNotification(
                             )
                         addCard = paymentQuery.create_card(db=db,card=createCard)
                     msg = f"Your purse has been funded with ₦{util.kobo_to_naira(int(updatedPayment.amount)):,.2f} successfully."
+                    await glAccountingService.post_funding_gl(
+                        db=db,
+                        reference=json_data["data"]["reference"],
+                        transaction_type="payment",
+                        customer_id=payment.user_id,
+                        amount = json_data["data"]["amount"])
                     background_task.add_task(notifyUser,db=db,title=f"Fund Notification", message=msg,userId=payment.user_id, setting=setting)
-                    await post_funding_gl(db=db,reference=json_data["data"]["reference"],customer_id=payment.user_id,amount = json_data["data"]["amount"], fee=json_data["data"]["fees"],net_amount = json_data["data"]["amount"])
                     return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST

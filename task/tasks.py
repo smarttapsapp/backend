@@ -7,7 +7,6 @@ from utils.database import CelerySessionLocal
 from sqlalchemy import desc,asc
 from utils import util
 from models.model import TransactionModel,AdminModel,ProductModel,ProductTypeModel,PackageModel
-from services.productservice import transactionRequery
 from utils.dependencies import getSystemSetting
 logger = logging.getLogger(__name__)
 
@@ -216,6 +215,9 @@ def run_product_updates(self):
         raise
     finally:
         db.close()
+@celery_app.task(bind=True)
+def emailNotification(self,subject:str,service:str,userId:int=None,adminId:int=None):
+    print(message)
 @celery_app.task(bind=True)
 def run_auto_fund_wallet(self):
     db = CelerySessionLocal()

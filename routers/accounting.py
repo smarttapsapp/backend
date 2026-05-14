@@ -43,8 +43,7 @@ from schemas.product_type import *
 from schemas.package import *
 from schemas.payment import *
 from schemas.transaction import *
-from schemas.support_ticket import *
-from schemas.seat import *
+from schemas.gl_posting_rules import *
 from models.model import *
 from datetime import date
 from schemas.setting import Setting
@@ -82,32 +81,37 @@ async def list_gl_accounts(
     accounts = db.query(GLAccountModel).all()
 
     return accounts
-@router.post("/posting-rule")
+@router.post("/posting-rule/add", 
+    response_model=BaseResponse,
+    response_model_exclude_unset=True)
 async def create_posting_rule(
-    payload: dict,
-    db: Session = Depends(get_db)
+    payload:AddPostingRuleRequest,
+    request: Request,
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)]
 ):
-
-    rule = GLPostingRule(
-        transaction_type=payload["transaction_type"],
-        entry_type=payload["entry_type"],
-        account_role=payload["account_role"],
-        account_code=payload["account_code"],
-    )
-
-    db.add(rule)
-
-    db.commit()
-
-    return {
-        "status": True,
-        "message": "Posting rule created"
-    }
-@router.get("/posting-rule")
-async def list_posting_rules(
-    db: Session = Depends(get_db)
-):
-
-    rules = db.query(GLPostingRule).all()
-
-    return rules
+    try:
+        return await glAccountingService.addPostingRules(
+            payload=payload,
+                db=db,
+                setting=setting,
+                request=request,
+                response=response,
+                admin=admin
+            )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/posting-rules",
+    response_model=PostingRulessResponse,
+    response_model_exclude_unset=True,)
+async def list_posting_rules(response: Response,admin: Annotated[AdminModel, Depends(validateAdmin)],db: Annotated[Session, Depends(get_db)]):
+    try:
+        return await glAccountingService.listOfPostingRules(db=db,response=response,admin=admin )
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

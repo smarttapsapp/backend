@@ -95,6 +95,7 @@ class PartyType(PythonEnum):
     SERVICE_PROVIDER = "SERVICE_PROVIDER"
     MERCHANT         = "MERCHANT"
     CUSTOMER         = "CUSTOMER"
+    OTHERS         = "OTHERS"
 class CommissionType(PythonEnum):
     percentage = "percentage"
     calculated = "calculated"
@@ -1005,7 +1006,6 @@ class GLPostingRule(Base):
     created_at = Column(DateTime,default=func.now(),server_default=func.now())
     is_active = Column(Boolean, default=True)
     priority = Column(Integer, default=1)
-    created_at = Column(DateTime, default=func.now())
     account = relationship("GLAccountModel")
 
     __table_args__ = (

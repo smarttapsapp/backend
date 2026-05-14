@@ -1,6 +1,7 @@
 
 import logging
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from models.model import *
 from models.queries import queries,adminQuery
 from datetime import datetime,timedelta
@@ -11,6 +12,7 @@ from schemas.customer import *
 from schemas.role import *
 from schemas.admin import *
 from schemas.general_ledger import *
+from schemas.gl_posting_rules import *
 from schemas.service_rate import *
 from schemas.commission import *
 from schemas.route import RoutesResponse,AddRouteRequest
@@ -20,7 +22,7 @@ from schemas.park import ParksResponse
 from schemas.payment import BillPaymentResponse,BuyTicketRequest,BuyTrainTicketRequest
 from schemas.train import TrainsResponse
 from schemas.notification import NotificationsResponse
-from services import notificationservice
+from task.tasks import emailNotification
 from fastapi import (
     status,
     Response,
@@ -608,28 +610,34 @@ async def addLedger(db: Session,setting: Setting,payload: AddGLRequest, backgrou
     try:
         logger.info(f"started creating new ledger @ {datetime.now()}")
         if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ACCOUNTANT]:
+            subject = "Create new General Ledger Account"
             if payload.id:
                 logger.info(f"started updating ledger {payload.id} @ {datetime.now()}")
                 existing = adminQuery.getGlAccountById(db=db,id=payload.id)
                 if existing:
+                    subject = "Update General Ledger Account"
                     existing.name = payload.name
                     existing.gl_type = payload.gl_type
+                    existing.party_type = payload.party_type
+                    existing.is_active = payload.is_active
                     existing.updated_at = datetime.now()
                     created = queries.create(db=db,model=existing)
                     if created:
-                        email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
-                        background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Ledger",toAddress=admin.email,)
+                        emailNotification.delay(service="updateLedger",subject=subject,adminId=admin.id)
                         return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
                     else:
                         response.status_code = status.HTTP_400_BAD_REQUEST
                         return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)
             else:
-                glcode = f"GL{util.generateId()}"
-                new = GLAccountModel(name=payload.name,code=glcode,gl_type=AccountType(payload.gl_type),created_at=datetime.now(),updated_at=datetime.now(),)
+                new = GLAccountModel(
+                    name=payload.name,
+                    code=util.generateOTP(),
+                    gl_type=AccountType(payload.gl_type),
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),)
                 created = queries.create(db=db,model=new)
                 if created:
-                    email_body = util.templates.TemplateResponse("onboarding.html",{"request": request, "user": admin,},)
-                    background_task.add_task(util.mailer,str(email_body.body, "utf-8"),setting=setting,subject="New Ledger",toAddress=admin.email,)
+                    emailNotification.delay(service="updateLedger",subject=subject,adminId=admin.id)
                     return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
@@ -855,19 +863,83 @@ async def toggleDiscount(db: Session,response: Response, setting: Setting,backgr
         logger.error(str(ex))
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
-
+# posting rule
+async def listOfPostingRules(response: Response,db: Session,admin: AdminModel):
+    try:
+        logger.info(f"started querying ledger..............@ {datetime.now()}")
+        if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.ADMIN]:
+            return PostingRulessResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.postingRules(db=db))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return PostingRulessResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=UNAUTHORISED,)
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return PostingRulessResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def addPostingRules(db: Session,setting: Setting,payload: AddPostingRuleRequest, request: Request,response: Response,admin:AdminModel):
+    try:
+        logger.info(f"started creating/updating posting rules at {datetime.now()}")
+        if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ACCOUNTANT,AdminRoleEnum.ADMIN,AdminRoleEnum.AUDIT]: 
+            subject = "Create new Posting Rules"   
+            if payload.id:
+                existing = adminQuery.postingRule(db=db,id=payload.id)
+                if existing:
+                    subject = "Update on Posting Rules"
+                    existing.account_code = payload.account_code
+                    existing.account_role = payload.account_role
+                    existing.priority = payload.priority
+                    existing.is_active = payload.is_active
+                    existing.transaction_type = payload.transaction_type
+                    existing.updated_at = datetime.now()
+                    created = adminQuery.create(db=db,model=existing)
+                    if created:
+                        emailNotification.delay(service="updatePostingRule",subject=subject,adminId=admin.id)
+                        return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                    else:
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Post Rule Update Error")
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Invalid Posting Rules")
+            else:
+                newRules = GLPostingRule(
+                    account_code=payload.account_code,
+                    account_role=payload.account_role,
+                    entry_type=payload.entry_type,
+                    is_active=payload.is_active,
+                    priority=payload.priority,
+                    transaction_type=payload.transaction_type,)
+                created = adminQuery.create(db=db,model=newRules)
+                if created:
+                    emailNotification.delay(service="createPostingRule",subject=subject,adminId=admin.id)
+                    return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
+                else:
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Failed to create posting rule")
+        else:
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            return BaseResponse(statusCode = str(status.HTTP_401_UNAUTHORIZED),statusDescription=UNAUTHORISED)    
+    except IntegrityError as e:
+        logger.error(str(e))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode = str(status.HTTP_400_BAD_REQUEST),statusDescription="Posting Rule Already exist")
+    except Exception as ex:
+        logger.error(str(ex))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY)    
 async def post_funding_gl(db: Session,reference: str,transaction_type:str,customer_id: int, amount: str,):
     gl_ref = f"GL-{reference}"
     existing = db.query(GLTransaction).filter(GLTransaction.reference == gl_ref).first()
     if existing:
         return
-    txn = GLTransaction(reference=gl_ref, transaction_type=transaction_type,description=f"Customer wallet funding {reference}",total_amount=amount,fee_amount=fee,provider_cost=fee,commission="0")
+    txn = GLTransaction(reference=gl_ref, transaction_type=transaction_type,description=f"Customer wallet funding {reference}",total_amount=amount,fee_amount="0",provider_cost="0",commission="0")
     e = make_entry
+    customer_wallet_gl = adminQuery.getGlAccountTransactionEntryAccountRole(db,transaction_type,PaymentEnum.DEBIT,"CUSTOMER_WALLET")
+    settlement_bank_gl = adminQuery.getGlAccountTransactionEntryAccountRole(db,transaction_type,PaymentEnum.CREDIT,"PROVIDER_PAYABLE")
     entries = [
             # bank account receives full payment
-            e(gl_ref, "1001", "DR", amount,     "HEAD_OFFICE", None,        "Bank receipt — customer funding"),
+            e(gl_ref, settlement_bank_gl.code, "DR", amount, settlement_bank_gl.party_type, None,"Bank receipt — customer funding"),
             # customer wallet credited with net
-            e(gl_ref, "2001", "CR", amount, "CUSTOMER",    customer_id, "Customer wallet credit"),
+            e(gl_ref, customer_wallet_gl.code, "CR", amount, customer_wallet_gl.party_type,customer_id, "Customer wallet credit"),
         ]
     txn.status = TransactionStatus.POSTED
     txn.posted_at = datetime.now()
@@ -924,8 +996,8 @@ async def post_transaction_gl(
     transaction_type: str,
     reference: str,
     customer_id: int,
-    amount: Decimal,
-    provider_cost: Decimal,
+    amount: str,
+    provider_cost: str,
 ):
 
     gl_ref = f"GL-{reference}"
@@ -1067,8 +1139,8 @@ async def post_airtime_purchase(
     db: Session,
     reference: str,
     customer_id: int,
-    amount: Decimal,
-    provider_cost: Decimal,
+    amount: str,
+    provider_cost: str,
 ):
 
     return await post_transaction_gl(
@@ -1083,8 +1155,8 @@ async def post_cabletv_purchase(
     db: Session,
     reference: str,
     customer_id: int,
-    amount: Decimal,
-    provider_cost: Decimal,
+    amount: str,
+    provider_cost: str,
 ):
 
     return await post_transaction_gl(
