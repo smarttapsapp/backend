@@ -934,7 +934,7 @@ async def post_funding_gl(db: Session,reference: str,transaction_type:str,custom
     txn = GLTransaction(reference=gl_ref, transaction_type=transaction_type,description=f"Customer wallet funding {reference}",total_amount=amount,fee_amount="0",provider_cost="0",commission="0")
     e = make_entry
     customer_wallet_gl = adminQuery.getGlAccountTransactionEntryAccountRole(db,transaction_type,PaymentEnum.DEBIT,"CUSTOMER_WALLET")
-    settlement_bank_gl = adminQuery.getGlAccountTransactionEntryAccountRole(db,transaction_type,PaymentEnum.CREDIT,"PROVIDER_PAYABLE")
+    settlement_bank_gl = adminQuery.getGlAccountTransactionEntryAccountRole(db,transaction_type,PaymentEnum.CREDIT,"WALLET_FUNDING")
     entries = [
             # bank account receives full payment
             e(gl_ref, settlement_bank_gl.code, "DR", amount, settlement_bank_gl.party_type, None,"Bank receipt — customer funding"),
@@ -946,7 +946,7 @@ async def post_funding_gl(db: Session,reference: str,transaction_type:str,custom
     db.add(txn)
     for entry in entries:
         db.add(entry)
-    db.execute(update(PaymentModel).where(PaymentModel.reference == reference).values(event="Y"))
+    db.execute(update(PaymentModel).where(PaymentModel.reference == reference).values(event="posted"))
     db.commit()
 def make_entry(ref: str, code: str, entry_type: str, amount: str, party_type: str,customer_id: int = None, description: str = None, ) -> GLEntry:
     return GLEntry(transaction_ref=ref,account_code=code,entry_type=entry_type,amount=amount,party_type=party_type,customer_id=customer_id,description=description,posted_at=datetime.now(),)

@@ -232,6 +232,7 @@ async def paystackNotification(
                 payment.fee = json_data["data"]["fees"]
                 payment.paystack_id = json_data["data"]["id"]
                 payment.payment_date = json_data["data"]["paid_at"]
+                payment.transactionreference = json_data["data"]["id"]
                 payment.statusCode = TransactionCodeEnum.SUCCESS
                 payment.statusDescription = TransactionStatusEnum.SUCCESS
                 payment.statusMessage = TransactionStatusEnum.SUCCESS.value
