@@ -224,10 +224,10 @@ async def paystackNotification(
         logger.info(f"incoming payment from paystack {str(json_data)}")
         payment = paymentQuery.getPaymentByReference(db=db,reference=json_data["data"]["reference"])
         if payment:
+            logger.info(f"incoming payment from paystack {str(json_data["data"]["channel"])}")
             if payment.status != "success":
                 payment.event = json_data["event"]
                 payment.channel = json_data["data"]["channel"]
-                payment.payment_date = json_data["data"]["channel"]
                 payment.status = json_data["data"]["status"]
                 payment.fee = json_data["data"]["fees"]
                 payment.paystack_id = json_data["data"]["id"]
@@ -243,6 +243,7 @@ async def paystackNotification(
                 payment.provider_code = setting.gl_outflow
                 payment.user.hasAuthToken = True
                 updatedPayment = paymentQuery.create_payment(db=db,payment=payment)
+                logger.info(f"incoming payment from paystack {str(json_data["data"]["channel"])}")
                 if updatedPayment:
                     card = paymentQuery.getCardByLast4(db=db,last4=json_data["data"]["authorization"]["last4"])
                     if card is None:
@@ -280,7 +281,6 @@ async def paystackNotification(
         else:
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Payment not found",)
-        
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
