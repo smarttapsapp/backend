@@ -240,7 +240,7 @@ async def paystackNotification(
                 payment.wallet.availableBalance = str(int(payment.wallet.availableBalance)+int(json_data["data"]["amount"]))
                 payment.updated_at = datetime.now()
                 payment.wallet.updated_at = datetime.now()
-                payment.code = setting.gl_outflow
+                payment.provider_code = setting.gl_outflow
                 payment.user.hasAuthToken = True
                 updatedPayment = paymentQuery.create_payment(db=db,payment=payment)
                 if updatedPayment:
