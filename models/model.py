@@ -1058,7 +1058,7 @@ class GLEntry(Base):
 
     id              = Column(Integer, primary_key=True, index=True)
     transaction_ref = Column(String(100), ForeignKey("gl_transactions.reference"),nullable=False, index=True)
-    account_code    = Column(String(10),  ForeignKey("gl_accounts.code"),nullable=False, index=True)
+    account_code    = Column(String(50),  ForeignKey("gl_accounts.code"),nullable=False, index=True)
     entry_type      = Column(Enum(PaymentEnum), nullable=False)
     amount          = Column(String(50), nullable=False)
     party_type      = Column(Enum(PartyType), nullable=False)

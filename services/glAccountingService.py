@@ -938,9 +938,9 @@ async def post_funding_gl(db: Session,reference: str,transaction_type:str,custom
     settlement_bank_gl = adminQuery.getGlAccountTransactionEntryAccountRole(db,transaction_type,PaymentEnum.DEBIT,"WALLET_FUNDING")
     entries = [
             # bank account receives full payment
-            e(gl_ref, settlement_bank_gl.code, "DR", amount, settlement_bank_gl.party_type, None,"Bank receipt — customer funding"),
+            e(gl_ref, settlement_bank_gl.code, PaymentEnum.DEBIT, amount, settlement_bank_gl.party_type, None,"Bank receipt — customer funding"),
             # customer wallet credited with net
-            e(gl_ref, customer_wallet_gl.code, "CR", amount, customer_wallet_gl.party_type,customer_id, "Customer wallet credit"),
+            e(gl_ref, customer_wallet_gl.code, PaymentEnum.CREDIT, amount, customer_wallet_gl.party_type,customer_id, "Customer wallet credit"),
         ]
     txn.status = TransactionStatusEnum.POSTED
     txn.posted_at = datetime.now()
