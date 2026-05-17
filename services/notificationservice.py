@@ -12,6 +12,7 @@ from utils.constant import *
 from schemas.customer import *
 from datetime import datetime
 from schemas.admin import Admin
+from task.tasks import emailNotification
 from fastapi import (
     status,
     Response,
