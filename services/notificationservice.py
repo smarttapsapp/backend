@@ -144,7 +144,7 @@ async def sendNotification(request:Request,setting: Setting,notificationType:str
 async def sendOutNotification(notificationType:str,subject: str,adminId:int=None,userId:int=None):
     try:
         logger.info(f"Started sending notification to {notificationType} {datetime.now()} {subject}")
-        emailNotification.delay(service=notificationType,subject=subject,adminId=admin.id)
+        emailNotification.delay(service=notificationType,subject=subject,adminId=adminId,userId=userId)
         if notificationType =="unlockInitiate":
             if template == "otp":
                 email_body = util.templates.TemplateResponse("otp_message.html",{"request": request,"message":message},)
