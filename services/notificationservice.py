@@ -140,3 +140,16 @@ async def sendNotification(request:Request,setting: Setting,notificationType:str
         logger.info(f"started sending notification at {datetime.now()}")
     except Exception as ex:
         logger.info(f"Error {ex} occurred while processing your debit transaction at {datetime.now()}")
+async def sendOutNotification(notificationType:str,subject: str,adminId:int=None,userId:int=None):
+    try:
+        logger.info(f"Started sending notification to {notificationType} {datetime.now()} {subject}")
+        emailNotification.delay(service=notificationType,subject=subject,adminId=admin.id)
+        if notificationType =="unlockInitiate":
+            if template == "otp":
+                email_body = util.templates.TemplateResponse("otp_message.html",{"request": request,"message":message},)
+                subject = "Unlock Device"
+                    
+        util.mailer(body=str(email_body.body, "utf-8"),setting=setting,subject=subject,toAddress=email,)
+        logger.info(f"started sending notification at {datetime.now()}")
+    except Exception as ex:
+        logger.info(f"Error {ex} occurred while processing your debit transaction at {datetime.now()}")

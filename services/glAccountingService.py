@@ -18,13 +18,8 @@ from schemas.gl_posting_rules import *
 from schemas.service_rate import *
 from schemas.commission import *
 from schemas.route import RoutesResponse,AddRouteRequest
-from schemas.ticket import TicketsResponse
-from schemas.bus import BusesResponse,AddBusRequest
-from schemas.park import ParksResponse
 from schemas.payment import BillPaymentResponse,BuyTicketRequest,BuyTrainTicketRequest
-from schemas.train import TrainsResponse
-from schemas.notification import NotificationsResponse
-from task.tasks import emailNotification
+from services import notificationservice
 from fastapi import (
     status,
     Response,
@@ -637,7 +632,7 @@ async def addLedger(db: Session,setting: Setting,payload: AddGLRequest, backgrou
                     existing.updated_at = datetime.now()
                     created = queries.create(db=db,model=existing)
                     if created:
-                        emailNotification.delay(service="updateLedger",subject=subject,adminId=admin.id)
+                        background_task.add_task(notificationservice.sendOutNotification,notificationType="createLedger",subject=subject,adminId=admin.id)
                         return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
                     else:
                         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -651,7 +646,7 @@ async def addLedger(db: Session,setting: Setting,payload: AddGLRequest, backgrou
                     updated_at=datetime.now(),)
                 created = queries.create(db=db,model=new)
                 if created:
-                    emailNotification.delay(service="updateLedger",subject=subject,adminId=admin.id)
+                    background_task.add_task(notificationservice.sendOutNotification,notificationType="updateLedger",subject=subject,adminId=admin.id)
                     return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
@@ -906,7 +901,7 @@ async def addPostingRules(db: Session,setting: Setting,payload: AddPostingRuleRe
                     existing.updated_at = datetime.now()
                     created = adminQuery.create(db=db,model=existing)
                     if created:
-                        emailNotification.delay(service="updatePostingRule",subject=subject,adminId=admin.id)
+                        background_task.add_task(notificationservice.sendOutNotification,notificationType="updatePostingRule",subject=subject,adminId=admin.id)
                         return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
                     else:
                         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -924,7 +919,7 @@ async def addPostingRules(db: Session,setting: Setting,payload: AddPostingRuleRe
                     transaction_type=payload.transaction_type,)
                 created = adminQuery.create(db=db,model=newRules)
                 if created:
-                    emailNotification.delay(service="createPostingRule",subject=subject,adminId=admin.id)
+                    background_task.add_task(notificationservice.sendOutNotification,notificationType="createPostingRule",subject=subject,adminId=admin.id)
                     return BaseResponse(statusCode = str(status.HTTP_200_OK),statusDescription=SUCCESS)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
