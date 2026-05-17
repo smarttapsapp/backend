@@ -148,6 +148,8 @@ class DebitRequest(PINRequest):
     transactionId:str
     transactionChannel:str
     transactionDate:str
+    billerId: Union[str, None] = "nfc"
+    billerType:Union[str, None] = "payment"
 class BillNameEnquiryRequest(BaseModel):
     billerId:str
     billerType:str
@@ -178,6 +180,8 @@ class WalletDebitRequest(PINRequest):
     receiverAccountName: str
     description:str
     amount: float
+    billerId: Union[str, None] = "wallet"
+    billerType:Union[str, None] = "payment"
 class VerifyCashoutRequest(BaseModel):
     bankCode:str
     accountNumber:str
@@ -186,4 +190,6 @@ class AddCashoutRequest(PINRequest):
     accountNumber:str
 class CashoutRequest(PINRequest):
     amount:str
+    billerId: Union[str, None] = "cashout"
+    billerType:Union[str, None] = "payment"
     desc:Optional[str] = None

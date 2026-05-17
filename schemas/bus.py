@@ -45,7 +45,6 @@ class Bus(BusBase):
     class Config:
         from_attributes = True
         populate_by_name = True
-
 class MiniBus(BaseModel):
     name: Union[str, None] = None
     types: Union[str, None] = None

@@ -36,6 +36,7 @@ from schemas.schedule import *
 from schemas.commission import *
 from schemas.service_rate import *
 from schemas.general_ledger import *
+from schemas.general_ledger_transaction import *
 from schemas.journal import *
 from schemas.product import *
 from schemas.bus_type import *
@@ -115,3 +116,20 @@ async def list_posting_rules(response: Response,admin: Annotated[AdminModel, Dep
         logger.error(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
         return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+@router.get("/gl_transactions", 
+    response_model=GTransactionsResponse,
+    response_model_exclude_unset=True,tags=["accounting"])
+async def get_general_ledger_transactions(
+    response: Response,
+    admin: Annotated[AdminModel, Depends(validateAdmin)],
+    setting: Annotated[Setting, Depends(getSystemSetting)],
+    db: Annotated[Session, Depends(get_db)],
+    startDate: str = Query(None),
+    endDate: str = Query(None),
+):
+    try:
+        return await glAccountingService.listOfGTransactions(response=response,db=db, admin=admin)
+    except Exception as ex:
+        logger.error(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return GTransactionsResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)

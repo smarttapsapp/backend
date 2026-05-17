@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from utils.database import CelerySessionLocal
 from sqlalchemy import desc,asc
 from utils import util
+from services import glAccountingService
 from models.model import TransactionModel,AdminModel,ProductModel,ProductTypeModel,PackageModel
 from utils.dependencies import getSystemSetting
 logger = logging.getLogger(__name__)
@@ -274,3 +275,45 @@ def paystackNotification(self):
         raise
     finally:
         db.close()
+@celery_app.task(bind=True,)
+def process_gl_transactions(self,reference: str):
+    try:
+        setting = get_settings()
+        asyncio.run(process_trigger(msisdn=msisdn,autotopupReference=autotopupReference,network=network,setting=setting,product=product))
+    except Exception as exc:
+        logger.exception(f"requery_pending_transactions unrecoverable {exc}")
+@celery_app.task(bind=True,)
+def process_app_notifications(self,customer: str):
+    try:
+        setting = get_settings()
+        asyncio.run(process_trigger(msisdn=msisdn,autotopupReference=autotopupReference,network=network,setting=setting,product=product))
+    except Exception as exc:
+        logger.exception(f"requery_pending_transactions unrecoverable {exc}")
+@celery_app.task(bind=True,)
+def process_bills_payment(self,customer: str):
+    try:
+        setting = get_settings()
+        asyncio.run(process_trigger(msisdn=msisdn,autotopupReference=autotopupReference,network=network,setting=setting,product=product))
+    except Exception as exc:
+        logger.exception(f"requery_pending_transactions unrecoverable {exc}")
+@celery_app.task(bind=True,)
+def process_bus_payment(self,transactionReference: str):
+    try:
+        setting = get_settings()
+        db = CelerySessionLocal()
+        asyncio.run(glAccountingService.process_cashout_payment(transactionReference=transactionReference,db=db,setting=setting))
+    except Exception as exc:
+        logger.exception(f"process_bus_payment unrecoverable {exc}")
+    finally:
+        db.close()
+@celery_app.task(bind=True,)
+def process_cashout_payment(self,transactionReference: str):
+    try:
+        setting = get_settings()
+        db = CelerySessionLocal()
+        asyncio.run(glAccountingService.process_cashout_payment(transactionReference=transactionReference,db=db,setting=setting))
+    except Exception as exc:
+        logger.exception(f"process_cashout_payment unrecoverable {exc}")
+    finally:
+        db.close()
+    

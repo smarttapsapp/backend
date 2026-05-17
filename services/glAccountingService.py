@@ -13,6 +13,7 @@ from schemas.customer import *
 from schemas.role import *
 from schemas.admin import *
 from schemas.general_ledger import *
+from schemas.general_ledger_transaction import *
 from schemas.gl_posting_rules import *
 from schemas.service_rate import *
 from schemas.commission import *
@@ -32,6 +33,18 @@ from fastapi import (
 )
 
 logger = logging.getLogger(__name__)
+# general ledger transactions
+async def listOfGTransactions(response: Response,db: Session,admin: AdminModel):
+    try:
+        logger.info(f"started querying genaral ledger transactions ..............@ {datetime.now()}")
+        if admin.role.tag in [AdminRoleEnum.SUPERADMIN,AdminRoleEnum.ACCOUNTANT]:
+            return GTransactionsResponse(statusCode= str(status.HTTP_200_OK),statusDescription=SUCCESS,data=adminQuery.getGlTransactions(db=db))
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return GTransactionsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=FAILED,data=[])
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return GTransactionsResponse(statusCode= str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,data=[])
 
 async def creditViaPaystackTransaction(request: Request,response:Response,setting: Setting,db: Session,biller:ProductTypeModel,customer:CustomerModel,payload:BuyTicketRequest,background_task:BackgroundTasks,bus:BusModel,remark:str=None,merchant:AdminModel=None):
     try:
@@ -1168,3 +1181,203 @@ async def post_cabletv_purchase(
         amount=amount,
         provider_cost=provider_cost,
     )
+async def post_nfc_transaction_gl(
+    db: Session,
+    transaction_type: str,
+    reference: str,
+    customer_id: int,
+    amount: str,
+    provider_cost: str,
+):
+
+    gl_ref = f"GL-{reference}"
+
+    # -----------------------------------------
+    # Idempotency Check
+    # -----------------------------------------
+
+    existing = db.query(GLTransaction).filter(
+        GLTransaction.reference == gl_ref
+    ).first()
+
+    if existing:
+        return existing
+
+    commission = amount - provider_cost
+
+    # -----------------------------------------
+    # Dynamic GL Resolution
+    # -----------------------------------------
+
+    customer_wallet_gl = get_gl_account(
+        db,
+        transaction_type,
+        PaymentEnum.DEBIT,
+        "CUSTOMER_WALLET"
+    )
+
+    provider_payable_gl = get_gl_account(
+        db,
+        transaction_type,
+        PaymentEnum.CREDIT,
+        "PROVIDER_PAYABLE"
+    )
+
+    commission_gl = get_gl_account(
+        db,
+        transaction_type,
+        PaymentEnum.CREDIT,
+        "COMMISSION_REVENUE"
+    )
+
+    # -----------------------------------------
+    # Create Transaction Header
+    # -----------------------------------------
+
+    txn = GLTransaction(
+        reference=gl_ref,
+        transaction_type=transaction_type,
+        description=f"{transaction_type} posting",
+        total_amount=amount,
+        provider_cost=provider_cost,
+        commission=commission,
+        status=TransactionStatusEnum.POSTED,
+        posted_at=datetime.now(),
+    )
+
+    db.add(txn)
+
+    # -----------------------------------------
+    # Create Entries
+    # -----------------------------------------
+
+    entries = [
+
+        # DR Customer Wallet
+        make_entry(
+            gl_ref,
+            customer_wallet_gl.code,
+            PaymentEnum.DEBIT,
+            amount,
+            PartyType.CUSTOMER,
+            customer_id,
+            "Customer wallet debit"
+        ),
+
+        # CR Provider Payable
+        make_entry(
+            gl_ref,
+            provider_payable_gl.code,
+            PaymentEnum.CREDIT,
+            provider_cost,
+            PartyType.PROVIDER,
+            None,
+            "Provider payable"
+        ),
+
+        # CR Revenue
+        make_entry(
+            gl_ref,
+            commission_gl.code,
+            PaymentEnum.CREDIT,
+            commission,
+            PartyType.HEAD_OFFICE,
+            None,
+            "Commission revenue"
+        ),
+    ]
+
+    validate_entries(entries)
+
+    db.add_all(entries)
+
+    # -----------------------------------------
+    # Update GL Balances
+    # -----------------------------------------
+
+    for entry in entries:
+
+        account = db.query(GLAccountModel).filter(
+            GLAccountModel.code == entry.account_code
+        ).with_for_update().first()
+
+        if entry.entry_type == PaymentEnum.DEBIT:
+
+            if account.gl_type in [
+                AccountType.ASSET,
+                AccountType.EXPENSE
+            ]:
+                account.gl_balance += entry.amount
+            else:
+                account.gl_balance -= entry.amount
+
+        else:
+
+            if account.gl_type in [
+                AccountType.LIABILITY,
+                AccountType.INCOME,
+                AccountType.EQUITY
+            ]:
+                account.gl_balance += entry.amount
+            else:
+                account.gl_balance -= entry.amount
+
+    db.commit()
+
+    return txn
+async def process_cashout_payment(transactionReference: str,db: Session,setting: Setting):
+    try:
+        logger.info(f"Processing trigger {autotopupReference}")
+        payment = paymentQuery.getPaymentByReference(db=db,reference=transactionReference)
+        if payment:
+            if int(user.cashout_limit) >= int(dailyCashout):
+                logger.info(f"Start processing cashout records ............... @ {datetime.now()}")
+                headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
+                params ={"source": payment.cashout.source,"amount": payment.cashout.amount,"reference":payment.reference,"recipient": payment.cashout.recipient,"reason": payment.cashout.reason }
+                result = util.http(f"{setting.paystack_url}transfer",params=params,headers=headers)
+                paystackResponse = result.json()
+                if result.status_code == 200:
+                    if paystackResponse and paystackResponse["status"] is True:
+                        recipientData = paystackResponse.get("data", {})
+                        payment.statusCode = TransactionCodeEnum.SUCCESS
+                        payment.statusDescription = TransactionStatusEnum.SUCCESS
+                        payment.status = "success"
+                        payment.event = "charge.success"
+                        payment.cashout.withdrawalStatus = WithrawalStatusEnum.COMPLETED,
+                        payment.cashout.statusCode = TransactionCodeEnum.SUCCESS,
+                        payment.cashout.statusDescription = TransactionStatusEnum.SUCCESS,
+                else:
+                    payment.statusCode = TransactionCodeEnum.FAILED
+                    payment.statusDescription = TransactionStatusEnum.FAILED
+                    payment.status = "failed"
+                    payment.event = "charge.failed"
+                    payment.cashout.withdrawalStatus = WithrawalStatusEnum.FAILED,
+                    payment.cashout.statusCode = TransactionCodeEnum.FAILED,
+                    payment.cashout.statusDescription = TransactionStatusEnum.FAILED,
+            else:
+                logger.info(f"cashout daily limit exceeded at {datetime.now()}")
+                payment.statusCode = TransactionCodeEnum.PROCESSING
+                payment.statusDescription = TransactionStatusEnum.PROCESSING
+                #payment.cashout.statusCode = TransactionCodeEnum.PROCESSING,
+                #payment.cashout.statusDescription = TransactionStatusEnum.PROCESSING,
+                #payment.cashout.withdrawalStatus = WithrawalStatusEnum.WAITING,
+            saved = paymentQuery.create(db=db,model=payment)
+            background_task.add_task(notifyUser,db=db,title=f"Cashout Notification", message=payment.statusDescription,userId=user.id, setting=setting)
+                #email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"payment":createCashoutRecord},)
+                #background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Cashout Notification",toAddress=user.email)
+            return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":payment.reference})
+        else:
+            logger.info(f"Cashout not enabled for {user.firstname} {user.lastname} for {user.email} @ {datetime.now()}")
+            response.status_code = status.HTTP_400_BAD_REQUEST 
+            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Payment not found Error")
+    except Exception:
+        db.rollback()
+        logger.exception(
+            f"Trigger processing failed "
+            f"{msisdn}"
+        )
+
+        raise
+
+    finally:
+        db.close()

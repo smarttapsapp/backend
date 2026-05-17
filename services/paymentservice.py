@@ -1,6 +1,7 @@
 
 import logging
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import select,update
 from models.model import *
 from models.queries import paymentQuery,queries,adminQuery
 from datetime import datetime
@@ -15,6 +16,7 @@ from schemas.cashout import *
 from services import notificationservice
 from schemas.ticket import TicketResponse,TicketsResponse
 from schemas.admin import Admin
+from task.tasks import process_gl_transactions,process_bills_payment,process_cashout_payment
 from fastapi import (
     status,
     Response,
@@ -224,7 +226,6 @@ async def paystackNotification(
         logger.info(f"incoming payment from paystack {str(json_data)}")
         payment = paymentQuery.getPaymentByReference(db=db,reference=json_data["data"]["reference"])
         if payment:
-            logger.info(f"incoming payment from paystack {str(json_data["data"]["channel"])}")
             if payment.status != "success":
                 payment.event = json_data["event"]
                 payment.channel = json_data["data"]["channel"]
@@ -244,7 +245,6 @@ async def paystackNotification(
                 payment.provider_code = setting.gl_outflow
                 payment.user.hasAuthToken = True
                 updatedPayment = paymentQuery.create_payment(db=db,payment=payment)
-                logger.info(f"incoming payment from paystack {str(json_data["data"]["channel"])}")
                 if updatedPayment:
                     card = paymentQuery.getCardByLast4(db=db,last4=json_data["data"]["authorization"]["last4"])
                     if card is None:
@@ -431,17 +431,9 @@ async def payment(
                statusDescription=str(ex),
          
         )
-async def nfcdebitService(
-        payload:DebitRequest,
-        request: Request,
-    response: Response,
-    setting: Setting,
-    db: Session,
-    user: Customer,
-    background_task:BackgroundTasks
-):
+async def nfcdebitService(payload:DebitRequest,request: Request,response: Response,setting: Setting,db: Session,user: Customer,background_task:BackgroundTasks):
     try:
-        logger.info(f"started debit transaction via NFC for sender {payload.senderAccount} to receiver {payload.walletAccount}")
+        logger.info(f"{payload.senderAccount} started debit transaction via NFC for {payload.billerId} sender {payload.senderAccount} to receiver {payload.walletAccount}")
         sender = paymentQuery.querySender(db=db,walletAccount=payload.senderAccount)
         if sender:
             verifiedPIN = util.verify_password(payload.pin,sender.user.pin)
@@ -449,36 +441,102 @@ async def nfcdebitService(
                 if payload.senderAccount != user.wallet.walletAccount:
                     duplicate = paymentQuery.getPaymentByReference(db=db,reference=payload.transactionId)
                     if duplicate:
-                        logger.info(f"duplicate transaction found {duplicate.reference}")
+                        logger.info(f"{payload.senderAccount} duplicate transaction found {duplicate.reference}")
                         response.status_code = status.HTTP_400_BAD_REQUEST
                         return PaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=DUPLICATE)
-                    else:
-                        product = queries.getBillByVas(db=db,vasType="payment")
-                        if product:
-                            if float(sender.availableBalance) >= float(payload.amount):
-                                lastTransaction = paymentQuery.queryLatestRecordByAmount(db=db,amount=payload.amount)
-                                if lastTransaction:
-                                    logger.info(f"last transaction from sender {payload.senderAccount} is {lastTransaction.created_at}")
-                                    timeDifference  = (datetime.now() - lastTransaction.updated_at).total_seconds()
-                                    logger.info(f"ths time difference is {timeDifference}")
-                                    if int(timeDifference) > 5:
-                                        #if lastTransaction.amount != payload.amount:
-                                        #    lastTransactionTime = datetime.strptime(lastTransaction.updated_at, "%Y-%m-%d %H:%M:%S")
-                                        return await debitNfc(payload=payload,request=request,response=response,setting=setting,db=db,user=user,sender=sender,recipient=user.wallet,product=product,background_task=background_task)
-                                        #else:
-                                        #    response.status_code = status.HTTP_400_BAD_REQUEST
-                                        #    return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = DUPLICATE)
-                                    else:
-                                        response.status_code = status.HTTP_400_BAD_REQUEST
-                                        return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = DUPLICATE)
-                                else:
-                                    return await debitNfc(payload=payload,request=request,response=response,setting=setting,db=db,user=user,sender=sender,recipient=user.wallet,product=product,background_task=background_task)
-                            else:
-                                response.status_code = status.HTTP_400_BAD_REQUEST
-                                return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = INSUFFICIENTFUND)
-                        else:
-                            response.status_code = status.HTTP_400_BAD_REQUEST
-                            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
+                    logger.info(f"{payload.senderAccount} started payment for biller {payload.billerId} for amount {payload.billerType} at {datetime.now()}")
+                    productType = paymentQuery.get_single_biller_by_billerId(db=db,billerId=payload.billerId, billerType=payload.billerType)
+                    if not productType:
+                        logger.info(f"Product Type not configured at {datetime.now()}")
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
+                    if not productType.provider:
+                        logger.info(f"{payload.senderAccount} Provider not configured at {datetime.now()}")
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
+                    serviceCharge = queries.getServiceProviderByProduct(db=db,productTypeId=productType.id)
+                    if not serviceCharge:
+                        logger.info(f"{payload.senderAccount} Service charge not configured at {datetime.now()}")
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
+                    logger.info(f"{payload.senderAccount}  {serviceCharge.admin.companyName}  is configured configured at {datetime.now()}")
+                    provider_cost = int(serviceCharge.provider_discount_rate) if serviceCharge.provider_discount_type == CommissionType.calculated else int(payload.amount) * (serviceCharge.provider_discount_rate/100)
+                    amountToDebit = int(payload.amount) + provider_cost
+                    if float(sender.availableBalance) < float(amountToDebit):
+                        logger.info(f"{payload.senderAccount} Insufficient fund to send fund at {datetime.now()}")
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = INSUFFICIENTFUND)
+                    transactionReference = f"{str(productType.billerId[:2]).upper()}-{util.generateId()}"
+                    debitvalues ={"availableBalance":int(sender.availableBalance) - int(amountToDebit),"updated_at":datetime.now()}
+                    creditvalues ={"availableBalance":int(user.wallet.availableBalance) + int(payload.amount),"updated_at":datetime.now()}
+                    db.execute(update(AccountModel).where(AccountModel.id == sender.id).values(**debitvalues).execution_options(synchronize_session="fetch"))
+                    db.execute(update(AccountModel).where(AccountModel.id == user.wallet.id).values(**creditvalues).execution_options(synchronize_session="fetch"))
+                    paymentRecord = [
+                        PaymentModel(
+                        wallet_id = sender.id,
+                        user_id = sender.user_id, 
+                        amount = int(payload.amount),
+                        payment_type = PaymentEnum.DEBIT,
+                        reference =payload.transactionId,
+                        event = "charge.success",
+                        status = "success",
+                        channel = payload.transactionChannel if payload.transactionChannel else  ChannelEnum.NFC,
+                        providerAmount = 0,
+                        statusCode = TransactionCodeEnum.SUCCESS,
+                        statusDescription = TransactionStatusEnum.SUCCESS,
+                        commissionAmount = 0,
+                        transactionreference=transactionReference,
+                        product_type_id = productType.id,product_id=productType.product_id,
+                        recipient=sender.walletAccount,statusMessage = payload.description,
+                        balanceBefore = sender.availableBalance,balanceAfter = sender.availableBalance,
+                        created_at =datetime.now(),updated_at = datetime.now()),
+                        PaymentModel(
+                        wallet_id = sender.id,
+                        user_id = sender.user_id, 
+                        amount = int(provider_cost),
+                        payment_type = PaymentEnum.DEBIT,
+                        reference =f"SVC-{util.generateId()}",
+                        event = "charge.success",
+                        status = "success",
+                        channel =payload.transactionChannel if payload.transactionChannel else  ChannelEnum.NFC,
+                        providerAmount = 0,
+                        statusCode = TransactionCodeEnum.SUCCESS,
+                        statusDescription = TransactionStatusEnum.SUCCESS,
+                        commissionAmount = 0,
+                        transactionreference=payload.transactionId,
+                        product_type_id = productType.id,product_id=productType.product_id,
+                        recipient=sender.walletAccount,statusMessage = payload.description,
+                        balanceBefore = sender.availableBalance,balanceAfter = sender.availableBalance,
+                        created_at =datetime.now(),updated_at = datetime.now()),
+                        PaymentModel(
+                        wallet_id = user.wallet.id,
+                        user_id = user.id, 
+                        amount = int(payload.amount),
+                        payment_type = PaymentEnum.CREDIT,
+                        transactionreference = payload.transactionId,
+                        event = "charge.success",
+                        status = "success",
+                        channel =payload.transactionChannel if payload.transactionChannel else  ChannelEnum.NFCC,
+                        providerAmount = 0,
+                        statusCode = TransactionCodeEnum.SUCCESS,
+                        statusDescription = TransactionStatusEnum.SUCCESS,
+                        commissionAmount = 0,
+                        reference=f"{str(productType.billerId[:2]).upper()}-{util.generateId()}",
+                        product_type_id = productType.id,product_id=productType.product_id,
+                        recipient=sender.walletAccount,statusMessage = payload.description,
+                        balanceBefore = user.wallet.availableBalance,balanceAfter = user.wallet.availableBalance,
+                        created_at =datetime.now(),updated_at = datetime.now())
+                    ]
+                    db.add_all(paymentRecord)
+                    db.commit()
+                    process_gl_transactions.delay(payload.transactionId)
+                    return BaseResponse(statusCode="00",statusDescription=SUCCESS,data={"transactionId":payload.transactionId})
+                    #updatedWallet = queries.updateWallet(db=db,id=user.wallet.id,values=creditvalues)
+                    #updatedWallet = queries.updateWallet(db=db,id=sender.id,values=values)
+                    #if not updatedWallet:
+                    #    logger.info(f"{payload.senderAccount} unable to debit wallet at {datetime.now()}")
+                    #    response.status_code = status.HTTP_400_BAD_REQUEST
+                    #    return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = INSUFFICIENTFUND)
                 else:
                     response.status_code = status.HTTP_400_BAD_REQUEST
                     return PaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SAMEACCOUNT,)
@@ -491,65 +549,65 @@ async def nfcdebitService(
     except Exception as ex:
         logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return PaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex),)
-async def debitNfc(
-        payload:DebitRequest,
-        request: Request,
-    response: Response,
-    setting: Setting,
-    db: Session,
-    user: Customer,
-    sender:AccountModel,
-    recipient:AccountModel,
-    product:ProductModel,
-    background_task:BackgroundTasks
-):
-    biller = util.find_item(product.billers,"billerId","debit")
-    if biller:
-        debitReference = f"{str(biller.billerId[:2]).upper()}-{payload.transactionId}"
-        # debit customer
-        logger.info(f"started debit for customer account {sender.walletAccount} at {datetime.now()}")
-        sender.availableBalance = int(sender.availableBalance) - int(payload.amount)
-        sender.updated_at = datetime.now()
-        sender.payments.append(PaymentModel(
-            wallet_id = sender.id,user_id =sender.user_id, amount = int(payload.amount),
-            payment_type =PaymentEnum.DEBIT,reference =debitReference,
-            event = "charge.success",status = "success",channel =ChannelEnum.NFC,providerAmount = 0,
-            statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,
-            commissionAmount = 0,transactionreference=payload.transactionId,product_type_id = biller.id,product_id=biller.product_id,
-            recipient=sender.walletAccount,statusMessage = payload.description,balanceBefore = sender.availableBalance,
-            balanceAfter = sender.availableBalance,created_at =datetime.now(),updated_at = datetime.now())),
-        logger.info(f"balance after debit posted successfully is {sender.availableBalance}")
-        savedSender = adminQuery.save(db=db,account=sender)
-        if savedSender:
-            creditReference = f"CR-{payload.transactionId}"
-            background_task.add_task(notificationservice.sendNotification,notificationType="debit",setting=setting,background_task=background_task)
-            recipient.availableBalance = int(recipient.availableBalance) + int(payload.amount)
-            recipient.updated_at = datetime.now()
-            recipient.payments.append(PaymentModel(
-                wallet_id = recipient.id,user_id = recipient.user_id,amount = int(payload.amount),
-                payment_type =PaymentEnum.CREDIT,reference = creditReference,
-                transactionreference=payload.transactionId,commissionAmount = 0,fee = 0,
-                event = "charge.success",status = "success",channel = ChannelEnum.NFC,
+        return PaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
+async def debitNfc(payload:DebitRequest,request: Request,response: Response,setting: Setting,db: Session,user: Customer,sender:AccountModel,ecipient:AccountModel,productType:ProductTypeModel):
+    try:
+        if productType:
+            discount = queries.getServiceProviderByProduct(db=db,productTypeId=productType.id)
+            if discount:
+                if productType.provider:
+                    logger.info(f"{discount.admin.companyName}  is configured configured at {datetime.now()}")
+                    provider_cost = int(discount.provider_discount_rate) if discount.provider_discount_type == CommissionType.calculated else amount * (1 - discount.provider_discount_rate)
+                    netIncome = amount + provider_cost
+
+            debitReference = f"{str(biller.billerId[:2]).upper()}-{payload.transactionId}"
+            # debit customer
+            logger.info(f"started debit for customer account {sender.walletAccount} at {datetime.now()}")
+            sender.availableBalance = int(sender.availableBalance) - int(payload.amount)
+            sender.updated_at = datetime.now()
+            sender.payments.append(PaymentModel(
+                wallet_id = sender.id,user_id =sender.user_id, amount = int(payload.amount),
+                payment_type =PaymentEnum.DEBIT,reference =debitReference,
+                event = "charge.success",status = "success",channel =ChannelEnum.NFC,providerAmount = 0,
                 statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,
-                product_type_id = biller.id,product_id=biller.product_id,
-                recipient=recipient.walletAccount,statusMessage = payload.description,balanceBefore = recipient.availableBalance,
-                balanceAfter =recipient.availableBalance,created_at =datetime.now(),updated_at = datetime.now()))
-            creditProductType = util.find_item(product.billers,"billerId","credit")
-            logger.info(f"create credit record for reciever {recipient.walletAccount} with balance after {recipient.availableBalance}")
-            savedRecipient = adminQuery.create(db=db,model=recipient)
-            if savedRecipient:
-                background_task.add_task(notificationservice.sendNotification,notificationType="credit",setting=setting,background_task=background_task)
-                return BaseResponse(statusCode="00",statusDescription=SUCCESS,data={"transactionId":debitReference})
-            logger.info(f"unable to credit recipient at {datetime.now()}")
+                commissionAmount = 0,transactionreference=payload.transactionId,product_type_id = biller.id,product_id=biller.product_id,
+                recipient=sender.walletAccount,statusMessage = payload.description,balanceBefore = sender.availableBalance,
+                balanceAfter = sender.availableBalance,created_at =datetime.now(),updated_at = datetime.now())),
+            logger.info(f"balance after debit posted successfully is {sender.availableBalance}")
+            savedSender = adminQuery.save(db=db,account=sender)
+            if savedSender:
+                creditReference = f"CR-{payload.transactionId}"
+                background_task.add_task(notificationservice.sendNotification,notificationType="debit",setting=setting,background_task=background_task)
+                recipient.availableBalance = int(recipient.availableBalance) + int(payload.amount)
+                recipient.updated_at = datetime.now()
+                recipient.payments.append(PaymentModel(
+                    wallet_id = recipient.id,user_id = recipient.user_id,amount = int(payload.amount),
+                    payment_type =PaymentEnum.CREDIT,reference = creditReference,
+                    transactionreference=payload.transactionId,commissionAmount = 0,fee = 0,
+                    event = "charge.success",status = "success",channel = ChannelEnum.NFC,
+                    statusCode = TransactionCodeEnum.SUCCESS,statusDescription = TransactionStatusEnum.SUCCESS,
+                    product_type_id = biller.id,product_id=biller.product_id,
+                    recipient=recipient.walletAccount,statusMessage = payload.description,balanceBefore = recipient.availableBalance,
+                    balanceAfter =recipient.availableBalance,created_at =datetime.now(),updated_at = datetime.now()))
+                creditProductType = util.find_item(product.billers,"billerId","credit")
+                logger.info(f"create credit record for reciever {recipient.walletAccount} with balance after {recipient.availableBalance}")
+                savedRecipient = adminQuery.create(db=db,model=recipient)
+                if savedRecipient:
+                    background_task.add_task(notificationservice.sendNotification,notificationType="credit",setting=setting,background_task=background_task)
+                    return BaseResponse(statusCode="00",statusDescription=SUCCESS,data={"transactionId":debitReference})
+                logger.info(f"unable to credit recipient at {datetime.now()}")
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)
+            logger.info(f"unable to debit sender at {datetime.now()}")
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)
-        logger.info(f"unable to debit sender at {datetime.now()}")
+        logger.info(f"service not configured at {datetime.now()}")
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=PENDING)
-    logger.info(f"service not configured at {datetime.now()}")
-    response.status_code = status.HTTP_400_BAD_REQUEST
-    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SERVICEERROR)    
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SERVICEERROR)    
+    except Exception as ex:
+        logger.info(ex)
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=str(ex),)
 async def debitNfcConfirmation(
     request: Request,
     response: Response,
@@ -626,27 +684,101 @@ async def payBills(
         user: CustomerModel,
         background_task:BackgroundTasks
 ):
-    logger.info(f"started bill payment for biller {payload.billerId} for amount {payload.billerType}")
-    biller = paymentQuery.get_single_biller_by_billerId(db=db,billerId=payload.billerId, billerType=payload.billerType)
-    if payload.customerNumber:
-        if biller:
-            if biller.hasPackages:
-                package = next((x for x in biller.packages if x.packageCode == payload.packageId), None)
-                if package:
-                    # debit the customer
-                    return await debitBillPayment(biller=biller,package=package,payload=payload,request=request,response=response,setting=setting,db=db,user=user,background_task=background_task)
-                else:
-                    logger.info(f"Invalid package code selected {payload.packageId}")
-                    response.status_code = status.HTTP_400_BAD_REQUEST
-                    return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDBILLER)
-            else:
-                return await debitBillPayment(biller=biller,payload=payload,request=request,response=response,setting=setting,db=db,user=user,background_task=background_task)
-        logger.info(f"Invalid biller selected {payload.billerId}")    
+    try:
+        walletAccount = paymentQuery.querySender(db=db,walletAccount=payload.walletAccount)
+        if not walletAccount:
+            logger.info(f"{payload.walletAccount} Account not found at {datetime.now()}")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
+        logger.info(f"started bill payment for biller {payload.billerId} for amount {payload.billerType}")
+        productType = paymentQuery.get_single_biller_by_billerId(db=db,billerId=payload.billerId, billerType=payload.billerType)
+        if not productType:
+            logger.info(f"Product Type not configured at {datetime.now()}")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
+        provider = queries.getAdminById(db=db,adminId=productType.provider_id)
+        if not provider:
+            logger.info(f"{payload.senderAccount} Provider not configured at {datetime.now()}")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
+        if productType.hasPackages:
+            package = next((x for x in biller.packages if x.packageCode == payload.packageId), None)
+            if not package:
+                logger.info(f"Invalid package code selected {payload.packageId}")
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Package cannot be empty")
+            if package.amount and package.amount != payload.amount:
+                logger.info(f"Invalid package code selected {payload.packageId}")
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Amount cannot be empty")
+        serviceDiscount = queries.getServiceProviderByProduct(db=db,productTypeId=productType.id)
+        if not serviceDiscount:
+            logger.info(f"{payload.customerNumber} Service charge not configured at {datetime.now()}")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
+        logger.info(f"{payload.customerNumber}  {serviceDiscount.admin.companyName}  is configured configured at {datetime.now()}")
+        provider_cost = (int(payload.amount) - int(serviceDiscount.provider_discount_rate)) if serviceDiscount.provider_discount_type == CommissionType.calculated else int(payload.amount) * (1- serviceDiscount.provider_discount_rate/100)
+        commssionAmount = int(payload.amount) - provider_cost
+        if float(walletAccount.availableBalance) < float(payload.amount):
+            logger.info(f"{payload.customerNumber} Insufficient fund to send fund at {datetime.now()}")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = INSUFFICIENTFUND)
+        trnxId = util.generateId()
+        debitvalues ={"availableBalance":int(walletAccount.availableBalance) - int(payload.amount),"updated_at":datetime.now()}
+        db.execute(update(AccountModel).where(AccountModel.id == walletAccount.id).values(**debitvalues).execution_options(synchronize_session="fetch"))
+        creditvalues ={"availableBalance":int(provider.wallet.availableBalance) + int(provider_cost),"updated_at":datetime.now()}
+        db.execute(update(AccountModel).where(AccountModel.id == provider.wallet.id).values(**creditvalues).execution_options(synchronize_session="fetch"))
+        paymentRecord = [PaymentModel(
+                        wallet_id = walletAccount.id,
+                        user_id = walletAccount.user_id, 
+                        amount = int(payload.amount),
+                        payment_type = PaymentEnum.DEBIT,
+                        reference =trnxId,
+                        event = "charge.success",
+                        status = "success",
+                        channel = ChannelEnum.MOBILE,
+                        providerAmount = provider_cost,
+                        statusCode = TransactionCodeEnum.PROCESSING,
+                        statusDescription = TransactionStatusEnum.PROCESSING,
+                        statusMessage =f"{productType.billerType} Purchase",
+                        commissionAmount = commssionAmount,
+                        transactionreference=trnxId,
+                        product_type_id = productType.id,product_id=productType.product_id,
+                        packageId= package.packageCode if productType.hasPackages and package else None,
+                        provider_code = provider.billerId,
+                        recipient=payload.customerNumber,
+                        balanceBefore = walletAccount.availableBalance,balanceAfter = walletAccount.availableBalance,
+                        created_at =datetime.now(),updated_at = datetime.now()),
+                        PaymentModel(
+                        wallet_id = provider.wallet.id,
+                        admin_id = provider.id, 
+                        amount = provider_cost,
+                        payment_type = PaymentEnum.CREDIT,
+                        reference =util.generateId(),
+                        event = "charge.success",
+                        status = "success",
+                        channel = ChannelEnum.MOBILE,
+                        providerAmount = provider_cost,
+                        statusCode = TransactionCodeEnum.PROCESSING,
+                        statusDescription = TransactionStatusEnum.PROCESSING,
+                        statusMessage =f"{productType.billerType} Purchase",
+                        commissionAmount = commssionAmount,
+                        transactionreference=trnxId,
+                        product_type_id = productType.id,product_id=productType.product_id,
+                        packageId=package.packageCode if productType.hasPackages and package else None,
+                        provider_code = provider.billerId,
+                        recipient=payload.customerNumber,
+                        balanceBefore = provider.wallet.availableBalance,balanceAfter = provider.wallet.availableBalance,
+                        created_at =datetime.now(),updated_at = datetime.now())
+                          ]
+        db.add_all(paymentRecord)
+        db.commit()
+        process_bills_payment.delay(trnxId)
+        return BaseResponse(statusCode="00",statusDescription=SUCCESS,data={"transactionId":trnxId})
+    except Exception as ex:
+        logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDBILLER)
-    else:
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return BillPaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INCOMPLETE)
+        return PaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 async def debitBillPayment(
         biller:ProductTypeModel,
         payload:BillPaymentRequest,
@@ -753,41 +885,103 @@ async def walletTransfer(
         user: CustomerModel,
         background_task:BackgroundTasks
 ):
-    if payload.senderAccount != payload.receiverAccount:
+    try:
+        if payload.senderAccount == payload.receiverAccount:
+            logger.info(f"{payload.senderAccount} sender and recipient account {payload.receiverAccount} cannot be same at {datetime.now()}")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SAMEACCOUNT)
+        if user.wallet.walletAccount != payload.senderAccount:
+            logger.info(f"{payload.senderAccount} sender and recipient account {payload.receiverAccount} cannot be same at {datetime.now()}")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription ="Suspected fraudulent transaction")
         recipient = queries.queryWallet(db=db,walletAccount=payload.receiverAccount)
-        if recipient:
-            sender = queries.queryWallet(db=db,walletAccount=payload.senderAccount)
-            if sender:
-                bill = queries.getBillByVas(db=db,vasType="payment")
-                if bill:
-                    if int(sender.availableBalance) >= int(payload.amount):
-                        lastPayment = queries.getLastpaymentByAccount(db=db,accountId=sender.id)
-                        if lastPayment:
-                            logger.info(f"last transaction from sender {payload.senderAccount} is {lastPayment.created_at}")
-                            timeDifference  = (datetime.now() - lastPayment.updated_at).total_seconds()
-                            if timeDifference > 5:
-                                return await debitWallet(payload=payload,request=request,response=response,setting=setting,db=db,user=user,sender=sender,recipient=recipient,product=bill,background_task=background_task)
-                            else:
-                                response.status_code = status.HTTP_400_BAD_REQUEST
-                                return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = DUPLICATE)
-                        else:
-                            logger.info(f"last payment not found for {sender.walletAccount}")
-                            return await debitWallet(payload=payload,request=request,response=response,setting=setting,db=db,user=user,sender=sender,recipient=recipient,product=bill,background_task=background_task)
-                    else:
-                        response.status_code = status.HTTP_400_BAD_REQUEST
-                        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = INSUFFICIENTFUND)
-                else:
-                    response.status_code = status.HTTP_400_BAD_REQUEST
-                    return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
-            else:
-                response.status_code = status.HTTP_400_BAD_REQUEST
-                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNT)
-        else:
+        if not recipient:
+            logger.info(f"{payload.receiverAccount} wallet not found")
             response.status_code = status.HTTP_400_BAD_REQUEST
             return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INVALIDACCOUNTREP)
-    else:
+        logger.info(f"{payload.senderAccount} started payment for biller {payload.billerId} for amount {payload.billerType} at {datetime.now()}")
+        productType = paymentQuery.get_single_biller_by_billerId(db=db,billerId=payload.billerId, billerType=payload.billerType)
+        if not productType:
+            logger.info(f"Product Type not configured at {datetime.now()}")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
+        if not productType.provider:
+            logger.info(f"{payload.senderAccount} Provider not configured at {datetime.now()}")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
+        serviceCharge = queries.getServiceProviderByProduct(db=db,productTypeId=productType.id)
+        if not serviceCharge:
+            logger.info(f"{payload.senderAccount} Service charge not configured at {datetime.now()}")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
+        logger.info(f"{payload.senderAccount}  {serviceCharge.admin.companyName}  is configured configured at {datetime.now()}")
+        provider_cost = int(serviceCharge.provider_discount_rate) if serviceCharge.provider_discount_type == CommissionType.calculated else int(payload.amount) * (serviceCharge.provider_discount_rate/100)
+        amountToDebit = int(payload.amount) + provider_cost
+        if float(user.wallet.availableBalance) < float(amountToDebit):
+            logger.info(f"{payload.senderAccount} Insufficient fund to send fund at {datetime.now()}")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return PaymentResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = INSUFFICIENTFUND)
+        transactionReference = f"W2W-{util.generateId()}"
+        creditvalues ={"availableBalance":int(recipient.availableBalance) + int(payload.amount),"updated_at":datetime.now()}
+        debitvalues={"availableBalance":int(user.wallet.availableBalance) - int(amountToDebit),"updated_at":datetime.now()}
+        db.execute(update(AccountModel).where(AccountModel.id == recipient.id).values(**creditvalues).execution_options(synchronize_session="fetch"))
+        db.execute(update(AccountModel).where(AccountModel.id == user.wallet.id).values(**debitvalues).execution_options(synchronize_session="fetch"))
+        paymentRecord = [
+            PaymentModel(
+            wallet_id = user.wallet.id,
+            user_id = user.id, 
+            amount = int(amountToDebit),
+            payment_type = PaymentEnum.DEBIT,
+            reference =transactionReference,
+            event = "charge.success",
+            status = "success",
+            channel = ChannelEnum.WALLET,
+            providerAmount = provider_cost,
+            statusCode = TransactionCodeEnum.SUCCESS,
+            statusDescription = TransactionStatusEnum.SUCCESS,
+            commissionAmount = 0,
+            transactionreference=transactionReference,
+            product_type_id = productType.id,
+            product_id=productType.product_id,
+            provider_code = serviceCharge.admin.billerId,
+            recipient=user.wallet.walletAccount, 
+            statusMessage = payload.description,
+            balanceBefore = user.wallet.availableBalance,
+            balanceAfter = user.wallet.availableBalance,
+            created_at =datetime.now(),
+            updated_at = datetime.now()),
+            PaymentModel(
+            wallet_id = recipient.id,
+            user_id = recipient.user_id, 
+            amount = int(payload.amount),
+            payment_type = PaymentEnum.CREDIT,
+            transactionreference = transactionReference,
+            event = "charge.success",
+            status = "success",
+            channel = ChannelEnum.WALLET,
+            providerAmount = provider_cost,
+            statusCode = TransactionCodeEnum.SUCCESS,
+            statusDescription = TransactionStatusEnum.SUCCESS,
+            commissionAmount = 0,
+            reference= util.generateId(),
+            product_type_id = productType.id,
+            product_id=productType.product_id,
+            provider_code = serviceCharge.admin.billerId,
+            recipient=recipient.walletAccount,
+            statusMessage = payload.description,
+            balanceBefore = recipient.availableBalance,
+            balanceAfter = recipient.availableBalance,
+            created_at =datetime.now(),
+            updated_at = datetime.now())
+        ]
+        db.add_all(paymentRecord)
+        db.commit()
+        process_gl_transactions.delay(transactionReference)
+        return BaseResponse(statusCode="00",statusDescription=SUCCESS,data={"transactionId":transactionReference})
+    except Exception as ex:
+        logger.info(ex)
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SAMEACCOUNT,)
+        return PaymentResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=SYSTEMBUSY,)
 async def debitWallet(
         payload:WalletDebitRequest,
         request: Request,
@@ -1152,109 +1346,90 @@ async def addCashout(
             logger.info(f"Started adding cashout request of {payload.amount} for {user.firstname} {user.lastname} for {user.email}")
             if user.account_type == AccountEnum.MERCHANT:
                 if user.cashout_enabled and user.cashout_code and user.cashout_account and user.cashout_bank:
-                    cashoutPd = queries.getProductTypeBYname(db=db,name="cashout")
-                    if cashoutPd:
-                        if int(user.wallet.availableBalance) >= int(payload.amount):
-                            logger.info(f"balance is sufficient {user.wallet.availableBalance}  @ {datetime.now()}")
-                            dailyCashout = 0
-                            dailyLimit = queries.getDailyCashoutTransactionsByUser(db=db,productId=cashoutPd.id,userId=user.id)
-                            if dailyLimit:
-                                dailyCashout = dailyLimit
-                            trnxId = f"CASH-{util.generateId()}"
-                            logger.info(f"cash out is below user limit {user.cashout_limit}  @ {datetime.now()}")
-                            logger.info(f"cash out is below user limit {dailyCashout}  @ {datetime.now()}")
-                            newBalance = int(user.wallet.availableBalance) - int(payload.amount)
-                            user.wallet.availableBalance = newBalance
-                            user.wallet.payments.append(PaymentModel(
-                                    wallet_id = user.wallet.id,
-                                    user_id =user.id,
-                                    amount = payload.amount,
-                                    payment_type =PaymentEnum.DEBIT,
-                                    reference = trnxId,
-                                    event = "charge.processing",
-                                    status = "started",
-                                    channel = ChannelEnum.WEB,
+                    if int(user.cashout_limit) < int(payload.amount):
+                        logger.info(f"Cashout limit exceeded  at {datetime.now()}")
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription ="Cashout limit exceeded")
+                    logger.info(f"{user.wallet.walletAccount} started payment for biller {payload.billerId} for amount {payload.billerType} at {datetime.now()}")
+                    productType = paymentQuery.get_single_biller_by_billerId(db=db,billerId=payload.billerId, billerType=payload.billerType)
+                    if not productType:
+                        logger.info(f"Product Type not configured at {datetime.now()}")
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
+                    if not productType.provider:
+                        logger.info(f"{user.wallet.walletAccount} Provider not configured at {datetime.now()}")
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
+                    serviceCharge = queries.getServiceProviderByProduct(db=db,productTypeId=productType.id)
+                    if not serviceCharge:
+                        logger.info(f"{user.wallet.walletAccount} Service charge not configured at {datetime.now()}")
+                        response.status_code = status.HTTP_400_BAD_REQUEST
+                        return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription = SERVICEERROR)
+                    logger.info(f"{user.wallet.walletAccount}  {serviceCharge.admin.companyName}  is configured configured at {datetime.now()}")
+                    provider_cost = int(serviceCharge.provider_discount_rate) if serviceCharge.provider_discount_type == CommissionType.calculated else int(payload.amount) * (serviceCharge.provider_discount_rate/100)
+                    amountToDebit = int(payload.amount) + provider_cost
+                    if int(user.wallet.availableBalance) >= int(payload.amount):
+                        logger.info(f"balance is sufficient {user.wallet.availableBalance}  @ {datetime.now()}")
+                        dailyCashout = int(payload.amount)
+                        cashOutDailyLimit = queries.getDailyCashoutTransactionsByUser(db=db,productId=productType.id,userId=user.id)
+                        logger.info(cashOutDailyLimit)
+                        if cashOutDailyLimit:
+                                dailyCashout = int(cashOutDailyLimit) + dailyCashout
+                        if dailyCashout > int(user.cashout_limit):
+                            logger.info(f"Cashout limit exceeded  at {datetime.now()}")
+                            response.status_code = status.HTTP_400_BAD_REQUEST
+                            return BaseResponse(statusCode =str(status.HTTP_400_BAD_REQUEST),statusDescription ="Cummulative cashout limit exceeded") 
+                        trnxId = f"CSH-{util.generateId()}"
+                        logger.info(f"cash out is below user limit {user.cashout_limit}  @ {datetime.now()}")
+                        logger.info(f"cash out is below user limit {dailyCashout}  @ {datetime.now()}")
+                        newBalance = int(user.wallet.availableBalance) - int(payload.amount)
+                        debitvalues={"availableBalance":newBalance,"updated_at":datetime.now()}
+                        db.execute(update(AccountModel).where(AccountModel.id == user.wallet.id).values(**debitvalues).execution_options(synchronize_session="fetch"))
+                        paymentRecord = [
+                            PaymentModel(
+                                wallet_id = user.wallet.id,
+                                user_id =user.id,
+                                amount = payload.amount,
+                                payment_type =PaymentEnum.DEBIT,
+                                reference = trnxId,
+                                event = "charge.processing",
+                                status = "started",
+                                channel = ChannelEnum.WEB,
+                                transactionreference = trnxId,
+                                providerAmount = provider_cost,
+                                statusCode = TransactionCodeEnum.PROCESSING,
+                                statusDescription = TransactionStatusEnum.PROCESSING,
+                                recipient=user.cashout_account,
+                                statusMessage = f"Cashout to {user.cashout_account} {user.cashout_bank}",
+                                balanceBefore = user.wallet.availableBalance,
+                                balanceAfter = newBalance,
+                                product_id=productType.product_id,
+                                product_type_id=productType.id,  # Assuming product_id is 1 for cashout
+                                cashout = CashOutModel(
+                                    user_id = user.id,
+                                    source= 'balance',
+                                    amount= payload.amount,
+                                    recipient= user.cashout_code,
+                                    withdrawalStatus = WithrawalStatusEnum.WAITING,
                                     statusCode = TransactionCodeEnum.PROCESSING,
                                     statusDescription = TransactionStatusEnum.PROCESSING,
-                                    recipient=user.cashout_account,
-                                    statusMessage = f"Cashout to {user.cashout_account} {user.cashout_bank}",
-                                    balanceBefore = user.wallet.availableBalance,
-                                    balanceAfter = newBalance,
-                                    product_id=cashoutPd.product_id,
-                                    product_type_id=cashoutPd.id,  # Assuming product_id is 1 for cashout
-                                    cashout = CashOutModel(
-                                        user_id = user.id,
-                                        source= 'balance',
-                                        amount= payload.amount,
-                                        recipient= user.cashout_code,
-                                        withdrawalStatus = WithrawalStatusEnum.WAITING,
-                                        statusCode = TransactionCodeEnum.PROCESSING,
-                                        statusDescription = TransactionStatusEnum.PROCESSING,
-                                        reference = trnxId,
-                                        reason = payload.desc,
-                                        created_at = datetime.now(),
-                                        updated_at =  datetime.now()
-                                    ),
-                                    created_at =datetime.now(),
-                                    updated_at = datetime.now()
-                                )
+                                    reference = trnxId,
+                                    reason = payload.desc,
+                                    created_at = datetime.now(),
+                                    updated_at =  datetime.now()
+                                ),
+                                created_at =datetime.now(),
+                                updated_at = datetime.now()
                             )
-                            updatedUser = paymentQuery.create(db=db,model=user)
-                            if updatedUser:
-                                payment = paymentQuery.getPaymentByReference(db=db,reference=trnxId)
-                                if payment:
-                                    if int(user.cashout_limit) >= int(dailyCashout):
-                                        logger.info(f"Start processing cashout records ............... @ {datetime.now()}")
-                                        headers =  {'Authorization': f'Bearer {setting.paystack_token}','content-type': 'application/json'}
-                                        params ={"source": payment.cashout.source,"amount": payment.cashout.amount,"reference":payment.reference,"recipient": payment.cashout.recipient,"reason": payment.cashout.reason }
-                                        result = util.http(f"{setting.paystack_url}transfer",params=params,headers=headers)
-                                        paystackResponse = result.json()
-                                        if result.status_code == 200:
-                                            if paystackResponse and paystackResponse["status"] is True:
-                                                recipientData = paystackResponse.get("data", {})
-                                                payment.statusCode = TransactionCodeEnum.SUCCESS
-                                                payment.statusDescription = TransactionStatusEnum.SUCCESS
-                                                payment.status = "success"
-                                                payment.event = "charge.success"
-                                                payment.cashout.withdrawalStatus = WithrawalStatusEnum.COMPLETED,
-                                                payment.cashout.statusCode = TransactionCodeEnum.SUCCESS,
-                                                payment.cashout.statusDescription = TransactionStatusEnum.SUCCESS,
-                                        else:
-                                            payment.statusCode = TransactionCodeEnum.FAILED
-                                            payment.statusDescription = TransactionStatusEnum.FAILED
-                                            payment.status = "failed"
-                                            payment.event = "charge.failed"
-                                            payment.cashout.withdrawalStatus = WithrawalStatusEnum.FAILED,
-                                            payment.cashout.statusCode = TransactionCodeEnum.FAILED,
-                                            payment.cashout.statusDescription = TransactionStatusEnum.FAILED,
-                                    else:
-                                        logger.info(f"cashout daily limit exceeded at {datetime.now()}")
-                                        payment.statusCode = TransactionCodeEnum.PROCESSING
-                                        payment.statusDescription = TransactionStatusEnum.PROCESSING
-                                        #payment.cashout.statusCode = TransactionCodeEnum.PROCESSING,
-                                        #payment.cashout.statusDescription = TransactionStatusEnum.PROCESSING,
-                                        #payment.cashout.withdrawalStatus = WithrawalStatusEnum.WAITING,
-                                    saved = paymentQuery.create(db=db,model=payment)
-                                    background_task.add_task(notifyUser,db=db,title=f"Cashout Notification", message=payment.statusDescription,userId=user.id, setting=setting)
-                                        #email_debit = util.templates.TemplateResponse("debit.html",{"request": request, "user": user,"payment":createCashoutRecord},)
-                                        #background_task.add_task(util.mailer,str(email_debit.body, "utf-8"),setting=setting,subject="Cashout Notification",toAddress=user.email)
-                                    return BaseResponse(statusCode=str(status.HTTP_200_OK),statusDescription=SUCCESS,data={"transactionId":payment.reference})
-                                else:
-                                    logger.info(f"Cashout not enabled for {user.firstname} {user.lastname} for {user.email} @ {datetime.now()}")
-                                    response.status_code = status.HTTP_400_BAD_REQUEST 
-                                    return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Payment not found Error")
-                            else:
-                                logger.info(f"Unable to process cashout for {user.firstname} {user.lastname} for {user.email} @ {datetime.now()}")
-                                response.status_code = status.HTTP_400_BAD_REQUEST 
-                                return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Unable to process cashout")
-                        else:
-                            logger.info(f"Insufficient balance for {user.email} to cashout @ {datetime.now()}")
-                            response.status_code = status.HTTP_400_BAD_REQUEST
-                            return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INSUFFICIENTFUND)
+                        ]
+                        db.add_all(paymentRecord)
+                        db.commit()
+                        process_cashout_payment.delay(transactionReference=trnxId)
+                        return BaseResponse(statusCode="00",statusDescription=SUCCESS,data={"transactionId":trnxId})
                     else:
-                        logger.info(f"cash service is not configured @ {datetime.now()}")
+                        logger.info(f"Insufficient balance for {user.email} to cashout @ {datetime.now()}")
                         response.status_code = status.HTTP_400_BAD_REQUEST
-                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription="Cashout Error")
+                        return BaseResponse(statusCode=str(status.HTTP_400_BAD_REQUEST),statusDescription=INSUFFICIENTFUND)
                 else:
                     logger.info(f"Cashout not enabled for {user.firstname} {user.lastname} for {user.email} @ {datetime.now()}")
                     response.status_code = status.HTTP_400_BAD_REQUEST

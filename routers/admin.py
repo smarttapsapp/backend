@@ -36,6 +36,7 @@ from schemas.schedule import *
 from schemas.commission import *
 from schemas.service_rate import *
 from schemas.general_ledger import *
+from schemas.general_ledger_transaction import *
 from schemas.journal import *
 from schemas.product import *
 from schemas.bus_type import *

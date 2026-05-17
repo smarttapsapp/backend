@@ -128,7 +128,6 @@ async def validateTransactionPIN(
         return user
     except JWTError:
         raise util.UnicornException(status=status.HTTP_401_UNAUTHORIZED,error={"statusCode": "401", "statusDescription": "Your session has expired!"},)
-    
 async def validateCustomer(
     request: Request,
     token: str = Depends(util.oauth2_scheme),

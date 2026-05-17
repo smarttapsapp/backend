@@ -456,6 +456,9 @@ def postingRules(db:Session):
     return db.query(GLPostingRule).order_by(desc(GLPostingRule.created_at)).all()
 def postingRule(db: Session,id:int):
     return db.query(GLPostingRule).filter(GLPostingRule.id == id).first()
+# gl transactions
+def getGlTransactions(db: Session):
+    return db.query(GLTransaction).order_by(desc(GLTransaction.created_at)).all()
 # gl accounting
 def getGlAccounts(db: Session):
     return db.query(GLAccountModel).order_by(desc(GLAccountModel.created_at)).all()

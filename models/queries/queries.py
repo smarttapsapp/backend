@@ -479,7 +479,7 @@ def getProductTypeBYname(db: Session,name:str):
     return db.query(ProductTypeModel).filter(ProductTypeModel.billerType == name).first()
 def getDailyCashoutTransactionsByUser(db: Session,productId:int,userId:int):
     logger.info(f"Started getting daily cashout total for user {userId} @ {str(datetime.now())}")
-    return db.query(func.sum(CashOutModel.amount)).filter(CashOutModel.user_id == userId).scalar()
+    return db.query(func.sum(CashOutModel.amount)).filter(CashOutModel.user_id == userId,CashOutModel.withdrawalStatus == WithrawalStatusEnum.COMPLETED).scalar()
 def getBillerByBillerId(db: Session, billerId: str):
     return db.query(ProductTypeModel).filter(ProductTypeModel.billerId == billerId).first()
 def trainById(db: Session,trainId:int):
@@ -515,3 +515,25 @@ def getCashoutsLastTenDays(db: Session,adminId:str=None):
     if adminId:
         return db.query(CashOutModel).filter(CashOutModel.admin_id == adminId).filter(CashOutModel.created_at >= cutoff_date).order_by(desc(CashOutModel.created_at)).all()
     return db.query(CashOutModel).filter(CashOutModel.created_at >= cutoff_date).order_by(desc(CashOutModel.created_at)).all()    
+def getServiceProviderByProduct(db: Session,productTypeId:int):
+    return db.query(ServiceRateModel).filter(ServiceRateModel.active==True).filter(ServiceRateModel.product_type_id==productTypeId).first()
+def updateWallet(db: Session, id: int, values: dict):
+    updated =db.execute(update(AccountModel).where(AccountModel.id == id).values(**values).execution_options(synchronize_session="fetch"))
+    db.commit()
+    return updated.rowcount > 0
+def updateUser(db: Session, id: int, values: dict):
+    updated =db.execute(update(CustomerModel).where(CustomerModel.id == id).values(**values).execution_options(synchronize_session="fetch"))
+    db.commit()
+    return updated.rowcount > 0
+def updatePayment(db: Session, id: int, values: dict):
+    updated =db.execute(update(PaymentModel).where(PaymentModel.id == id).values(**values).execution_options(synchronize_session="fetch"))
+    db.commit()
+    return updated.rowcount > 0
+def updateCashOut(db: Session, id: int, values: dict):
+    updated =db.execute(update(CashOutModel).where(CashOutModel.id == id).values(**values).execution_options(synchronize_session="fetch"))
+    db.commit()
+    return updated.rowcount > 0
+def updateOTP(db: Session, id: int, values: dict):
+    updated =db.execute(update(OTPModel).where(OTPModel.id == id).values(**values).execution_options(synchronize_session="fetch"))
+    db.commit()
+    return updated.rowcount > 0
